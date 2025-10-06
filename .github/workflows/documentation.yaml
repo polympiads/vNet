@@ -1,0 +1,53 @@
+name: documentation
+
+on: [push, workflow_dispatch]
+
+permissions:
+  contents: write
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+      - name: Install dependencies
+        run: |
+          sudo apt-get install python3-sphinx
+      - name: Sphinx build
+        run: |
+          branches=`python3 doc/listbranches.py`
+          echo Found branches $branches
+
+          mkdir _pages_build
+          for branch in $branches; do
+            if [[ "$branch" != "gh-pages" ]]; then
+              git checkout $branch
+
+              branch_target="_pages_build/$branch"
+              if [[ "$branch" == "release" ]]; then
+                branch_target="_pages_build"
+              else
+                mkdir $branch_target
+              fi
+
+              if [ -d "doc" ]; then
+                echo "Found documentation for branch $branch, target=$branch_target"
+
+                sphinx-build doc $branch_target > /dev/null
+              fi
+            fi
+          done
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: ${{ github.event_name == 'push' }}
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: _pages_build/
+          force_orphan: true

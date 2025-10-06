@@ -1,0 +1,7 @@
+<h3>Versions</h3>
+<ul>
+    {{ html_sidebars }}
+    {%- for branch in all_branches %}
+    <li><p style="margin: 0;"><a href="{{ branch.path }}">{{ branch.name }}</a> {% if branch.name == git_branch %}(Current){% endif %}</p></li>
+    {%- endfor %}
+</ul>
