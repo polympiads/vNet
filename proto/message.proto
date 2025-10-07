@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package sample.message;
+
+message Message {
+    repeated int32 id = 1;
+}
