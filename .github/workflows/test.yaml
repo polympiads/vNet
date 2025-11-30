@@ -1,0 +1,37 @@
+on:
+  push:
+    branches:
+      - "**"
+jobs:
+  ubuntu-test:
+    name: test on all operating systems
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13' 
+      - name: install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ cmake valgrind libprotobuf-dev protobuf-compiler
+      - name: compile
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON
+          cmake --build .
+      - name: run tests
+        run: |
+          cd build
+          cmake --build . --target coverage
+      - name: run memory tests
+        run: |
+          cd build
+          cmake --build . --target memcheck
