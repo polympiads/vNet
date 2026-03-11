@@ -1,0 +1,24 @@
+FROM ubuntu:24.04 AS builder
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    protobuf-compiler \
+    libprotobuf-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . /app
+
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build --target switch -- -j$(nproc)
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libprotobuf32t64 bash \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/build/switch /usr/local/bin/switch
+
+CMD ["/usr/local/bin/switch"]

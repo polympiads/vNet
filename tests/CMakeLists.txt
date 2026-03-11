@@ -1,4 +1,4 @@
-
+# CMakeLists.txt for tests directory
 include(CTest)
 set(CTEST_TIMEOUT 30)
 

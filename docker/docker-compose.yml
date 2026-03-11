@@ -1,0 +1,122 @@
+services:
+  conductor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.conductor
+    container_name: vnet-conductor
+    networks: [vnet]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/5000' || exit 1"]
+      interval: 3s
+      retries: 10
+      start_period: 5s
+    command: ["/usr/local/bin/conductor"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  switch1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.switch
+    container_name: vnet-switch1
+    networks: [vnet]
+    depends_on:
+      conductor:
+        condition: service_healthy
+    environment:
+      - CONDUCTOR_IP=vnet-conductor
+      - CONDUCTOR_PORT=5000
+    command: ["/usr/local/bin/switch", "switch1", "authkey1", "6000"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/6000' || exit 1"]
+      interval: 3s
+      retries: 10
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  switch2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.switch
+    container_name: vnet-switch2
+    networks: [vnet]
+    depends_on:
+      conductor:
+        condition: service_healthy
+    environment:
+      - CONDUCTOR_IP=vnet-conductor
+      - CONDUCTOR_PORT=5000
+    command: ["/usr/local/bin/switch", "switch2", "authkey2", "6001"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/6001' || exit 1"]
+      interval: 3s
+      retries: 10
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  switch3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.switch
+    container_name: vnet-switch3
+    networks: [vnet]
+    depends_on:
+      conductor:
+        condition: service_healthy
+    environment:
+      - CONDUCTOR_IP=vnet-conductor
+      - CONDUCTOR_PORT=5000
+    command: ["/usr/local/bin/switch", "switch3", "authkey3", "6002"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/6002' || exit 1"]
+      interval: 3s
+      retries: 10
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: vnet-agent
+    networks: [vnet]
+    depends_on:
+      switch1:
+        condition: service_healthy
+      switch2:
+        condition: service_healthy
+      switch3:
+        condition: service_healthy
+    environment:
+      - CONDUCTOR_IP=vnet-conductor
+      - CONDUCTOR_PORT=5000
+    command: ["/usr/local/bin/agent", "agent1", "agentkey1"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+networks:
+  vnet:
+    driver: bridge

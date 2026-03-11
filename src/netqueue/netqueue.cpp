@@ -120,7 +120,7 @@ void NetQueue::wait_and_process () {
             data.ptr_data = current_element->ptr;
             data.reason = reason;
 
-            handler.onClose(data);
+            handler.onClose(handler.ptr_data, data);
 
             elements_closed.insert(current_element);
 
@@ -190,7 +190,7 @@ void NetQueue::process (NetworkElement* element) {
                 sck_data.payload_size  = header->get_payload_size();
                 sck_data.packet_buffer = element->net_buffer + sizeof(protocol::PacketHeader);
 
-                handler.onSocketReady(sck_data);
+                handler.onSocketReady(handler.ptr_data, sck_data);
 
                 element->net_buffer_used = 0;
                 element->state = SCK_HEADER;
@@ -228,7 +228,7 @@ void NetQueue::process (NetworkElement* element) {
                 data.ip_buffer = element->net_buffer;
                 data.ip_buffer_size = element->net_buffer_used;
                 
-                handler.onTunReady(data);
+                handler.onTunReady(handler.ptr_data, data);
                 
                 element->state = TUN_RECEIVE;
 
