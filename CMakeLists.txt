@@ -8,25 +8,22 @@ find_program(VALGRIND_EXECUTABLE NAMES valgrind)
 
 if (ENABLE_COVERAGE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage -O0")
-
     set(MEMORYCHECK_COMMAND "${VALGRIND_EXECUTABLE}")
     set(MEMORYCHECK_COMMAND_OPTIONS "--tool=memcheck --leak-check=full --track-fds=yes --error-exitcode=1")
 
     add_custom_target(
         memcheck
-
         COMMAND ctest -T memcheck
         COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/lookup_wrong_fds.py ${CMAKE_CURRENT_BINARY_DIR}/Testing/Temporary
     )
+
     add_custom_target(
         coverage
-
         COMMAND lcov --directory . --zerocounters --rc branch_coverage=1
         COMMAND ctest
-        
-        COMMAND lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch --rc branch_coverage=1
-        COMMAND lcov --remove coverage.info '/usr/*' '*test*' --output-file coverage_filtered.info --rc branch_coverage=1
 
+        COMMAND lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch --rc branch_coverage=1
+        COMMAND lcov --remove coverage.info '/usr/*' '*test*' --output-file coverage_filtered.info --rc branch_coverage=1 --ignore-errors unused
         COMMAND genhtml coverage_filtered.info --output-directory html_report --rc branch_coverage=1
     )
 endif()
@@ -43,28 +40,37 @@ include_directories(${ProtobufIncludePath})
 #############################################################
 
 SET(VNET_SOURCE_FILES
+        src/common/socket_utils.cpp
         src/protocol/header.cpp
         src/protocol/types.cpp
-        
+        src/protocol/dispatch.cpp
+
         src/netqueue/element.cpp
         src/netqueue/netqueue.cpp
         src/netqueue/handler.cpp)
 
 add_library(vnet STATIC ${VNET_SOURCE_FILES})
+target_link_libraries(vnet PUBLIC vnet_proto)
 target_link_libraries(vnet PRIVATE gcov)
 target_include_directories(vnet PUBLIC include)
+
+#############################################################
+######################## EXECUTABLES ########################
+#############################################################
+
+add_subdirectory(src/conductor)
+add_subdirectory(src/switch)
+add_subdirectory(src/agent)
 
 #############################################################
 ######################## GOOGLE TEST ########################
 #############################################################
 
 include(FetchContent)
-
 FetchContent_Declare(
     googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
 )
 FetchContent_MakeAvailable(googletest)
-
 enable_testing()
 add_subdirectory(tests)

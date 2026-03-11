@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package vnet.protocol.mip;
+
+message PacketSwitchMIP {
+    string name     = 1;
+    string auth_key = 2;
+    string network  = 3;
+    
+    port = 4;
+}
+message PacketAgentMIP {
+    string name     = 1;
+    string auth_key = 2;
+    string network  = 3;
+}
+
+
+message PacketConnectToSwitch {
+    string  switch_name = 1;
+    fixed32 switch_ipv4 = 2;
+
+    fixed64 connection_token = 3;
+}
+message PacketAgentConnectionToken {
+    string agent_name = 1;
+
+    fixed64 connection_token = 2;
+}
+message PacketAuthConnectToSwitch {
+    fixed64 connection_token = 2;
+}
+message PacketConnectionAccepted {}

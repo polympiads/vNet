@@ -1,10 +1,14 @@
+# CMakeLists.txt for proto directory
+
 find_package(Protobuf REQUIRED)
 
-protobuf_generate_cpp(
-    PROTO_SRC
-    PROTO_HEADER
-    message.proto
+protobuf_generate_cpp(PROTO_SRC PROTO_HDR mip.proto)
+
+add_library(vnet_proto STATIC ${PROTO_SRC} ${PROTO_HDR})
+
+target_include_directories(vnet_proto PUBLIC
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${Protobuf_INCLUDE_DIRS}
 )
 
-add_library(vnet_proto ${PROTO_HEADER} ${PROTO_SRC})
-target_link_libraries(vnet_proto PRIVATE ${PROTOBUF_LIBRARIES})
+target_link_libraries(vnet_proto PUBLIC protobuf::libprotobuf)
