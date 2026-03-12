@@ -47,7 +47,13 @@ SET(VNET_SOURCE_FILES
 
         src/netqueue/element.cpp
         src/netqueue/netqueue.cpp
-        src/netqueue/handler.cpp)
+        src/netqueue/handler.cpp
+
+        src/blackbox/ipv4.cpp
+        src/blackbox/agent_registry.cpp
+        src/blackbox/routing_table.cpp
+        src/blackbox/config.cpp
+        src/blackbox/blackbox.cpp)
 
 add_library(vnet STATIC ${VNET_SOURCE_FILES})
 target_link_libraries(vnet PUBLIC vnet_proto)

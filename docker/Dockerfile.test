@@ -27,6 +27,6 @@ COPY . /vnet
 
 RUN mkdir -p build
 WORKDIR /vnet/build
-RUN cmake -B . -S .. -GNinja -DENABLE_COVERAGE=ON -DBUILD_TESTS=ON && ninja
+RUN cmake -B . -S .. -GNinja -DENABLE_COVERAGE=ON && ninja
 
 ENTRYPOINT ["ctest", "--output-on-failure", "-j4"]
