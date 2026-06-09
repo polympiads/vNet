@@ -1,7 +1,5 @@
 #include <iostream>
 #include <vector>
-#include <unordered_map>
-#include <mutex>
 #include <chrono>
 #include <random>
 #include <algorithm>
@@ -15,7 +13,6 @@
 #include <fcntl.h>
 
 #include "mip.pb.h"
-#include "common/config.h"
 #include "common/socket_utils.h"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
@@ -118,6 +115,11 @@ static ConductorState g_state;
 // ---------------------------------------------------------------------------
 
 struct ConductorDispatch : public Dispatch {
+    NetQueue* queue = nullptr;
+
+    void set_queue(NetQueue* q) {
+        queue = q;
+    }
 
     void onSwitchMIP(socket_data data, mip::PacketSwitchMIP& pkt) override {
         auto* info   = static_cast<ConnInfo*>(data.ptr_data);
@@ -155,6 +157,7 @@ struct ConductorDispatch : public Dispatch {
         if (!sw) {
             std::cerr << "[Conductor] No available switch for agent "
                       << pkt.name() << "\n";
+            queue->close(data.fd);
             return;
         }
 
@@ -170,13 +173,19 @@ struct ConductorDispatch : public Dispatch {
         resp.set_switch_ipv4(sw->sw_ipv4);
         resp.set_connection_token(token);
         resp.set_switch_port(sw->sw_port);
-        send_protobuf_packet(data.fd, PacketType::CONNECT_TO_SWITCH, resp);
+        if (!send_protobuf_packet(data.fd, PacketType::CONNECT_TO_SWITCH, resp)) {
+            std::cerr << "[Conductor] Failed to send switch assignment to agent " << pkt.name() << "\n";
+            return;
+        }
 
         // 2) Tell the switch to expect this agent (three-party handshake)
         mip::PacketAgentConnectionToken notify;
         notify.set_agent_name(pkt.name());
         notify.set_connection_token(token);
-        send_protobuf_packet(sw->fd, PacketType::AGENT_CONNECTION_TOKEN, notify);
+        if (!send_protobuf_packet(sw->fd, PacketType::AGENT_CONNECTION_TOKEN, notify)) {
+            std::cerr << "[Conductor] Failed to notify switch " << sw->name << " of agent " << pkt.name() << "\n";
+            return;
+        }
 
         g_state.agents.push_back(info);
     }
@@ -281,6 +290,7 @@ int main() {
     ConductorDispatch dispatch;
     NetworkQueueHandler handler = makeNetworkQueueHandler(&dispatch);
     NetQueue queue(handler, /*epoll_timeout_ms=*/200);
+    dispatch.set_queue(&queue);
 
     // --- Event loop ---
     while (g_running) {
