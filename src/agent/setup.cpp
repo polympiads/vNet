@@ -76,11 +76,11 @@ struct AgentDispatch : public Dispatch {
 //  Heartbeat sender
 // ---------------------------------------------------------------------------
 
-static void send_heartbeats() {
+static void send_heartbeats(NetQueue& queue) {
     auto now = clk::now();
     auto try_hb = [&](ConnInfo* c) {
         if (c && c->fd >= 0 && now - c->last_hb_sent >= HEARTBEAT_INTERVAL) {
-            send_heartbeat(c->fd);
+            queue.send_heartbeat(c->fd);
             c->last_hb_sent = now;
         }
     };
@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
 
     while (g_running) {
         queue.wait_and_process();
-        send_heartbeats();
+        send_heartbeats(queue);
     }
 
     std::cout << "[Agent] Shutting down.\n";

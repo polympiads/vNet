@@ -157,7 +157,7 @@ struct ConductorDispatch : public Dispatch {
         if (!sw) {
             std::cerr << "[Conductor] No available switch for agent "
                       << pkt.name() << "\n";
-            queue.close(data.fd);
+            queue->close(data.fd);
             return;
         }
 
@@ -173,7 +173,7 @@ struct ConductorDispatch : public Dispatch {
         resp.set_switch_ipv4(sw->sw_ipv4);
         resp.set_connection_token(token);
         resp.set_switch_port(sw->sw_port);
-        if (!send_protobuf_packet(data.fd, PacketType::CONNECT_TO_SWITCH, resp)) {
+        if (!queue->send(data.fd, PacketType::CONNECT_TO_SWITCH, resp)) {
             std::cerr << "[Conductor] Failed to send switch assignment to agent " << pkt.name() << "\n";
             return;
         }
@@ -182,7 +182,7 @@ struct ConductorDispatch : public Dispatch {
         mip::PacketAgentConnectionToken notify;
         notify.set_agent_name(pkt.name());
         notify.set_connection_token(token);
-        if (!send_protobuf_packet(sw->fd, PacketType::AGENT_CONNECTION_TOKEN, notify)) {
+        if (!queue->send(sw->fd, PacketType::AGENT_CONNECTION_TOKEN, notify)) {
             std::cerr << "[Conductor] Failed to notify switch " << sw->name << " of agent " << pkt.name() << "\n";
             return;
         }
@@ -239,12 +239,12 @@ struct ConductorDispatch : public Dispatch {
 //  Heartbeat sender — called periodically from the main loop
 // ---------------------------------------------------------------------------
 
-static void send_heartbeats() {
+static void send_heartbeats(NetQueue& queue) {
     auto now = clk::now();
 
     auto try_hb = [&](ConnInfo* c) {
         if (now - c->last_hb_sent >= HEARTBEAT_INTERVAL) {
-            send_heartbeat(c->fd);
+            queue.send_heartbeat(c->fd);
             c->last_hb_sent = now;
         }
     };
@@ -318,7 +318,7 @@ int main() {
         queue.wait_and_process();
 
         // 3. Send heartbeats
-        send_heartbeats();
+        send_heartbeats(queue);
     }
 
     close(listener);
