@@ -118,7 +118,7 @@ struct SwitchDispatch : public Dispatch {
             std::cerr << "[Switch] Rejected agent: invalid token "
                       << token << "\n";
             queue->close(data.fd);
-            return;
+            return;     // NetQueue will see no further reads → eventually close
         }
 
         info->role = ConnRole::AGENT_AUTHENTICATED;
@@ -292,7 +292,7 @@ int main(int argc, char** argv) {
     cdt_info->fd   = cdt_sock;
     g_state.conductor = cdt_info;
 
-    if (!queue.put_sck(cdt_sock, cdt_info)) {
+    if (queue.put_sck(cdt_sock, cdt_info) == nullptr) {
         std::cerr << "[Switch] Failed to add conductor fd to queue\n";
         return 1;
     }
@@ -310,7 +310,7 @@ int main(int argc, char** argv) {
             info->role = ConnRole::AGENT_PENDING;
             info->fd   = agent_fd;
 
-            if (!queue.put_sck(agent_fd, info)) {
+            if (queue.put_sck(agent_fd, info) == nullptr) {
                 close(agent_fd);
                 delete info;
             }
