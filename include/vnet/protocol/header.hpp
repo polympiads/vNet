@@ -13,8 +13,8 @@ namespace vnet::protocol {
         uint32_t      payload_size;
         uint_packet_t packet_type;
     public:
-        uint32_t   get_payload_size();
-        PacketType get_packet_type ();
+        uint32_t   get_payload_size() const;
+        PacketType get_packet_type () const;
 
         PacketHeader ();
         PacketHeader (uint32_t payload_size, PacketType packet_type);
