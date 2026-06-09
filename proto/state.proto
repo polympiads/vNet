@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package vnet.state;
+
+message SwitchState {
+    string   name       = 1;
+    string   network    = 2;
+    string   ipv4       = 3;
+    uint32   port       = 4;
+    int64    connected_at_ms = 5;  // unix timestamp ms
+}
+
+message AgentState {
+    string   name            = 1;
+    string   assigned_switch = 2;
+    int64    connected_at_ms = 3;  // unix timestamp ms
+}
+
+message PendingToken {
+    string   agent_name  = 1;
+    uint64   token       = 2;
+    string   switch_name = 3;
+    int64    created_at_ms = 4;  // unix timestamp ms
+}
+
+message ConductorState {
+    int64                  dumped_at_ms   = 1;  // unix timestamp ms when dump was written
+    repeated SwitchState   switches       = 2;
+    repeated AgentState    agents         = 3;
+    repeated PendingToken  pending_tokens = 4;
+}
