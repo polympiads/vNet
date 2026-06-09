@@ -307,7 +307,7 @@ int main() {
             auto* info = new ConnInfo();
             info->fd = client;
 
-            if (!queue.put_sck(client, info)) {
+            if (queue.put_sck(client, info) == nullptr) {
                 std::cerr << "[Conductor] Failed to add fd " << client << " to queue\n";
                 close(client);
                 delete info;

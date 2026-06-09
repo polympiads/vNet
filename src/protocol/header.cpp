@@ -1,13 +1,14 @@
 
 #include <arpa/inet.h>
 #include "vnet/protocol/header.hpp"
+#include "vnet/protocol/types.hpp"
 
 using namespace vnet::protocol;
 
-uint32_t PacketHeader::get_payload_size () {
+uint32_t PacketHeader::get_payload_size () const {
     return ntohl(payload_size);
 }
-PacketType PacketHeader::get_packet_type () {
+PacketType PacketHeader::get_packet_type () const {
     return ntoh_packet_type(packet_type);
 }
 
