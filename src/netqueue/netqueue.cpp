@@ -1,4 +1,3 @@
-
 #include "vnet/netqueue/netqueue.hpp"
 #include "vnet/protocol/header.hpp"
 

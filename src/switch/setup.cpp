@@ -17,6 +17,7 @@
 #include "mip.pb.h"
 #include "common/config.h"
 #include "common/socket_utils.h"
+#include "vnet/netqueue/handler.hpp"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
 
@@ -82,6 +83,11 @@ static SwitchState g_state;
 // ---------------------------------------------------------------------------
 
 struct SwitchDispatch : public Dispatch {
+    NetQueue* queue = nullptr;
+
+    void set_queue(NetQueue* q) {
+        queue = q;
+    }
 
     /*
      * Received from the conductor: a new agent is about to connect.
@@ -111,6 +117,7 @@ struct SwitchDispatch : public Dispatch {
         if (it == g_state.pending_tokens.end()) {
             std::cerr << "[Switch] Rejected agent: invalid token "
                       << token << "\n";
+            queue->close(data.fd);
             return;     // NetQueue will see no further reads → eventually close
         }
 
@@ -276,6 +283,7 @@ int main(int argc, char** argv) {
     SwitchDispatch dispatch;
     NetworkQueueHandler handler = makeNetworkQueueHandler(&dispatch);
     NetQueue queue(handler, /*epoll_timeout_ms=*/200);
+    dispatch.set_queue(&queue);
 
     // Add conductor connection to the queue
     auto* cdt_info = new ConnInfo();
