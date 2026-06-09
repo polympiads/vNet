@@ -1,4 +1,5 @@
 #include "vnet/netqueue/netqueue.hpp"
+#include "vnet/netqueue/fsm.hpp"
 #include "vnet/protocol/header.hpp"
 
 #include <sys/epoll.h>
@@ -51,6 +52,108 @@ NetworkElement* NetQueue::put (int fd, void* data, FiniteStateMachine state) {
     return element;
 }
 
+bool NetQueue::flush_write_buffer(NetworkElement* element) {
+    auto& buf    = element->write_buffer;
+    auto& offset = element->write_buffer_offset;
+
+    while (offset < buf.size()) {
+        ssize_t r = ::write(element->fd,
+                            buf.data() + offset,
+                            buf.size() - offset);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Still can't write — keep EPOLLOUT registered
+                return true;
+            }
+            return false; // real error - caller should close
+        }
+        if (r == 0) return false;
+        offset += r;
+    }
+
+    // Buffer fully drained — clear it and remove EPOLLOUT
+    buf.clear();
+    offset = 0;
+
+    struct epoll_event ev;
+    ev.data.ptr = element;
+    ev.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
+    epoll_ctl(epoll_fd, EPOLL_CTL_MOD, element->fd, &ev);
+
+    return true;
+}
+
+bool NetQueue::send(int fd, const void* data, size_t n) {
+    NetworkElement* element = get_network_element_from_fd(fd);
+    if (!element) return false;
+
+    const uint8_t* ptr   = static_cast<const uint8_t*>(data);
+    size_t         total = 0;
+
+    // If there's already buffered data, append to it to preserve order
+    if (!element->write_buffer.empty()) {
+        size_t already_buffered = element->write_buffer.size()
+                                    - element->write_buffer_offset;
+        if (already_buffered + n > WRITE_BUFFER_MAX) {
+            element->state = SCK_ERROR;
+            return false;
+        }
+        element->write_buffer.insert(element->write_buffer.end(),
+                                     ptr, ptr + n);
+        return true;
+    }
+
+    // Try to write directly first
+    while (total < n) {
+        ssize_t r = ::write(fd, ptr + total, n - total);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Buffer the remainder
+                size_t remaining = n - total;
+                if (remaining > WRITE_BUFFER_MAX) {
+                    element->state = SCK_ERROR;
+                    return false;
+                }
+                element->write_buffer.assign(ptr + total, ptr + n);
+                element->write_buffer_offset = 0;
+
+                // Register EPOLLOUT
+                struct epoll_event ev;
+                ev.data.ptr = element;
+                ev.events   = EPOLLIN | EPOLLOUT | EPOLLET | EPOLLONESHOT;
+                epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd, &ev);
+
+                return true;
+            }
+            return false;
+        }
+        if (r == 0) return false;
+        total += r;
+    }
+    return true;
+}
+
+bool NetQueue::send(int fd, protocol::PacketType type,
+                    const google::protobuf::Message& msg) {
+    std::string body;
+    if (!msg.SerializeToString(&body)) return false;
+
+    protocol::PacketHeader hdr(static_cast<uint32_t>(body.size()), type);
+
+    if (!send(fd, &hdr, protocol::PACKET_HEADER_SIZE)) return false;
+    if (!body.empty()) {
+        if (!send(fd, body.data(), body.size())) return false;
+    }
+    return true;
+}
+
+bool NetQueue::send_heartbeat(int fd) {
+    protocol::PacketHeader hdr(0, protocol::PacketType::HEARTBEAT);
+    return send(fd, &hdr, protocol::PACKET_HEADER_SIZE);
+}
+
 NetQueue::NetQueue (NetworkQueueHandler handler) : NetQueue(handler, -1) {}
 NetQueue::NetQueue (NetworkQueueHandler handler, int epoll_timeout) {
     if (handler.onClose == nullptr || handler.onSocketReady == nullptr || handler.onTunReady == nullptr) {
@@ -93,6 +196,12 @@ void NetQueue::wait_and_process () {
                 reason = CLOSE_HANGUP;
             }
         }
+        if (events[i_event].events & EPOLLOUT) {
+            if (!flush_write_buffer(current_element)) {
+                should_close = true;
+                reason = CLOSE_ERROR;
+            }
+        }
         if (events[i_event].events & EPOLLERR) {
             should_close = true;
             reason = CLOSE_ERROR;
@@ -106,7 +215,9 @@ void NetQueue::wait_and_process () {
             struct epoll_event event;
             event.data.ptr = current_element;
             event.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
-        
+            if (!current_element->write_buffer.empty()) {
+                event.events |= EPOLLOUT;
+            }
             if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, current_element->fd, &event) < 0) {
                 should_close = true;
                 reason = CLOSE_EPOLL;

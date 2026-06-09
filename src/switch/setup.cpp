@@ -129,7 +129,7 @@ struct SwitchDispatch : public Dispatch {
 
         // Send acceptance
         mip::PacketConnectionAccepted ack;
-        send_protobuf_packet(data.fd, PacketType::CONNECTION_ACCEPTED, ack);
+        queue->send(data.fd, PacketType::CONNECTION_ACCEPTED, ack);
 
         std::cout << "[Switch] Agent " << info->name
                   << " authenticated (fd=" << data.fd << ")\n";
@@ -163,11 +163,11 @@ struct SwitchDispatch : public Dispatch {
 //  Heartbeat sender
 // ---------------------------------------------------------------------------
 
-static void send_heartbeats() {
+static void send_heartbeats(NetQueue& queue) {
     auto now = clk::now();
     auto try_hb = [&](ConnInfo* c) {
         if (c && c->fd >= 0 && now - c->last_hb_sent >= HEARTBEAT_INTERVAL) {
-            send_heartbeat(c->fd);
+            queue.send_heartbeat(c->fd);
             c->last_hb_sent = now;
         }
     };
@@ -323,7 +323,7 @@ int main(int argc, char** argv) {
         g_state.expire_tokens();
 
         // Heartbeats
-        send_heartbeats();
+        send_heartbeats(queue);
     }
 
     close(listener);

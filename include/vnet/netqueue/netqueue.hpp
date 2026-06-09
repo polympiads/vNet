@@ -4,7 +4,9 @@
 #include "vnet/netqueue/fsm.hpp"
 #include "vnet/netqueue/element.hpp"
 #include "vnet/netqueue/handler.hpp"
+#include "vnet/protocol/types.hpp"
 
+#include <google/protobuf/message.h>
 #include <unordered_map>
 #include <mutex>
 
@@ -47,7 +49,42 @@ namespace vnet::netqueue {
          */
         NetworkQueueHandler handler;
 
+        /**
+        * Attempt to drain the write buffer for an element.
+        * Registers/deregisters EPOLLOUT as needed.
+        * Returns false if the connection should be closed.
+        */
+        bool flush_write_buffer(NetworkElement* element);
+
     public:
+
+        /**
+        * Send data to a file descriptor managed by this queue.
+        *
+        * If the kernel send buffer is full (EAGAIN), the remaining
+        * bytes are saved in the element's write buffer and sent when
+        * epoll signals the fd is writable (EPOLLOUT).
+        *
+        * If the write buffer exceeds WRITE_BUFFER_MAX the connection
+        * is closed and onClose is fired.
+        *
+        * @return true if all bytes were sent or buffered successfully.
+        *         false if the fd is not in the queue or the buffer limit
+        *         was exceeded (connection closed).
+        */
+        bool send(int fd, const void* data, size_t n);
+
+        /**
+        * Send a protobuf message with the 6-byte packet header
+        * through the queue's write path.
+        */
+        bool send(int fd, protocol::PacketType type, const google::protobuf::Message& msg);
+
+        /**
+        * Send a heartbeat (header-only) through the queue's write path.
+        */
+        bool send_heartbeat(int fd);
+
         /**
          * Put a file descriptor into the queue
          * with a pointer to some data the user wants
