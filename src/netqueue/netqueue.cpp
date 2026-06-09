@@ -99,8 +99,10 @@ bool NetQueue::send(int fd, const void* data, size_t n) {
             element->state = SCK_ERROR;
             return false;
         }
-        element->write_buffer.insert(element->write_buffer.end(),
-                                     ptr, ptr + n);
+        element->write_buffer.reserve(element->write_buffer.size() + n);
+        for (size_t i = 0; i < n; i++) {
+            element->write_buffer.push_back(ptr[i]);
+        }
         return true;
     }
 

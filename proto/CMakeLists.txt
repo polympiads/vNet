@@ -2,7 +2,7 @@
 
 find_package(Protobuf REQUIRED)
 
-protobuf_generate_cpp(PROTO_SRC PROTO_HDR mip.proto)
+protobuf_generate_cpp(PROTO_SRC PROTO_HDR mip.proto state.proto)
 
 add_library(vnet_proto STATIC ${PROTO_SRC} ${PROTO_HDR})
 
