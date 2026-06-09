@@ -26,3 +26,16 @@ create_test(netqueue_tests        netqueue/netqueue_tests.cpp)
 
 # testing utils
 create_test(tun_wrapper_tests utils/tun_wrapper_tests.cpp)
+
+# testing vnet/blackbox
+function(create_blackbox_test test_name test_file)
+    add_executable(${test_name} ${test_file})
+    target_link_libraries(${test_name} PRIVATE vnet GTest::gtest_main)
+    gtest_discover_tests(${test_name})
+endfunction()
+
+create_blackbox_test(ipv4_tests             blackbox/ipv4_tests.cpp)
+create_blackbox_test(agent_registry_tests   blackbox/agent_registry_tests.cpp)
+create_blackbox_test(routing_table_tests    blackbox/routing_table_tests.cpp)
+create_blackbox_test(config_tests           blackbox/config_tests.cpp)
+create_blackbox_test(blackbox_tests         blackbox/blackbox_tests.cpp)
