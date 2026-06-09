@@ -20,9 +20,12 @@
 #include "vnet/netqueue/handler.hpp"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
+#include "vnet/blackbox/blackbox.hpp"
+#include "vnet/blackbox/config.hpp"
 
 using namespace vnet::protocol;
 using namespace vnet::netqueue;
+using namespace vnet::blackbox;
 using clk = std::chrono::steady_clock;
 
 static const int                  LISTEN_BACKLOG      = 64;
@@ -77,6 +80,7 @@ struct SwitchState {
 };
 
 static SwitchState g_state;
+static BlackBox* g_blackbox = nullptr;
 
 // ---------------------------------------------------------------------------
 //  Dispatch
@@ -105,34 +109,54 @@ struct SwitchDispatch : public Dispatch {
     }
 
     /*
-     * An agent that has connected to us sends its token.
-     * Validate and either accept or drop.
-     */
+    * An agent that has connected to us sends its token.
+    * Validate and either accept or drop.
+    */
     void onAuthConnectToSwitch(socket_data data,
-                               mip::PacketAuthConnectToSwitch& pkt) override {
-        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+                            mip::PacketAuthConnectToSwitch& pkt) override {
+        auto*    info  = static_cast<ConnInfo*>(data.ptr_data);
         uint64_t token = pkt.connection_token();
 
         auto it = g_state.pending_tokens.find(token);
         if (it == g_state.pending_tokens.end()) {
             std::cerr << "[Switch] Rejected agent: invalid token "
-                      << token << "\n";
-            queue->close(data.fd);
-            return;     // NetQueue will see no further reads → eventually close
+                    << token << "\n";
+            data.net_element->state = SCK_ERROR;
+            return;
+        }
+
+        std::string agent_name = it->second.agent_name;
+        g_state.pending_tokens.erase(it);
+
+        // Register agent in BlackBox — looks up virtual IP from config
+        if (!g_blackbox->on_agent_authenticated(agent_name, data.fd)) {
+            std::cerr << "[Switch] Agent " << agent_name
+                    << " not found in config, rejecting\n";
+            data.net_element->state = SCK_ERROR;
+            return;
+        }
+
+        // Get the virtual IP the BlackBox assigned
+        AgentEntry* entry = g_blackbox->agents().find_by_name(agent_name);
+        if (!entry) {
+            std::cerr << "[Switch] Failed to get agent entry for "
+                    << agent_name << "\n";
+            data.net_element->state = SCK_ERROR;
+            return;
         }
 
         info->role = ConnRole::AGENT_AUTHENTICATED;
-        info->name = it->second.agent_name;
-
-        g_state.pending_tokens.erase(it);
+        info->name = agent_name;
         g_state.agents.push_back(info);
 
-        // Send acceptance
+        // Send acceptance with virtual IP so agent can set up its TUN
         mip::PacketConnectionAccepted ack;
+        ack.set_virtual_ipv4(entry->virtual_ipv4);
         queue->send(data.fd, PacketType::CONNECTION_ACCEPTED, ack);
 
         std::cout << "[Switch] Agent " << info->name
-                  << " authenticated (fd=" << data.fd << ")\n";
+                << " authenticated (fd=" << data.fd
+                << ", ip=" << ipv4_to_string(entry->virtual_ipv4) << ")\n";
     }
 
     void onHeartbeat(socket_data) override {}
@@ -143,10 +167,12 @@ struct SwitchDispatch : public Dispatch {
 
         if (info->role != ConnRole::AGENT_PENDING) {
             std::cout << "[Switch] Connection closed: " << info->name
-                      << " (fd=" << data.fd << ")\n";
+                    << " (fd=" << data.fd << ")\n";
         }
 
         if (info->role == ConnRole::AGENT_AUTHENTICATED) {
+            // Notify BlackBox so it cleans up the agent registry
+            g_blackbox->on_agent_disconnected(data.fd);
             g_state.agents.erase(
                 std::remove(g_state.agents.begin(), g_state.agents.end(), info),
                 g_state.agents.end());
@@ -216,10 +242,27 @@ int main(int argc, char** argv) {
     // --- Read conductor address from environment ---
     const char* cdt_ip_env   = std::getenv("CONDUCTOR_IP");
     const char* cdt_port_env = std::getenv("CONDUCTOR_PORT");
+    const char* config_path = std::getenv("VNET_CONFIG_PATH");
     if (!cdt_ip_env || !cdt_port_env) {
         std::cerr << "[Switch] CONDUCTOR_IP and CONDUCTOR_PORT must be set\n";
         return 1;
     }
+    if (!config_path) {
+        std::cerr << "[Switch] VNET_CONFIG_PATH must be set\n";
+        return 1;
+    }
+
+    // --- Load config and initialize BlackBox ---
+    vnet::blackbox::Config config;
+    if (!config.load(config_path)) {
+        std::cerr << "[Switch] Failed to load config: " << config_path << "\n";
+        return 1;
+    }
+
+    BlackBox blackbox(config, -1);  // -1 = no internet TUN yet
+    g_blackbox = &blackbox;
+
+    std::cout << "[Switch] Loaded config from " << config_path << "\n";
 
     MachineConfig conductor_cfg {
         cdt_ip_env,

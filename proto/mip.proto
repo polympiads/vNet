@@ -34,9 +34,29 @@ message PacketAuthConnectToSwitch {
     fixed64 connection_token = 1;
 }
 
-message PacketConnectionAccepted {}
+message PacketConnectionAccepted {
+    fixed32 virtual_ipv4 = 1;
+}
 
 message PacketAgentMRP {
     string name     = 1;
     string auth_key = 2;
+}
+
+message PacketPrepareRouteForTarget {
+    fixed32 dest_ipv4 = 1;
+}
+
+message PacketNextForTarget {
+    fixed32 dest_ipv4       = 1;
+
+    // next_switch_ipv4 = 0 means the target disconnected, remove the route
+    fixed32 next_switch_ipv4 = 2;
+
+    uint32  next_switch_port = 3;
+    string  next_switch_name = 4;
+}
+
+message PacketIPv4Raw {
+    bytes payload = 1;
 }

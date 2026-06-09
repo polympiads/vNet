@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y \
     cmake \
     protobuf-compiler \
     libprotobuf-dev \
+    libgtest-dev \
+    libgmock-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

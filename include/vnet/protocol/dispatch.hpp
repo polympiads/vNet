@@ -26,6 +26,11 @@ namespace vnet::protocol {
         /** Reconnection */
         virtual void onAgentMRP (netqueue::socket_data data, mip::PacketAgentMRP &packet);
 
+        /** Routing */
+        virtual void onPrepareRouteForTarget(netqueue::socket_data data, mip::PacketPrepareRouteForTarget &packet);
+        virtual void onNextForTarget(netqueue::socket_data data, mip::PacketNextForTarget &packet);
+        virtual void onIPv4Raw(netqueue::socket_data data, mip::PacketIPv4Raw &packet);
+
         virtual ~Dispatch() = default;
     };
 
