@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y \
     cmake \
     protobuf-compiler \
     libprotobuf-dev \
+    libgtest-dev \
+    libgmock-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -16,9 +18,12 @@ RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
 FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libprotobuf32t64 bash \
+    libprotobuf32t64 bash iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/build/switch /usr/local/bin/switch
+COPY docker/switch-entrypoint.sh /usr/local/bin/switch-entrypoint.sh
+RUN chmod +x /usr/local/bin/switch-entrypoint.sh
 
+ENTRYPOINT [ "/usr/local/bin/switch-entrypoint.sh" ]
 CMD ["/usr/local/bin/switch"]

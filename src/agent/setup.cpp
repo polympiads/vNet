@@ -10,6 +10,7 @@
 #include <netinet/tcp.h>
 #include <unistd.h>
 
+#include "common/tun.h"
 #include "mip.pb.h"
 #include "common/config.h"
 #include "common/socket_utils.h"
@@ -206,11 +207,25 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::cout << "[Agent] Authenticated with switch "
-              << assignment.switch_name() << "!\n";
+    uint32_t virtual_ipv4 = ack.virtual_ipv4();
+    std::cout << "[Agent] Authenticated with switch " << assignment.switch_name()
+          << ", virtual IP: " << ipv4_to_string(virtual_ipv4) << "\n";
 
     // ===================================================================
-    //  STEP 4 — Switch both fds to non-blocking, enter event loop
+    //  STEP 4 — Open TUN device with assigned virtual IP
+    // ===================================================================
+    
+    std::string tun_name = "vnet-" + agent_name;
+    int tun_fd = tun_open(tun_name, virtual_ipv4);
+    if (tun_fd < 0) {
+        std::cerr << "[Agent] Failed to open TUN device\n";
+        close(sw_sock);
+        close(cdt_sock);
+        return 1;
+    }
+
+    // ===================================================================
+    //  STEP 5 — Switch both fds to non-blocking, enter event loop
     // ===================================================================
     set_nonblocking(cdt_sock);
     set_nonblocking(sw_sock);
@@ -235,6 +250,8 @@ int main(int argc, char** argv) {
     g_state.sw = sw_info;
     queue.put_sck(sw_sock, sw_info);
 
+    queue.put_tun(tun_fd, nullptr);
+
     std::cout << "[Agent] Entering event loop.\n";
 
     while (g_running) {
@@ -243,6 +260,7 @@ int main(int argc, char** argv) {
     }
 
     std::cout << "[Agent] Shutting down.\n";
+    tun_close(tun_fd, tun_name);
     google::protobuf::ShutdownProtobufLibrary();
     return 0;
 }

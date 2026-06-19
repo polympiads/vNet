@@ -1,4 +1,5 @@
 #include "vnet/protocol/dispatch.hpp"
+#include "vnet/protocol/types.hpp"
 
 using namespace vnet::protocol;
 using namespace vnet::netqueue;
@@ -88,6 +89,48 @@ void Dispatch::onSocketReady(socket_data data) {
             }
             break;
         }
+        case PREPARE_ROUTE_FOR_TARGET: {
+            mip::PacketPrepareRouteForTarget packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onPrepareRouteForTarget(data, packet);
+            }
+            break;
+        }
+        case NEXT_FOR_TARGET: {
+            mip::PacketNextForTarget packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onNextForTarget(data, packet);
+            }
+            break;
+        }
+        case IPV4_RAW: {
+            mip::PacketIPv4Raw packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onIPv4Raw(data, packet);
+            }
+            break;
+        }
+        case AGENT_REGISTERED: {
+            mip::PacketAgentRegistered packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onAgentRegistered(data, packet);
+            }
+            break;
+        }
+        case SWITCH_ROUTE_UPDATE: {
+            mip::PacketSwitchRouteUpdate packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onSwitchRouteUpdate(data, packet);
+            }
+            break;
+        }
+        case SWITCH_DISCONNECTED: {
+            mip::PacketSwitchDisconnected packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onSwitchDisconnected(data, packet);
+            }
+            break;
+        }
         default:
             break;
     }
@@ -110,3 +153,10 @@ void Dispatch::onAgentConnectionToken(socket_data, mip::PacketAgentConnectionTok
 void Dispatch::onConnectionAccepted  (socket_data, mip::PacketConnectionAccepted&) {}
 
 void Dispatch::onAgentMRP (socket_data, mip::PacketAgentMRP&)                      {}
+
+void Dispatch::onPrepareRouteForTarget (socket_data, mip::PacketPrepareRouteForTarget&) {}
+void Dispatch::onNextForTarget         (socket_data, mip::PacketNextForTarget&)         {}
+void Dispatch::onIPv4Raw               (socket_data, mip::PacketIPv4Raw&)               {}
+void Dispatch::onAgentRegistered       (socket_data, mip::PacketAgentRegistered&)       {}
+void Dispatch::onSwitchRouteUpdate     (socket_data, mip::PacketSwitchRouteUpdate&)     {}
+void Dispatch::onSwitchDisconnected    (socket_data, mip::PacketSwitchDisconnected&)    {}

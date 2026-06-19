@@ -1,3 +1,5 @@
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -20,9 +22,13 @@
 #include "vnet/netqueue/handler.hpp"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
+#include "vnet/blackbox/blackbox.hpp"
+#include "vnet/blackbox/config.hpp"
+#include "vnet/protocol/types.hpp"
 
 using namespace vnet::protocol;
 using namespace vnet::netqueue;
+using namespace vnet::blackbox;
 using clk = std::chrono::steady_clock;
 
 static const int                  LISTEN_BACKLOG      = 64;
@@ -38,7 +44,7 @@ static void on_signal(int) { g_running = 0; }
 //  Connection metadata
 // ---------------------------------------------------------------------------
 
-enum class ConnRole { CONDUCTOR, AGENT_PENDING, AGENT_AUTHENTICATED };
+enum class ConnRole { CONDUCTOR, AGENT_PENDING, AGENT_AUTHENTICATED, PEER_SWITCH };
 
 struct ConnInfo {
     ConnRole    role;
@@ -61,6 +67,9 @@ struct SwitchState {
 
     /* Authenticated agent connections */
     std::vector<ConnInfo*> agents;
+    
+    /* Peer switch connections - keyed by switch name */
+    std::unordered_map<std::string, ConnInfo*> peer_switches;
 
     /* Conductor connection info */
     ConnInfo* conductor = nullptr;
@@ -77,6 +86,7 @@ struct SwitchState {
 };
 
 static SwitchState g_state;
+static BlackBox* g_blackbox = nullptr;
 
 // ---------------------------------------------------------------------------
 //  Dispatch
@@ -105,34 +115,59 @@ struct SwitchDispatch : public Dispatch {
     }
 
     /*
-     * An agent that has connected to us sends its token.
-     * Validate and either accept or drop.
-     */
+    * An agent that has connected to us sends its token.
+    * Validate and either accept or drop.
+    */
     void onAuthConnectToSwitch(socket_data data,
-                               mip::PacketAuthConnectToSwitch& pkt) override {
-        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+                            mip::PacketAuthConnectToSwitch& pkt) override {
+        auto*    info  = static_cast<ConnInfo*>(data.ptr_data);
         uint64_t token = pkt.connection_token();
 
         auto it = g_state.pending_tokens.find(token);
         if (it == g_state.pending_tokens.end()) {
             std::cerr << "[Switch] Rejected agent: invalid token "
-                      << token << "\n";
-            queue->close(data.fd);
-            return;     // NetQueue will see no further reads → eventually close
+                    << token << "\n";
+            data.net_element->state = SCK_ERROR;
+            return;
+        }
+
+        std::string agent_name = it->second.agent_name;
+        g_state.pending_tokens.erase(it);
+
+        // Register agent in BlackBox — looks up virtual IP from config
+        if (!g_blackbox->on_agent_authenticated(agent_name, data.fd)) {
+            std::cerr << "[Switch] Agent " << agent_name
+                    << " not found in config, rejecting\n";
+            data.net_element->state = SCK_ERROR;
+            return;
+        }
+
+        // Get the virtual IP the BlackBox assigned
+        AgentEntry* entry = g_blackbox->agents().find_by_name(agent_name);
+        if (!entry) {
+            std::cerr << "[Switch] Failed to get agent entry for "
+                    << agent_name << "\n";
+            data.net_element->state = SCK_ERROR;
+            return;
         }
 
         info->role = ConnRole::AGENT_AUTHENTICATED;
-        info->name = it->second.agent_name;
-
-        g_state.pending_tokens.erase(it);
+        info->name = agent_name;
         g_state.agents.push_back(info);
 
-        // Send acceptance
+        // Send acceptance with virtual IP so agent can set up its TUN
         mip::PacketConnectionAccepted ack;
+        ack.set_virtual_ipv4(entry->virtual_ipv4);
         queue->send(data.fd, PacketType::CONNECTION_ACCEPTED, ack);
 
+        mip::PacketAgentRegistered reg;
+        reg.set_agent_name(agent_name);
+        reg.set_virtual_ipv4(entry->virtual_ipv4);
+        queue->send(g_state.conductor->fd, PacketType::AGENT_REGISTERED, reg);
+
         std::cout << "[Switch] Agent " << info->name
-                  << " authenticated (fd=" << data.fd << ")\n";
+                << " authenticated (fd=" << data.fd
+                << ", ip=" << ipv4_to_string(entry->virtual_ipv4) << ")\n";
     }
 
     void onHeartbeat(socket_data) override {}
@@ -143,19 +178,116 @@ struct SwitchDispatch : public Dispatch {
 
         if (info->role != ConnRole::AGENT_PENDING) {
             std::cout << "[Switch] Connection closed: " << info->name
-                      << " (fd=" << data.fd << ")\n";
+                    << " (fd=" << data.fd << ")\n";
         }
 
         if (info->role == ConnRole::AGENT_AUTHENTICATED) {
+            // Notify BlackBox so it cleans up the agent registry
+            g_blackbox->on_agent_disconnected(data.fd);
             g_state.agents.erase(
                 std::remove(g_state.agents.begin(), g_state.agents.end(), info),
                 g_state.agents.end());
         }
+
+        if (info->role == ConnRole::PEER_SWITCH) {
+            g_blackbox->on_switch_disconnected(data.fd);
+            g_state.peer_switches.erase(info->name);
+        }
+
         if (info == g_state.conductor) {
             g_state.conductor = nullptr;
         }
 
         delete info;
+    }
+
+    void onSwitchRouteUpdate(socket_data data,
+                            mip::PacketSwitchRouteUpdate& pkt) override {
+        std::string sw_name  = pkt.switch_name();
+        uint32_t    sw_ipv4  = pkt.switch_ipv4();
+        uint32_t    sw_port  = pkt.switch_port();
+        uint32_t    agent_ip = pkt.agent_ipv4();
+
+        // Check if we already have a connection to this switch
+        auto it = g_state.peer_switches.find(sw_name);
+        if (it == g_state.peer_switches.end()) {
+            // Connect to the peer switch
+            MachineConfig sw_cfg {
+                ipv4_to_string(sw_ipv4),
+                static_cast<uint16_t>(sw_port)
+            };
+
+            int sw_fd = connect_to(sw_cfg);
+            if (sw_fd < 0) {
+                std::cerr << "[Switch] Failed to connect to peer switch "
+                        << sw_name << "\n";
+                return;
+            }
+
+            set_nonblocking(sw_fd);
+            int flag = 1;
+            setsockopt(sw_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
+            auto* info = new ConnInfo();
+            info->role = ConnRole::PEER_SWITCH;
+            info->name = sw_name;
+            info->fd   = sw_fd;
+
+            g_state.peer_switches[sw_name] = info;
+
+            if (queue->put_sck(sw_fd, info) == nullptr) {
+                std::cerr << "[Switch] Failed to add peer switch fd to queue\n";
+                close(sw_fd);
+                delete info;
+                return;
+            }
+
+            std::cout << "[Switch] Connected to peer switch " << sw_name << "\n";
+
+            // Update routing table
+            g_blackbox->on_route_update(agent_ip, sw_fd);
+        } else {
+            // Already connected - just update the route
+            g_blackbox->on_route_update(agent_ip, it->second->fd);
+        }
+
+        std::cout << "[Switch] Route update: " << ipv4_to_string(agent_ip)
+                << " → " << sw_name << "\n";
+    }
+
+    void onSwitchDisconnected(socket_data data,
+                            mip::PacketSwitchDisconnected& pkt) override {
+        std::string sw_name = pkt.switch_name();
+
+        auto it = g_state.peer_switches.find(sw_name);
+        if (it == g_state.peer_switches.end()) return;
+
+        // Close the connection
+        queue->close(it->second->fd);
+
+        std::cout << "[Switch] Peer switch disconnected: " << sw_name << "\n";
+    }
+
+    void onIPv4Raw(socket_data data,
+                    mip::PacketIPv4Raw& pkt) override {
+        const std::string& payload = pkt.payload();
+        if (payload.empty()) return;
+
+        const uint8_t* raw = reinterpret_cast<const uint8_t*>(payload.data());
+        size_t         len = payload.size();
+
+        PacketDecision decision = g_blackbox->process(
+            SourceType::SWITCH, data.fd, raw, len
+        );
+
+        if (decision.action == PacketAction::DELIVER_LOCAL) {
+            mip::PacketIPv4Raw fwd;
+            fwd.set_payload(payload);
+            queue->send(decision.target_fd, PacketType::IPV4_RAW, fwd);
+        } else {
+            std::cerr << "[Switch] Unexpected decision for SWITCH packet: "
+                      << (int)decision.action << "\n";
+        }
     }
 };
 
@@ -216,10 +348,27 @@ int main(int argc, char** argv) {
     // --- Read conductor address from environment ---
     const char* cdt_ip_env   = std::getenv("CONDUCTOR_IP");
     const char* cdt_port_env = std::getenv("CONDUCTOR_PORT");
+    const char* config_path = std::getenv("VNET_CONFIG_PATH");
     if (!cdt_ip_env || !cdt_port_env) {
         std::cerr << "[Switch] CONDUCTOR_IP and CONDUCTOR_PORT must be set\n";
         return 1;
     }
+    if (!config_path) {
+        std::cerr << "[Switch] VNET_CONFIG_PATH must be set\n";
+        return 1;
+    }
+
+    // --- Load config and initialize BlackBox ---
+    vnet::blackbox::Config config;
+    if (!config.load(config_path)) {
+        std::cerr << "[Switch] Failed to load config: " << config_path << "\n";
+        return 1;
+    }
+
+    BlackBox blackbox(config, -1);  // -1 = no internet TUN yet
+    g_blackbox = &blackbox;
+
+    std::cout << "[Switch] Loaded config from " << config_path << "\n";
 
     MachineConfig conductor_cfg {
         cdt_ip_env,
