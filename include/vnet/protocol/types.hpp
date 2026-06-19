@@ -23,7 +23,10 @@ namespace vnet::protocol {
         // Routing
         PREPARE_ROUTE_FOR_TARGET,
         NEXT_FOR_TARGET,
-        IPV4_RAW
+        IPV4_RAW,
+        AGENT_REGISTERED,
+        SWITCH_ROUTE_UPDATE,
+        SWITCH_DISCONNECTED,
     };
 
     PacketType    ntoh_packet_type (uint_packet_t type);

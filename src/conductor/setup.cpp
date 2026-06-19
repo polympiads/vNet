@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <iostream>
 #include <vector>
 #include <chrono>
@@ -16,6 +17,7 @@
 #include "mip.pb.h"
 #include "state.pb.h"
 #include "common/socket_utils.h"
+#include "vnet/netqueue/handler.hpp"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
 
@@ -61,7 +63,11 @@ struct ConnInfo {
     uint16_t    sw_port = 0;
     uint32_t    sw_ipv4 = 0;
 
-    int         fd = -1;
+    /* Agent-only fields */
+    std::string assigned_switch_name;
+    ConnInfo* assigned_switch = nullptr;
+
+    int             fd = -1;
     clk::time_point last_hb_sent  = clk::now();
     int64_t         connected_at_ms = 0;  // unix timestamp ms
 };
@@ -265,6 +271,9 @@ struct ConductorDispatch : public Dispatch {
             return;
         }
 
+        info->assigned_switch_name  = sw->name;
+        info->assigned_switch       = sw;
+
         uint64_t token = g_state.generate_token();
 
         std::cout << "[Conductor] Agent " << pkt.name()
@@ -336,11 +345,52 @@ struct ConductorDispatch : public Dispatch {
                       << " (fd=" << data.fd
                       << ", reason=" << reason_str << ")\n";
         }
-
-        if (info->role == Role::SWITCH_CONN) g_state.remove_switch(info);
-        else if (info->role == Role::AGENT_CONN) g_state.remove_agent(info);
+        
+        if (info->role == Role::SWITCH_CONN) {
+            // Null out assigned_switch for all agents pointing to this switch
+            for (auto* agent : g_state.agents) {
+                if (agent->assigned_switch == info) {
+                    agent->assigned_switch = nullptr;
+                }
+            }
+            // Broadcast disconnection to all remaining switches
+            mip::PacketSwitchDisconnected disc;
+            disc.set_switch_name(info->name);
+            for (auto* sw : g_state.switches) {
+                if (sw == info) continue;
+                queue->send(sw->fd, PacketType::SWITCH_DISCONNECTED, disc);
+            }
+            
+            g_state.remove_switch(info);
+        } else if (info->role == Role::AGENT_CONN) {
+            g_state.remove_agent(info);
+        }
 
         delete info;
+    }
+
+    void onAgentRegistered(socket_data data,
+                       mip::PacketAgentRegistered& pkt) override {
+        auto* sw_info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!sw_info || sw_info->role != Role::SWITCH_CONN) return;
+
+        uint32_t virtual_ipv4 = pkt.virtual_ipv4();
+
+        std::cout << "[Conductor] Agent " << pkt.agent_name()
+                << " registered with IP " << ipv4_to_string(virtual_ipv4)
+                << " on switch " << sw_info->name << "\n";
+
+        // Broadcast route to all other switches
+        mip::PacketSwitchRouteUpdate update;
+        update.set_switch_name(sw_info->name);
+        update.set_switch_ipv4(sw_info->sw_ipv4);
+        update.set_switch_port(sw_info->sw_port);
+        update.set_agent_ipv4(virtual_ipv4);
+
+        for (auto* sw : g_state.switches) {
+            if (sw->fd == data.fd) continue;  // don't send back to the same switch
+            queue->send(sw->fd, PacketType::SWITCH_ROUTE_UPDATE, update);
+        }
     }
 };
 

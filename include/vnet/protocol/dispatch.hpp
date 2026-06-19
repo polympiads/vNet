@@ -30,6 +30,9 @@ namespace vnet::protocol {
         virtual void onPrepareRouteForTarget(netqueue::socket_data data, mip::PacketPrepareRouteForTarget &packet);
         virtual void onNextForTarget(netqueue::socket_data data, mip::PacketNextForTarget &packet);
         virtual void onIPv4Raw(netqueue::socket_data data, mip::PacketIPv4Raw &packet);
+        virtual void onAgentRegistered    (netqueue::socket_data data, mip::PacketAgentRegistered    &packet);
+        virtual void onSwitchRouteUpdate  (netqueue::socket_data data, mip::PacketSwitchRouteUpdate  &packet);
+        virtual void onSwitchDisconnected (netqueue::socket_data data, mip::PacketSwitchDisconnected &packet);
 
         virtual ~Dispatch() = default;
     };
