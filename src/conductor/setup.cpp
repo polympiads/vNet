@@ -247,6 +247,16 @@ struct ConductorDispatch : public Dispatch {
         info->fd       = data.fd;
         info->connected_at_ms = now_ms();
 
+        // Reject if an agent with this name is already connected
+        for (const auto* existing : g_state.agents) {
+            if (existing->name == pkt.name()) {
+                std::cerr << "[Conductor] Rejected duplicate agent: "
+                        << pkt.name() << "\n";
+                queue->close(data.fd);
+                return;
+            }
+        }
+
         ConnInfo* sw = g_state.pick_switch(pkt.network());
         if (!sw) {
             std::cerr << "[Conductor] No available switch for agent "

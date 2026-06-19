@@ -41,6 +41,8 @@ include_directories(${ProtobufIncludePath})
 
 SET(VNET_SOURCE_FILES
         src/common/socket_utils.cpp
+        src/common/tun.cpp
+        
         src/protocol/header.cpp
         src/protocol/types.cpp
         src/protocol/dispatch.cpp
@@ -72,11 +74,14 @@ add_subdirectory(src/agent)
 ######################## GOOGLE TEST ########################
 #############################################################
 
-include(FetchContent)
-FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
-)
-FetchContent_MakeAvailable(googletest)
+find_package(GTest QUIET)
+if (NOT GTest_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
+    )
+    FetchContent_MakeAvailable(googletest)
+endif()
 enable_testing()
 add_subdirectory(tests)
