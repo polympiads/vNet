@@ -28,6 +28,8 @@
 #include "vnet/blackbox/blackbox.hpp"
 #include "vnet/blackbox/config.hpp"
 #include "vnet/protocol/types.hpp"
+#include "vnet/tls/session.hpp"
+#include <poll.h>
 
 using namespace vnet::protocol;
 using namespace vnet::netqueue;
@@ -243,6 +245,32 @@ static int dial_peer(NetQueue* queue, const PeerTarget& target) {
         std::cerr << "[Switch] Failed to connect to peer " << target.name << "\n";
         return -1;
     }
+    if (rc < 0) {
+        pollfd pfd{};
+        pfd.fd = fd;
+        pfd.events = POLLOUT;
+        if (poll(&pfd, 1, 3000) <= 0) {
+            ::close(fd);
+            return -1;
+        }
+        int soerr = 0;
+        socklen_t slen = sizeof(soerr);
+        getsockopt(fd, SOL_SOCKET, SO_ERROR, &soerr, &slen);
+        if (soerr != 0) {
+            ::close(fd);
+            return -1;
+        }
+    }
+    set_blocking(fd);
+    ssl_st* ssl = nullptr;
+    if (vnet::tls::enabled()) {
+        ssl = vnet::tls::handshake_client(fd);
+        if (!ssl) {
+            ::close(fd);
+            return -1;
+        }
+    }
+    set_nonblocking(fd);
 
     auto* info = new ConnInfo();
     info->role = ConnRole::PEER_SWITCH;
@@ -252,10 +280,12 @@ static int dial_peer(NetQueue* queue, const PeerTarget& target) {
 
     if (queue->put_sck(fd, info) == nullptr) {
         g_state.peer_switches.erase(target.name);
+        vnet::tls::free_session(ssl);
         ::close(fd);
         delete info;
         return -1;
     }
+    if (ssl) queue->adopt_tls(fd, ssl);
 
     mip::PacketSwitchHello hello;
     hello.set_switch_name(g_switch_name);
@@ -636,6 +666,7 @@ static int connect_with_retry(const MachineConfig& mc, const char* label) {
 
 int main(int argc, char** argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+    if (!vnet::tls::init()) return 1;
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
     signal(SIGINT,  on_signal);
@@ -707,13 +738,22 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    ssl_st* cdt_ssl = nullptr;
+    if (vnet::tls::enabled()) {
+        cdt_ssl = vnet::tls::handshake_client(cdt_sock);
+        if (!cdt_ssl) {
+            close(cdt_sock);
+            return 1;
+        }
+    }
+
     mip::PacketSwitchMIP mip_pkt;
     mip_pkt.set_name(switch_name);
     mip_pkt.set_auth_key(auth_key);
     mip_pkt.set_network("::internet");   // reachable from any network
     mip_pkt.set_port(port);
 
-    if (!send_protobuf_packet(cdt_sock, PacketType::SWITCH_MIP, mip_pkt)) {
+    if (!send_protobuf_packet(cdt_sock, PacketType::SWITCH_MIP, mip_pkt, cdt_ssl)) {
         std::cerr << "[Switch] Failed to send MIP\n";
         close(cdt_sock);
         return 1;
@@ -766,6 +806,7 @@ int main(int argc, char** argv) {
         std::cerr << "[Switch] Failed to add conductor fd to queue\n";
         return 1;
     }
+    if (cdt_ssl) queue.adopt_tls(cdt_sock, cdt_ssl);
     if (queue.put_tun(tun_fd, nullptr) == nullptr) {
         std::cerr << "[Switch] Failed to add internet TUN to queue\n";
         return 1;
@@ -779,15 +820,28 @@ int main(int argc, char** argv) {
             if (agent_fd < 0) break;
 
             setsockopt(agent_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+            set_blocking(agent_fd);
+            ssl_st* ssl = nullptr;
+            if (vnet::tls::enabled()) {
+                ssl = vnet::tls::handshake_server(agent_fd);
+                if (!ssl) {
+                    close(agent_fd);
+                    continue;
+                }
+            }
+            set_nonblocking(agent_fd);
 
             auto* info = new ConnInfo();
             info->role = ConnRole::AGENT_PENDING;
             info->fd   = agent_fd;
 
             if (queue.put_sck(agent_fd, info) == nullptr) {
+                vnet::tls::free_session(ssl);
                 close(agent_fd);
                 delete info;
+                continue;
             }
+            if (ssl) queue.adopt_tls(agent_fd, ssl);
         }
 
         // Process events

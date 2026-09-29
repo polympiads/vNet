@@ -5,6 +5,7 @@ SET(CMAKE_CXX_FLAGS "-g -Wall -Werror -std=c++17")
 option(ENABLE_COVERAGE "Enable code coverage instrumentation (requires gcov/lcov)" OFF)
 
 find_program(VALGRIND_EXECUTABLE NAMES valgrind)
+find_package(OpenSSL REQUIRED)
 
 if (ENABLE_COVERAGE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage -O0")
@@ -55,10 +56,12 @@ SET(VNET_SOURCE_FILES
         src/blackbox/agent_registry.cpp
         src/blackbox/routing_table.cpp
         src/blackbox/config.cpp
-        src/blackbox/blackbox.cpp)
+        src/blackbox/blackbox.cpp
+
+        src/tls/session.cpp)
 
 add_library(vnet STATIC ${VNET_SOURCE_FILES})
-target_link_libraries(vnet PUBLIC vnet_proto)
+target_link_libraries(vnet PUBLIC vnet_proto OpenSSL::SSL)
 target_link_libraries(vnet PRIVATE gcov)
 target_include_directories(vnet PUBLIC include)
 

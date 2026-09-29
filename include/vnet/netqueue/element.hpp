@@ -28,6 +28,9 @@ namespace vnet::netqueue {
         /* Set once close() has taken the element. The object stays alive
          * until the current epoll batch finishes. */
         bool dead = false;
+
+        /* Optional TLS session. Null means the fd is plaintext. */
+        struct ssl_st* ssl = nullptr;
     
         NetworkElement (int fd, void *ptr, FiniteStateMachine state);
     };

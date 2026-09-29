@@ -19,16 +19,21 @@ int connect_to(const MachineConfig& mc);
  */
 bool set_nonblocking(int fd);
 
+/** Clear O_NONBLOCK so a TLS handshake can run to completion. */
+bool set_blocking(int fd);
+
 /**
  * @brief Read exactly n bytes from a socket (blocking).
+ *        ssl, when set, reads through that finished TLS session.
  */
-bool read_n_bytes(int sock, void* buffer, size_t n);
+bool read_n_bytes(int sock, void* buffer, size_t n, struct ssl_st* ssl = nullptr);
 
 /**
  * @brief Write exactly n bytes to a socket.
  *        Handles EAGAIN for non-blocking fds via retry.
+ *        ssl, when set, writes through that finished TLS session.
  */
-bool write_n_bytes(int sock, const void* buffer, size_t n);
+bool write_n_bytes(int sock, const void* buffer, size_t n, struct ssl_st* ssl = nullptr);
 
 /**
  * @brief Send a protobuf message with the 6-byte packet header.
@@ -45,7 +50,8 @@ bool write_n_bytes(int sock, const void* buffer, size_t n);
  * AFTER the 6-byte header, matching NetQueue::process().
  */
 bool send_protobuf_packet(int sock, vnet::protocol::PacketType type,
-                          const google::protobuf::Message& msg);
+                          const google::protobuf::Message& msg,
+                          struct ssl_st* ssl = nullptr);
 
 /**
  * @brief Read a protobuf message with the 6-byte packet header (blocking).
@@ -58,7 +64,8 @@ bool send_protobuf_packet(int sock, vnet::protocol::PacketType type,
  * @param received_type  If non-null, receives the actual packet type.
  */
 bool read_protobuf_packet(int sock, vnet::protocol::PacketType expected_type,
-                          google::protobuf::Message& msg);
+                          google::protobuf::Message& msg,
+                          struct ssl_st* ssl = nullptr);
 
 /**
  * @brief Read a packet header and payload, returning the type.
