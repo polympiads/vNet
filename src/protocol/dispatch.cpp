@@ -35,6 +35,7 @@ NetworkQueueHandler vnet::protocol::makeNetworkQueueHandler(Dispatch* dispatch) 
 // ---------------------------------------------------------------------------
 
 void Dispatch::onSocketReady(socket_data data) {
+    onActivity(data);
     switch (data.packet_type) {
         case HEARTBEAT: {
             onHeartbeat(data);
@@ -154,6 +155,7 @@ void Dispatch::onSocketReady(socket_data data) {
 //  Default (no-op) implementations of all virtual handlers
 // ---------------------------------------------------------------------------
 
+void Dispatch::onActivity   (socket_data)                                         {}
 void Dispatch::onClose       (close_data)                                          {}
 void Dispatch::onTunReady    (tun_data)                                            {}
 void Dispatch::onHeartbeat   (socket_data)                                         {}

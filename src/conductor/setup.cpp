@@ -7,6 +7,8 @@
 #include <csignal>
 #include <cstring>
 #include <fstream>
+#include <sstream>
+#include <unordered_map>
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -34,6 +36,8 @@ static const uint16_t             LISTEN_PORT         = 5000;
 static const int                  LISTEN_BACKLOG      = 64;
 static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
 static const std::chrono::seconds DUMP_INTERVAL       {5};
+static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
+static std::chrono::seconds       g_dead{90};
 
 static const char* DEFAULT_DUMP_PATH = "/var/vnet-dump.bin";
 
@@ -68,7 +72,9 @@ struct ConnInfo {
     ConnInfo* assigned_switch = nullptr;
 
     int             fd = -1;
+    uint32_t        virtual_ipv4 = 0;
     clk::time_point last_hb_sent  = clk::now();
+    clk::time_point last_rx       = clk::now();
     int64_t         connected_at_ms = 0;  // unix timestamp ms
 };
 
@@ -128,10 +134,7 @@ struct ConductorState {
                 return sw;
             }
         }
-        // Fallback: round-robin without network check
-        ConnInfo* sw = switches[start % switches.size()];
-        rr_index = start + 1;
-        return sw;
+        return nullptr;
     }
 
     void remove_switch(ConnInfo* info) {
@@ -190,7 +193,19 @@ static void write_dump() {
     for (const auto* ag : g_state.agents) {
         auto* a = proto.add_agents();
         a->set_name(ag->name);
+        a->set_assigned_switch(ag->assigned_switch_name);
+        a->set_virtual_ipv4(ag->virtual_ipv4);
         a->set_connected_at_ms(ag->connected_at_ms);
+    }
+
+    static bool announced = false;
+    if (!announced && !g_state.agents.empty()) {
+        announced = true;
+        for (const auto* ag : g_state.agents) {
+            std::cout << "[Conductor] State " << ag->name
+                      << " -> " << ag->assigned_switch_name
+                      << " " << ipv4_to_string(ag->virtual_ipv4) << "\n";
+        }
     }
 
     for (const auto& pt : g_state.pending_tokens) {
@@ -224,12 +239,71 @@ static void write_dump() {
 //  Dispatch
 // ---------------------------------------------------------------------------
 
+struct AuthRecord {
+    std::string role;
+    std::string key;
+};
+static std::unordered_map<std::string, AuthRecord> g_auth;
+static bool g_auth_required = false;
+
+struct RememberedAgent {
+    std::string auth_key;
+    std::string network;
+    std::string switch_name;
+    uint32_t    virtual_ipv4 = 0;
+};
+static std::unordered_map<std::string, RememberedAgent> g_remembered;
+
+static bool load_auth_file(const std::string& path) {
+    std::ifstream in(path);
+    if (!in) return false;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos) continue;
+        if (line[start] == '#') continue;
+        std::istringstream iss(line.substr(start));
+        std::string role, name, key;
+        if (!(iss >> role >> name >> key)) return false;
+        if (role != "switch" && role != "agent") return false;
+        g_auth[name] = {role, key};
+    }
+    return !g_auth.empty();
+}
+
+static bool auth_ok(const std::string& role, const std::string& name,
+                    const std::string& key) {
+    if (!g_auth_required) return true;
+    auto it = g_auth.find(name);
+    if (it == g_auth.end()) return false;
+    return it->second.role == role && it->second.key == key;
+}
+
 struct ConductorDispatch : public Dispatch {
     NetQueue* queue = nullptr;
     void set_queue(NetQueue* q) { queue = q; }
 
+    void onActivity(socket_data data) override {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (info) info->last_rx = clk::now();
+    }
+
     void onSwitchMIP(socket_data data, mip::PacketSwitchMIP& pkt) override {
         auto* info     = static_cast<ConnInfo*>(data.ptr_data);
+        if (!auth_ok("switch", pkt.name(), pkt.auth_key())) {
+            std::cerr << "[Conductor] Rejected switch auth: " << pkt.name() << "\n";
+            queue->close(data.fd);
+            return;
+        }
+        for (const auto* existing : g_state.switches) {
+            if (existing->name == pkt.name()) {
+                std::cerr << "[Conductor] Rejected duplicate switch: "
+                          << pkt.name() << "\n";
+                queue->close(data.fd);
+                return;
+            }
+        }
         info->role     = Role::SWITCH_CONN;
         info->name     = pkt.name();
         info->auth_key = pkt.auth_key();
@@ -271,6 +345,11 @@ struct ConductorDispatch : public Dispatch {
 
     void onAgentMIP(socket_data data, mip::PacketAgentMIP& pkt) override {
         auto* info     = static_cast<ConnInfo*>(data.ptr_data);
+        if (!auth_ok("agent", pkt.name(), pkt.auth_key())) {
+            std::cerr << "[Conductor] Rejected agent auth: " << pkt.name() << "\n";
+            queue->close(data.fd);
+            return;
+        }
         info->role     = Role::AGENT_CONN;
         info->name     = pkt.name();
         info->auth_key = pkt.auth_key();
@@ -335,24 +414,59 @@ struct ConductorDispatch : public Dispatch {
         });
 
         g_state.agents.push_back(info);
+        g_remembered[info->name] = {
+            info->auth_key, info->network, info->assigned_switch_name, 0
+        };
     }
 
     void onAgentMRP(socket_data data, mip::PacketAgentMRP& pkt) override {
-        auto* info     = static_cast<ConnInfo*>(data.ptr_data);
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!auth_ok("agent", pkt.name(), pkt.auth_key())) {
+            std::cerr << "[Conductor] Rejected agent reauth: " << pkt.name() << "\n";
+            queue->close(data.fd);
+            return;
+        }
+
+        int old_fd = -1;
+        for (const auto* existing : g_state.agents) {
+            if (existing->name == pkt.name() && existing != info) {
+                old_fd = existing->fd;
+                break;
+            }
+        }
+        if (old_fd >= 0) queue->close(old_fd);
+
         info->role     = Role::AGENT_CONN;
         info->name     = pkt.name();
         info->auth_key = pkt.auth_key();
         info->fd       = data.fd;
         info->connected_at_ms = now_ms();
 
-        /* 
-         * Reconnection: the agent already has a switch, it just needs
-         * a fresh control-plane socket.  We register the new socket
-         * without redoing the full MIP.
-         */
-        g_state.agents.push_back(info);
+        auto mem = g_remembered.find(pkt.name());
+        ConnInfo* sw = nullptr;
+        if (mem != g_remembered.end() && mem->second.auth_key == pkt.auth_key()) {
+            info->network = mem->second.network;
+            info->assigned_switch_name = mem->second.switch_name;
+            info->virtual_ipv4 = mem->second.virtual_ipv4;
+            for (auto* candidate : g_state.switches) {
+                if (candidate->name == info->assigned_switch_name) {
+                    sw = candidate;
+                    break;
+                }
+            }
+        }
+        info->assigned_switch = sw;
 
-        std::cout << "[Conductor] Agent reconnected: " << pkt.name() << "\n";
+        if (!sw) {
+            std::cerr << "[Conductor] Agent " << pkt.name()
+                      << " reconnected without a live switch\n";
+            queue->close(data.fd);
+            return;
+        }
+
+        g_state.agents.push_back(info);
+        std::cout << "[Conductor] Agent reconnected: " << pkt.name()
+                  << " on " << sw->name << "\n";
     }
 
     void onHeartbeat(socket_data) override {}
@@ -406,6 +520,19 @@ struct ConductorDispatch : public Dispatch {
         if (!sw_info || sw_info->role != Role::SWITCH_CONN) return;
 
         uint32_t virtual_ipv4 = pkt.virtual_ipv4();
+
+        for (auto* agent : g_state.agents) {
+            if (agent->name == pkt.agent_name()) {
+                agent->virtual_ipv4 = virtual_ipv4;
+                agent->assigned_switch_name = sw_info->name;
+                agent->assigned_switch = sw_info;
+            }
+        }
+        auto remembered = g_remembered.find(pkt.agent_name());
+        if (remembered != g_remembered.end()) {
+            remembered->second.switch_name = sw_info->name;
+            remembered->second.virtual_ipv4 = virtual_ipv4;
+        }
 
         std::cout << "[Conductor] Agent " << pkt.agent_name()
                 << " registered with IP " << ipv4_to_string(virtual_ipv4)
@@ -474,7 +601,7 @@ static void send_heartbeats(NetQueue& queue) {
     auto now = clk::now();
 
     auto try_hb = [&](ConnInfo* c) {
-        if (c && c->fd >= 0 && now - c->last_hb_sent >= HEARTBEAT_INTERVAL) {
+        if (c && c->fd >= 0 && now - c->last_hb_sent >= g_heartbeat) {
             queue.send_heartbeat(c->fd);
             c->last_hb_sent = now;
         }
@@ -482,6 +609,21 @@ static void send_heartbeats(NetQueue& queue) {
 
     for (auto* c : g_state.switches) try_hb(c);
     for (auto* c : g_state.agents)   try_hb(c);
+}
+
+static void reap_dead(NetQueue& queue) {
+    auto now = clk::now();
+    std::vector<int> dead;
+    auto check = [&](ConnInfo* c) {
+        if (c && c->fd >= 0 && now - c->last_rx >= g_dead)
+            dead.push_back(c->fd);
+    };
+    for (auto* c : g_state.switches) check(c);
+    for (auto* c : g_state.agents) check(c);
+    for (int fd : dead) {
+        std::cerr << "[Conductor] Heartbeat timeout on fd " << fd << "\n";
+        queue.close(fd);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -501,6 +643,32 @@ int main() {
     const char* dump_env = std::getenv("VNET_DUMP_PATH");
     g_dump_path = dump_env ? dump_env : DEFAULT_DUMP_PATH;
     std::cout << "[Conductor] State dump path: " << g_dump_path << "\n";
+
+    if (const char* hb = std::getenv("VNET_HEARTBEAT_SEC"))
+        g_heartbeat = std::chrono::seconds(std::stoi(hb));
+    if (const char* dead = std::getenv("VNET_DEAD_SEC"))
+        g_dead = std::chrono::seconds(std::stoi(dead));
+
+    if (const char* auth_path = std::getenv("VNET_AUTH_FILE")) {
+        g_auth_required = true;
+        if (!load_auth_file(auth_path)) {
+            std::cerr << "[Conductor] Failed to load auth file " << auth_path << "\n";
+            return 1;
+        }
+        std::cout << "[Conductor] Loaded " << g_auth.size() << " auth record(s)\n";
+    }
+
+    {
+        std::ifstream previous(g_dump_path, std::ios::binary);
+        if (previous) {
+            vnet::state::ConductorState prior;
+            if (prior.ParseFromIstream(&previous)) {
+                std::cout << "[Conductor] Previous dump had "
+                          << prior.switches_size() << " switch(es) and "
+                          << prior.agents_size() << " agent(s)\n";
+            }
+        }
+    }
 
     // --- Create listener ---
     int listener = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -558,6 +726,7 @@ int main() {
 
         // Heartbeats
         send_heartbeats(queue);
+        reap_dead(queue);
 
         // Periodic dump
         auto now = clk::now();

@@ -8,7 +8,9 @@
 #include <thread>
 
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <sys/socket.h>
+#include <vector>
 #include <netinet/tcp.h>
 #include <unistd.h>
 
@@ -24,6 +26,12 @@ using namespace vnet::netqueue;
 using clk = std::chrono::steady_clock;
 
 static const std::chrono::seconds HEARTBEAT_INTERVAL {30};
+static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
+static std::chrono::seconds       g_dead{90};
+static std::string g_agent_name;
+static std::string g_auth_key;
+static MachineConfig g_conductor_cfg{"", 0};
+static clk::time_point g_last_reconn{};
 static const int MAX_CONNECT_RETRIES  = 20;
 static const int RETRY_DELAY_MS       = 2000;
 
@@ -40,6 +48,7 @@ struct ConnInfo {
     ConnRole role;
     int      fd = -1;
     clk::time_point last_hb_sent = clk::now();
+    clk::time_point last_rx = clk::now();
 };
 
 struct AgentState {
@@ -57,6 +66,11 @@ struct AgentDispatch : public Dispatch {
     int       tun_fd = -1;
 
     void onHeartbeat(socket_data) override {}
+
+    void onActivity(socket_data data) override {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (info) info->last_rx = clk::now();
+    }
 
     /*
      * A full IPv4 packet came off the TUN. Wrap it and hand it to the switch.
@@ -120,7 +134,7 @@ struct AgentDispatch : public Dispatch {
 static void send_heartbeats(NetQueue& queue) {
     auto now = clk::now();
     auto try_hb = [&](ConnInfo* c) {
-        if (c && c->fd >= 0 && now - c->last_hb_sent >= HEARTBEAT_INTERVAL) {
+        if (c && c->fd >= 0 && now - c->last_hb_sent >= g_heartbeat) {
             queue.send_heartbeat(c->fd);
             c->last_hb_sent = now;
         }
@@ -128,6 +142,67 @@ static void send_heartbeats(NetQueue& queue) {
 
     try_hb(g_state.conductor);
     try_hb(g_state.sw);
+}
+
+static void reap_dead(NetQueue& queue) {
+    auto now = clk::now();
+    std::vector<int> dead;
+    auto check = [&](ConnInfo* c) {
+        if (c && c->fd >= 0 && now - c->last_rx >= g_dead)
+            dead.push_back(c->fd);
+    };
+    check(g_state.conductor);
+    check(g_state.sw);
+    for (int fd : dead) {
+        std::cerr << "[Agent] Heartbeat timeout on fd " << fd << "\n";
+        queue.close(fd);
+    }
+}
+
+static void maybe_reconnect_conductor(NetQueue& queue) {
+    if (g_state.conductor) return;
+    if (!g_state.sw) return;
+    auto now = clk::now();
+    if (now - g_last_reconn < std::chrono::seconds(2)) return;
+    g_last_reconn = now;
+
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (fd < 0) return;
+
+    addrinfo hints{};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    addrinfo* result = nullptr;
+    std::string port = std::to_string(g_conductor_cfg.port);
+    if (getaddrinfo(g_conductor_cfg.ip.c_str(), port.c_str(), &hints, &result) != 0 || !result) {
+        ::close(fd);
+        return;
+    }
+    int rc = ::connect(fd, result->ai_addr, result->ai_addrlen);
+    freeaddrinfo(result);
+    if (rc < 0 && errno != EINPROGRESS) {
+        ::close(fd);
+        return;
+    }
+
+    int flag = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
+    auto* info = new ConnInfo();
+    info->role = ConnRole::CONDUCTOR;
+    info->fd = fd;
+    if (queue.put_sck(fd, info) == nullptr) {
+        ::close(fd);
+        delete info;
+        return;
+    }
+    g_state.conductor = info;
+
+    mip::PacketAgentMRP mrp;
+    mrp.set_name(g_agent_name);
+    mrp.set_auth_key(g_auth_key);
+    queue.send(fd, PacketType::AGENT_MRP, mrp);
+    std::cout << "[Agent] Reconnecting control plane\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -208,8 +283,15 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::string agent_name = argv[1];
-    std::string auth_key   = argv[2];
+    if (const char* hb = std::getenv("VNET_HEARTBEAT_SEC"))
+        g_heartbeat = std::chrono::seconds(std::stoi(hb));
+    if (const char* dead = std::getenv("VNET_DEAD_SEC"))
+        g_dead = std::chrono::seconds(std::stoi(dead));
+
+    g_agent_name = argv[1];
+    g_auth_key   = argv[2];
+    std::string agent_name = g_agent_name;
+    std::string auth_key   = g_auth_key;
 
     const char* cdt_ip_env   = std::getenv("CONDUCTOR_IP");
     const char* cdt_port_env = std::getenv("CONDUCTOR_PORT");
@@ -218,10 +300,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    MachineConfig conductor_cfg {
+    g_conductor_cfg = MachineConfig{
         cdt_ip_env,
         static_cast<uint16_t>(std::stoi(cdt_port_env))
     };
+    MachineConfig conductor_cfg = g_conductor_cfg;
 
     // ===================================================================
     //  STEP 1 — Connect to conductor and send Agent MIP
@@ -345,7 +428,9 @@ int main(int argc, char** argv) {
 
     while (g_running) {
         queue.wait_and_process();
+        maybe_reconnect_conductor(queue);
         send_heartbeats(queue);
+        reap_dead(queue);
     }
 
     std::cout << "[Agent] Shutting down.\n";

@@ -36,6 +36,8 @@ using clk = std::chrono::steady_clock;
 
 static const int                  LISTEN_BACKLOG      = 64;
 static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
+static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
+static std::chrono::seconds       g_dead{90};
 static const std::chrono::seconds TOKEN_EXPIRY        {60};
 static const int                  MAX_CONNECT_RETRIES = 20;
 static const int                  RETRY_DELAY_MS      = 2000;
@@ -54,6 +56,7 @@ struct ConnInfo {
     std::string name;
     int         fd = -1;
     clk::time_point last_hb_sent = clk::now();
+    clk::time_point last_rx = clk::now();
     /* Retiring a duplicate dial must not wipe routes that were moved. */
     bool        skip_route_cleanup = false;
 };
@@ -283,6 +286,11 @@ struct SwitchDispatch : public Dispatch {
 
     void set_queue(NetQueue* q) {
         queue = q;
+    }
+
+    void onActivity(socket_data data) override {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (info) info->last_rx = clk::now();
     }
 
     /*
@@ -534,7 +542,7 @@ struct SwitchDispatch : public Dispatch {
 static void send_heartbeats(NetQueue& queue) {
     auto now = clk::now();
     auto try_hb = [&](ConnInfo* c) {
-        if (c && c->fd >= 0 && now - c->last_hb_sent >= HEARTBEAT_INTERVAL) {
+        if (c && c->fd >= 0 && now - c->last_hb_sent >= g_heartbeat) {
             queue.send_heartbeat(c->fd);
             c->last_hb_sent = now;
         }
@@ -543,6 +551,22 @@ static void send_heartbeats(NetQueue& queue) {
     try_hb(g_state.conductor);
     for (auto* a : g_state.agents) try_hb(a);
     for (auto& peer : g_state.peer_switches) try_hb(peer.second);
+}
+
+static void reap_dead(NetQueue& queue) {
+    auto now = clk::now();
+    std::vector<int> dead;
+    auto check = [&](ConnInfo* c) {
+        if (c && c->fd >= 0 && now - c->last_rx >= g_dead)
+            dead.push_back(c->fd);
+    };
+    check(g_state.conductor);
+    for (auto* agent : g_state.agents) check(agent);
+    for (auto& peer : g_state.peer_switches) check(peer.second);
+    for (int fd : dead) {
+        std::cerr << "[Switch] Heartbeat timeout on fd " << fd << "\n";
+        queue.close(fd);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -622,6 +646,11 @@ int main(int argc, char** argv) {
         std::cerr << "Usage: ./switch <name> <auth_key> <port>\n";
         return 1;
     }
+
+    if (const char* hb = std::getenv("VNET_HEARTBEAT_SEC"))
+        g_heartbeat = std::chrono::seconds(std::stoi(hb));
+    if (const char* dead = std::getenv("VNET_DEAD_SEC"))
+        g_dead = std::chrono::seconds(std::stoi(dead));
 
     g_switch_name = argv[1];
     std::string switch_name = g_switch_name;
@@ -772,6 +801,7 @@ int main(int argc, char** argv) {
 
         // Heartbeats
         send_heartbeats(queue);
+        reap_dead(queue);
     }
 
     close(listener);
