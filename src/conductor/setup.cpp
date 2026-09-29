@@ -34,7 +34,8 @@ using sysclk = std::chrono::system_clock;
 // ---------------------------------------------------------------------------
 
 static const uint16_t             LISTEN_PORT         = 5000;
-static const int                  LISTEN_BACKLOG      = 64;
+static const int                  LISTEN_BACKLOG      = 1024;
+static const int                  ACCEPTS_PER_TURN    = 8;
 static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
 static const std::chrono::seconds DUMP_INTERVAL       {5};
 static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
@@ -703,8 +704,9 @@ int main() {
 
     // --- Event loop ---
     while (g_running) {
-        // Accept new connections
-        while (true) {
+        // A few handshakes, then back to epoll, so a burst of agents
+        // cannot stall route updates and heartbeats.
+        for (int accepted = 0; accepted < ACCEPTS_PER_TURN; accepted++) {
             sockaddr_in peer{};
             socklen_t plen = sizeof(peer);
             int client = accept4(listener, (sockaddr*)&peer, &plen, SOCK_NONBLOCK);
@@ -734,7 +736,10 @@ int main() {
                 delete info;
                 continue;
             }
-            if (ssl) queue.adopt_tls(client, ssl);
+            if (ssl) {
+                queue.adopt_tls(client, ssl);
+                queue.drain_tls(client);
+            }
         }
 
         // Process epoll events

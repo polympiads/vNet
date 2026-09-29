@@ -214,6 +214,20 @@ void NetQueue::reap_closed() {
     deferred_delete.clear();
 }
 
+void NetQueue::drain_tls(int fd) {
+    NetworkElement* element = get_network_element_from_fd(fd);
+    if (!element || !element->ssl || element->dead) return;
+    SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    if (SSL_pending(ssl) <= 0 && !SSL_has_pending(ssl)) return;
+
+    process(element);
+    if (element->dead) return;
+    if (element->state == SCK_ERROR || element->state == TUN_ERROR)
+        close(element, CLOSE_ERROR);
+    else if (element->state == SCK_EOF || element->state == TUN_EOF)
+        close(element, CLOSE_HANGUP);
+}
+
 void NetQueue::wait_and_process () {
     reap_closed();
 
@@ -230,7 +244,17 @@ void NetQueue::wait_and_process () {
 
         bool should_close = false;
         close_reason reason = CLOSE_ERROR;
-        if (events[i_event].events & EPOLLIN) {
+        // A TLS write can need a read before it finishes. Finish that write
+        // before SSL_read, or the session fails and the conductor drops the peer.
+        if (!current_element->write_buffer.empty() &&
+            (events[i_event].events & (EPOLLIN | EPOLLOUT))) {
+            if (!flush_write_buffer(current_element)) {
+                should_close = true;
+                reason = CLOSE_ERROR;
+            }
+        }
+        if (!should_close && current_element->write_buffer.empty() &&
+            (events[i_event].events & EPOLLIN)) {
             process(current_element);
             if (current_element->dead)
                 continue ;
@@ -245,12 +269,6 @@ void NetQueue::wait_and_process () {
         }
         if (current_element->dead)
             continue ;
-        if (events[i_event].events & EPOLLOUT) {
-            if (!flush_write_buffer(current_element)) {
-                should_close = true;
-                reason = CLOSE_ERROR;
-            }
-        }
         if (events[i_event].events & EPOLLERR) {
             should_close = true;
             reason = CLOSE_ERROR;

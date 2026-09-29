@@ -235,6 +235,12 @@ namespace vnet::netqueue {
         }
 
         /**
+         * Handshake can pull the first application record into OpenSSL.
+         * Epoll will not see those bytes, so read them now.
+         */
+        void drain_tls(int fd);
+
+        /**
          * Create a network queue with the given
          * handler for the events.
          * 
