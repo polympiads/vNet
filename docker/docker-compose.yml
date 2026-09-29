@@ -19,6 +19,7 @@ services:
     restart: unless-stopped
 
   switch1:
+    image: vnet-switch
     build:
       context: ..
       dockerfile: docker/Dockerfile.switch
@@ -32,7 +33,7 @@ services:
       - CONDUCTOR_PORT=5000
       - VNET_CONFIG_PATH=/etc/vnet/config.txt
     volumes:
-      - ../config/switch1.txt:/etc/vnet/config.txt:ro
+      - ./switch1.txt:/etc/vnet/config.txt:ro
     cap_add:
       - NET_ADMIN
     devices:
@@ -51,6 +52,7 @@ services:
     restart: unless-stopped
 
   switch2:
+    image: vnet-switch
     build:
       context: ..
       dockerfile: docker/Dockerfile.switch
@@ -64,7 +66,7 @@ services:
       - CONDUCTOR_PORT=5000
       - VNET_CONFIG_PATH=/etc/vnet/config.txt
     volumes:
-      - ../config/switch2.txt:/etc/vnet/config.txt:ro
+      - ./switch2.txt:/etc/vnet/config.txt:ro
     cap_add:
       - NET_ADMIN
     devices:
@@ -83,6 +85,7 @@ services:
     restart: unless-stopped
 
   switch3:
+    image: vnet-switch
     build:
       context: ..
       dockerfile: docker/Dockerfile.switch
@@ -96,7 +99,7 @@ services:
       - CONDUCTOR_PORT=5000
       - VNET_CONFIG_PATH=/etc/vnet/config.txt
     volumes:
-      - ../config/switch3.txt:/etc/vnet/config.txt:ro
+      - ./switch3.txt:/etc/vnet/config.txt:ro
     cap_add:
       - NET_ADMIN
     devices:
@@ -115,6 +118,7 @@ services:
     restart: unless-stopped
 
   agent:
+    image: vnet-agent
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
@@ -135,6 +139,35 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     command: ["/usr/local/bin/agent", "agent1", "agentkey1"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  agent2:
+    image: vnet-agent
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: vnet-agent2
+    networks: [vnet]
+    depends_on:
+      switch1:
+        condition: service_healthy
+      switch2:
+        condition: service_healthy
+      switch3:
+        condition: service_healthy
+    environment:
+      - CONDUCTOR_IP=vnet-conductor
+      - CONDUCTOR_PORT=5000
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    command: ["/usr/local/bin/agent", "agent2", "agentkey2"]
     logging:
       driver: "json-file"
       options:

@@ -8,6 +8,7 @@
 #include <chrono>
 #include <thread>
 #include <csignal>
+#include <cerrno>
 #include <cstring>
 
 #include <arpa/inet.h>
@@ -89,6 +90,114 @@ static SwitchState g_state;
 static BlackBox* g_blackbox = nullptr;
 
 // ---------------------------------------------------------------------------
+//  Packets waiting on a route the conductor has not pushed yet
+// ---------------------------------------------------------------------------
+
+static const size_t               PENDING_PER_DEST = 16;
+static const std::chrono::seconds PENDING_TTL{5};
+
+struct BufferedPacket {
+    SourceType      source_type;
+    int             source_fd;
+    std::string     bytes;
+    clk::time_point created;
+};
+
+static std::unordered_map<uint32_t, std::vector<BufferedPacket>> g_pending;
+
+static const char* drop_reason_str(DropReason reason) {
+    switch (reason) {
+        case DropReason::MALFORMED_PACKET: return "malformed";
+        case DropReason::SOURCE_SPOOF:     return "spoof";
+        case DropReason::SOURCE_UNKNOWN:   return "unknown-source";
+        case DropReason::DEST_UNREACHABLE: return "unreachable";
+        case DropReason::ACL_DENIED:       return "acl";
+        default:                           return "none";
+    }
+}
+
+static bool send_ipv4(NetQueue* queue, int fd, const uint8_t* raw, size_t len) {
+    mip::PacketIPv4Raw fwd;
+    fwd.set_payload(raw, len);
+    return queue->send(fd, PacketType::IPV4_RAW, fwd);
+}
+
+static void buffer_for_route(uint32_t dest_ipv4, SourceType source_type,
+                             int source_fd, const uint8_t* raw, size_t len) {
+    auto& q = g_pending[dest_ipv4];
+    if (q.size() >= PENDING_PER_DEST) q.erase(q.begin());
+    q.push_back({source_type, source_fd,
+                 std::string(reinterpret_cast<const char*>(raw), len),
+                 clk::now()});
+    std::cout << "[Switch] Buffered packet for " << ipv4_to_string(dest_ipv4)
+              << " (" << q.size() << " waiting)\n";
+}
+
+static void apply_decision(NetQueue* queue, const PacketDecision& decision,
+                           const uint8_t* raw, size_t len,
+                           SourceType source_type, int source_fd);
+
+static void flush_pending(NetQueue* queue, uint32_t dest_ipv4) {
+    auto it = g_pending.find(dest_ipv4);
+    if (it == g_pending.end()) return;
+
+    std::vector<BufferedPacket> waiting = std::move(it->second);
+    g_pending.erase(it);
+
+    for (auto& pkt : waiting) {
+        const uint8_t* raw = reinterpret_cast<const uint8_t*>(pkt.bytes.data());
+        PacketDecision decision = g_blackbox->process(
+            pkt.source_type, pkt.source_fd, raw, pkt.bytes.size());
+        if (decision.action == PacketAction::REQUEST_ROUTE) {
+            buffer_for_route(decision.dest_ipv4, pkt.source_type,
+                             pkt.source_fd, raw, pkt.bytes.size());
+            continue;
+        }
+        apply_decision(queue, decision, raw, pkt.bytes.size(),
+                       pkt.source_type, pkt.source_fd);
+    }
+}
+
+static void expire_pending() {
+    auto now = clk::now();
+    for (auto it = g_pending.begin(); it != g_pending.end(); ) {
+        auto& q = it->second;
+        q.erase(std::remove_if(q.begin(), q.end(), [&](const BufferedPacket& p) {
+            return now - p.created > PENDING_TTL;
+        }), q.end());
+        if (q.empty()) it = g_pending.erase(it);
+        else ++it;
+    }
+}
+
+static void apply_decision(NetQueue* queue, const PacketDecision& decision,
+                           const uint8_t* raw, size_t len,
+                           SourceType source_type, int source_fd) {
+    switch (decision.action) {
+        case PacketAction::DELIVER_LOCAL:
+        case PacketAction::FORWARD_SWITCH:
+            if (!send_ipv4(queue, decision.target_fd, raw, len)) {
+                std::cerr << "[Switch] Failed to forward packet to fd "
+                          << decision.target_fd << "\n";
+            }
+            break;
+        case PacketAction::FORWARD_INTERNET: {
+            if (decision.target_fd < 0) break;
+            ssize_t n = ::write(decision.target_fd, raw, len);
+            if (n < 0 && errno != EINTR) perror("[Switch] tun write");
+            break;
+        }
+        case PacketAction::REQUEST_ROUTE:
+            buffer_for_route(decision.dest_ipv4, source_type, source_fd, raw, len);
+            break;
+        case PacketAction::DROP:
+            std::cerr << "[Switch] Drop (" << drop_reason_str(decision.drop_reason)
+                      << ")\n";
+            break;
+    }
+}
+
+// ---------------------------------------------------------------------------
 //  Dispatch
 // ---------------------------------------------------------------------------
 
@@ -168,6 +277,8 @@ struct SwitchDispatch : public Dispatch {
         std::cout << "[Switch] Agent " << info->name
                 << " authenticated (fd=" << data.fd
                 << ", ip=" << ipv4_to_string(entry->virtual_ipv4) << ")\n";
+
+        flush_pending(queue, entry->virtual_ipv4);
     }
 
     void onHeartbeat(socket_data) override {}
@@ -253,6 +364,8 @@ struct SwitchDispatch : public Dispatch {
 
         std::cout << "[Switch] Route update: " << ipv4_to_string(agent_ip)
                 << " → " << sw_name << "\n";
+
+        flush_pending(queue, agent_ip);
     }
 
     void onSwitchDisconnected(socket_data data,
@@ -270,24 +383,33 @@ struct SwitchDispatch : public Dispatch {
 
     void onIPv4Raw(socket_data data,
                     mip::PacketIPv4Raw& pkt) override {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!info) return;
+
         const std::string& payload = pkt.payload();
         if (payload.empty()) return;
+
+        /*
+         * Authenticated agents are checked for spoofing and ACL.
+         * Peer switches already did that. Inbound peer sockets are still
+         * accepted as AGENT_PENDING until the switch-hello handshake lands;
+         * those packets are switch traffic, not agent traffic.
+         */
+        SourceType source_type;
+        if (info->role == ConnRole::AGENT_AUTHENTICATED) {
+            source_type = SourceType::AGENT;
+        } else if (info->role == ConnRole::PEER_SWITCH ||
+                   info->role == ConnRole::AGENT_PENDING) {
+            source_type = SourceType::SWITCH;
+        } else {
+            return;
+        }
 
         const uint8_t* raw = reinterpret_cast<const uint8_t*>(payload.data());
         size_t         len = payload.size();
 
-        PacketDecision decision = g_blackbox->process(
-            SourceType::SWITCH, data.fd, raw, len
-        );
-
-        if (decision.action == PacketAction::DELIVER_LOCAL) {
-            mip::PacketIPv4Raw fwd;
-            fwd.set_payload(payload);
-            queue->send(decision.target_fd, PacketType::IPV4_RAW, fwd);
-        } else {
-            std::cerr << "[Switch] Unexpected decision for SWITCH packet: "
-                      << (int)decision.action << "\n";
-        }
+        PacketDecision decision = g_blackbox->process(source_type, data.fd, raw, len);
+        apply_decision(queue, decision, raw, len, source_type, data.fd);
     }
 };
 
@@ -468,8 +590,9 @@ int main(int argc, char** argv) {
         // Process events
         queue.wait_and_process();
 
-        // Expire old tokens
+        // Expire old tokens and packets that never learned a route
         g_state.expire_tokens();
+        expire_pending();
 
         // Heartbeats
         send_heartbeats(queue);
