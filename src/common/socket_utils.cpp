@@ -14,6 +14,7 @@
 #include "common/config.h"
 #include "common/socket_utils.h"
 #include "vnet/protocol/header.hpp"
+#include <openssl/ssl.h>
 
 using namespace vnet::protocol;
 
@@ -56,11 +57,42 @@ bool set_nonblocking(int fd) {
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK) >= 0;
 }
 
-bool write_n_bytes(int sock, const void* buffer, size_t n) {
+bool set_blocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) return false;
+    return fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) >= 0;
+}
+
+static ssize_t io_write_fd(int sock, ssl_st* ssl, const void* buf, size_t n) {
+    if (!ssl) return ::write(sock, buf, n);
+    int r = SSL_write(reinterpret_cast<SSL*>(ssl), buf, static_cast<int>(n));
+    if (r > 0) return r;
+    int err = SSL_get_error(reinterpret_cast<SSL*>(ssl), r);
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        errno = EAGAIN;
+        return -1;
+    }
+    return -1;
+}
+
+static ssize_t io_read_fd(int sock, ssl_st* ssl, void* buf, size_t n) {
+    if (!ssl) return ::read(sock, buf, n);
+    int r = SSL_read(reinterpret_cast<SSL*>(ssl), buf, static_cast<int>(n));
+    if (r > 0) return r;
+    int err = SSL_get_error(reinterpret_cast<SSL*>(ssl), r);
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        errno = EAGAIN;
+        return -1;
+    }
+    if (err == SSL_ERROR_ZERO_RETURN) return 0;
+    return -1;
+}
+
+bool write_n_bytes(int sock, const void* buffer, size_t n, ssl_st* ssl) {
     size_t total = 0;
     const char* ptr = static_cast<const char*>(buffer);
     while (total < n) {
-        ssize_t r = write(sock, ptr + total, n - total);
+        ssize_t r = io_write_fd(sock, ssl, ptr + total, n - total);
         if (r < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
                 usleep(200);          // brief yield, then retry
@@ -74,11 +106,11 @@ bool write_n_bytes(int sock, const void* buffer, size_t n) {
     return true;
 }
 
-bool read_n_bytes(int sock, void* buffer, size_t n) {
+bool read_n_bytes(int sock, void* buffer, size_t n, ssl_st* ssl) {
     size_t total = 0;
     char* ptr = static_cast<char*>(buffer);
     while (total < n) {
-        ssize_t r = read(sock, ptr + total, n - total);
+        ssize_t r = io_read_fd(sock, ssl, ptr + total, n - total);
         if (r < 0) {
             if (errno == EINTR) continue;
             return false;               // EAGAIN = not ready, treat as error in blocking context
@@ -102,28 +134,28 @@ bool read_n_bytes(int sock, void* buffer, size_t n) {
 // ---------------------------------------------------------------------------
 
 bool send_protobuf_packet(int sock, PacketType type,
-                          const google::protobuf::Message& msg) {
+                          const google::protobuf::Message& msg, ssl_st* ssl) {
     std::string body;
     if (!msg.SerializeToString(&body)) return false;
 
     PacketHeader hdr(static_cast<uint32_t>(body.size()), type);
 
     // Write header (6 bytes)
-    if (!write_n_bytes(sock, &hdr, PACKET_HEADER_SIZE)) return false;
+    if (!write_n_bytes(sock, &hdr, PACKET_HEADER_SIZE, ssl)) return false;
 
     // Write protobuf payload
     if (!body.empty()) {
-        if (!write_n_bytes(sock, body.data(), body.size())) return false;
+        if (!write_n_bytes(sock, body.data(), body.size(), ssl)) return false;
     }
 
     return true;
 }
 
 bool read_protobuf_packet(int sock, PacketType expected_type,
-                          google::protobuf::Message& msg) {
+                          google::protobuf::Message& msg, ssl_st* ssl) {
     // Read 6-byte header
     PacketHeader hdr;
-    if (!read_n_bytes(sock, &hdr, PACKET_HEADER_SIZE)) return false;
+    if (!read_n_bytes(sock, &hdr, PACKET_HEADER_SIZE, ssl)) return false;
 
     PacketType type = hdr.get_packet_type();
     uint32_t   len  = hdr.get_payload_size();
@@ -134,9 +166,9 @@ bool read_protobuf_packet(int sock, PacketType expected_type,
         // Heartbeat has zero-length payload, but honour the field anyway
         if (len > 0) {
             std::vector<char> skip(len);
-            if (!read_n_bytes(sock, skip.data(), len)) return false;
+            if (!read_n_bytes(sock, skip.data(), len, ssl)) return false;
         }
-        if (!read_n_bytes(sock, &hdr, PACKET_HEADER_SIZE)) return false;
+        if (!read_n_bytes(sock, &hdr, PACKET_HEADER_SIZE, ssl)) return false;
         type = hdr.get_packet_type();
         len  = hdr.get_payload_size();
     }
@@ -149,7 +181,7 @@ bool read_protobuf_packet(int sock, PacketType expected_type,
     }
 
     std::vector<char> buf(len);
-    if (!read_n_bytes(sock, buf.data(), len)) return false;
+    if (!read_n_bytes(sock, buf.data(), len, ssl)) return false;
 
     return msg.ParseFromArray(buf.data(), buf.size());
 }

@@ -6,11 +6,49 @@
 #include <unistd.h>
 #include <iostream>
 #include <cerrno>
+#include <openssl/ssl.h>
 
 using namespace vnet::netqueue;
 
 void _real_close (int fd) {
     close(fd);
+}
+
+static void free_tls(NetworkElement* element) {
+    if (!element || !element->ssl) return;
+    SSL_free(reinterpret_cast<SSL*>(element->ssl));
+    element->ssl = nullptr;
+}
+
+static ssize_t io_read(NetworkElement* element, void* buf, size_t n) {
+    if (!element->ssl)
+        return ::read(element->fd, buf, n);
+    SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    int r = SSL_read(ssl, buf, static_cast<int>(n));
+    if (r > 0) return r;
+    int err = SSL_get_error(ssl, r);
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        errno = EAGAIN;
+        return -1;
+    }
+    if (err == SSL_ERROR_ZERO_RETURN) return 0;
+    errno = EIO;
+    return -1;
+}
+
+static ssize_t io_write(NetworkElement* element, const void* buf, size_t n) {
+    if (!element->ssl)
+        return ::write(element->fd, buf, n);
+    SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    int r = SSL_write(ssl, buf, static_cast<int>(n));
+    if (r > 0) return r;
+    int err = SSL_get_error(ssl, r);
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        errno = EAGAIN;
+        return -1;
+    }
+    errno = EIO;
+    return -1;
 }
 
 NetworkElement* NetQueue::put_tun (int tun_fd, void* data) {
@@ -56,9 +94,9 @@ bool NetQueue::flush_write_buffer(NetworkElement* element) {
     auto& offset = element->write_buffer_offset;
 
     while (offset < buf.size()) {
-        ssize_t r = ::write(element->fd,
-                            buf.data() + offset,
-                            buf.size() - offset);
+        ssize_t r = io_write(element,
+                             buf.data() + offset,
+                             buf.size() - offset);
         if (r < 0) {
             if (errno == EINTR) continue;
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -107,7 +145,7 @@ bool NetQueue::send(int fd, const void* data, size_t n) {
 
     // Try to write directly first
     while (total < n) {
-        ssize_t r = ::write(fd, ptr + total, n - total);
+        ssize_t r = io_write(element, ptr + total, n - total);
         if (r < 0) {
             if (errno == EINTR) continue;
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -246,7 +284,7 @@ void NetQueue::process (NetworkElement* element) {
         switch (element->state) {
             case SCK_HEADER: {
                 ssize_t nb_rem  = protocol::PACKET_HEADER_SIZE - element->net_buffer_used;
-                ssize_t nb_read = read(element->fd, element->net_buffer + element->net_buffer_used, nb_rem);
+                ssize_t nb_read = io_read(element, element->net_buffer + element->net_buffer_used, nb_rem);
                 if (nb_read < 0) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK)
                         return ;
@@ -270,7 +308,7 @@ void NetQueue::process (NetworkElement* element) {
                 protocol::PacketHeader* header = (protocol::PacketHeader*) element->net_buffer;
                 
                 size_t  buffer_size = header->get_payload_size() + protocol::PACKET_HEADER_SIZE;
-                ssize_t number_read = read(element->fd, element->net_buffer + element->net_buffer_used, buffer_size - element->net_buffer_used);
+                ssize_t number_read = io_read(element, element->net_buffer + element->net_buffer_used, buffer_size - element->net_buffer_used);
                 if (number_read < 0) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK)
                         return ;
@@ -314,7 +352,7 @@ void NetQueue::process (NetworkElement* element) {
                 return ;
             
             case TUN_RECEIVE: {
-                ssize_t nb_read = read(element->fd, element->net_buffer, NET_BUFFER_SIZE);
+                ssize_t nb_read = io_read(element, element->net_buffer, NET_BUFFER_SIZE);
                 if (nb_read < 0) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK)
                         return ;
@@ -361,6 +399,7 @@ NetQueue::~NetQueue () {
     if (epoll_fd < 0) return ;
 
     for (std::pair<int, NetworkElement*> fd_with_network_element : fd_to_network_element) {
+        free_tls(fd_with_network_element.second);
         _real_close(fd_with_network_element.first);
         delete fd_with_network_element.second;
     }
@@ -415,6 +454,7 @@ void NetQueue::close (NetworkElement* element, close_reason reason) {
     data.reason = reason;
     // onClose may send on another socket, which takes the same mutex.
     handler.onClose(handler.ptr_data, data);
+    free_tls(element);
 
     std::lock_guard<std::mutex> lock (fd_to_network_element_mutex);
 

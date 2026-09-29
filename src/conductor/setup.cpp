@@ -22,6 +22,7 @@
 #include "vnet/netqueue/handler.hpp"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
+#include "vnet/tls/session.hpp"
 
 using namespace vnet::protocol;
 using namespace vnet::netqueue;
@@ -391,7 +392,7 @@ struct ConductorDispatch : public Dispatch {
         resp.set_connection_token(token);
         resp.set_switch_port(sw->sw_port);
 
-        if (!send_protobuf_packet(data.fd, PacketType::CONNECT_TO_SWITCH, resp)) {
+        if (!queue->send(data.fd, PacketType::CONNECT_TO_SWITCH, resp)) {
             std::cerr << "[Conductor] Failed to send switch assignment to agent "
                       << pkt.name() << "\n";
             return;
@@ -402,7 +403,7 @@ struct ConductorDispatch : public Dispatch {
         notify.set_agent_name(pkt.name());
         notify.set_connection_token(token);
 
-        if (!send_protobuf_packet(sw->fd, PacketType::AGENT_CONNECTION_TOKEN, notify)) {
+        if (!queue->send(sw->fd, PacketType::AGENT_CONNECTION_TOKEN, notify)) {
             std::cerr << "[Conductor] Failed to notify switch " << sw->name
                       << " of agent " << pkt.name() << "\n";
             return;
@@ -632,6 +633,7 @@ static void reap_dead(NetQueue& queue) {
 
 int main() {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+    if (!vnet::tls::init()) return 1;
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
     signal(SIGINT,   on_signal);
@@ -711,14 +713,28 @@ int main() {
             int flag = 1;
             setsockopt(client, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 
+            set_blocking(client);
+            ssl_st* ssl = nullptr;
+            if (vnet::tls::enabled()) {
+                ssl = vnet::tls::handshake_server(client);
+                if (!ssl) {
+                    close(client);
+                    continue;
+                }
+            }
+            set_nonblocking(client);
+
             auto* info = new ConnInfo();
             info->fd = client;
 
             if (queue.put_sck(client, info) == nullptr) {
                 std::cerr << "[Conductor] Failed to add fd " << client << " to queue\n";
+                vnet::tls::free_session(ssl);
                 close(client);
                 delete info;
+                continue;
             }
+            if (ssl) queue.adopt_tls(client, ssl);
         }
 
         // Process epoll events

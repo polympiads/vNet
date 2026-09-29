@@ -225,6 +225,16 @@ namespace vnet::netqueue {
         NetworkElement* put_sck (int fd, void* ptr);
 
         /**
+         * Attach a finished TLS session to a socket already in the queue.
+         * Later reads and writes go through SSL_read / SSL_write.
+         */
+        void adopt_tls(int fd, struct ssl_st* ssl) {
+            NetworkElement* element = get_network_element_from_fd(fd);
+            if (!element) return;
+            element->ssl = ssl;
+        }
+
+        /**
          * Create a network queue with the given
          * handler for the events.
          * 

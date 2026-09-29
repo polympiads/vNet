@@ -9,6 +9,7 @@
 
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <vector>
 #include <netinet/tcp.h>
@@ -20,6 +21,7 @@
 #include "common/socket_utils.h"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
+#include "vnet/tls/session.hpp"
 
 using namespace vnet::protocol;
 using namespace vnet::netqueue;
@@ -184,6 +186,26 @@ static void maybe_reconnect_conductor(NetQueue& queue) {
         ::close(fd);
         return;
     }
+    if (rc < 0) {
+        pollfd pfd{};
+        pfd.fd = fd;
+        pfd.events = POLLOUT;
+        if (poll(&pfd, 1, 3000) <= 0) {
+            ::close(fd);
+            return;
+        }
+    }
+    set_blocking(fd);
+
+    ssl_st* ssl = nullptr;
+    if (vnet::tls::enabled()) {
+        ssl = vnet::tls::handshake_client(fd);
+        if (!ssl) {
+            ::close(fd);
+            return;
+        }
+    }
+    set_nonblocking(fd);
 
     int flag = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
@@ -192,10 +214,12 @@ static void maybe_reconnect_conductor(NetQueue& queue) {
     info->role = ConnRole::CONDUCTOR;
     info->fd = fd;
     if (queue.put_sck(fd, info) == nullptr) {
+        vnet::tls::free_session(ssl);
         ::close(fd);
         delete info;
         return;
     }
+    if (ssl) queue.adopt_tls(fd, ssl);
     g_state.conductor = info;
 
     mip::PacketAgentMRP mrp;
@@ -272,6 +296,7 @@ static int connect_with_retry(const MachineConfig& mc, const char* label) {
 
 int main(int argc, char** argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+    if (!vnet::tls::init()) return 1;
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
     signal(SIGINT,  on_signal);
@@ -318,12 +343,21 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    ssl_st* cdt_ssl = nullptr;
+    if (vnet::tls::enabled()) {
+        cdt_ssl = vnet::tls::handshake_client(cdt_sock);
+        if (!cdt_ssl) {
+            close(cdt_sock);
+            return 1;
+        }
+    }
+
     mip::PacketAgentMIP mip_pkt;
     mip_pkt.set_name(agent_name);
     mip_pkt.set_auth_key(auth_key);
     mip_pkt.set_network("vnet.internal");
 
-    if (!send_protobuf_packet(cdt_sock, PacketType::AGENT_MIP, mip_pkt)) {
+    if (!send_protobuf_packet(cdt_sock, PacketType::AGENT_MIP, mip_pkt, cdt_ssl)) {
         std::cerr << "[Agent] Failed to send MIP\n";
         close(cdt_sock);
         return 1;
@@ -333,7 +367,7 @@ int main(int argc, char** argv) {
     //  STEP 2 — Receive switch assignment
     // ===================================================================
     mip::PacketConnectToSwitch assignment;
-    if (!read_protobuf_packet(cdt_sock, PacketType::CONNECT_TO_SWITCH, assignment)) {
+    if (!read_protobuf_packet(cdt_sock, PacketType::CONNECT_TO_SWITCH, assignment, cdt_ssl)) {
         std::cerr << "[Agent] Did not receive switch assignment\n";
         close(cdt_sock);
         return 1;
@@ -353,14 +387,26 @@ int main(int argc, char** argv) {
     int sw_sock = connect_with_retry(sw_cfg, "switch");
     if (sw_sock < 0) {
         std::cerr << "[Agent] Cannot reach assigned switch\n";
+        vnet::tls::free_session(cdt_ssl);
         close(cdt_sock);
         return 1;
+    }
+
+    ssl_st* sw_ssl = nullptr;
+    if (vnet::tls::enabled()) {
+        sw_ssl = vnet::tls::handshake_client(sw_sock);
+        if (!sw_ssl) {
+            vnet::tls::free_session(cdt_ssl);
+            close(sw_sock);
+            close(cdt_sock);
+            return 1;
+        }
     }
 
     mip::PacketAuthConnectToSwitch auth_pkt;
     auth_pkt.set_connection_token(assignment.connection_token());
 
-    if (!send_protobuf_packet(sw_sock, PacketType::AUTH_CONNECT_TO_SWITCH, auth_pkt)) {
+    if (!send_protobuf_packet(sw_sock, PacketType::AUTH_CONNECT_TO_SWITCH, auth_pkt, sw_ssl)) {
         std::cerr << "[Agent] Failed to send auth to switch\n";
         close(sw_sock);
         close(cdt_sock);
@@ -368,7 +414,7 @@ int main(int argc, char** argv) {
     }
 
     mip::PacketConnectionAccepted ack;
-    if (!read_protobuf_packet(sw_sock, PacketType::CONNECTION_ACCEPTED, ack)) {
+    if (!read_protobuf_packet(sw_sock, PacketType::CONNECTION_ACCEPTED, ack, sw_ssl)) {
         std::cerr << "[Agent] Switch did not accept connection\n";
         close(sw_sock);
         close(cdt_sock);
@@ -415,12 +461,14 @@ int main(int argc, char** argv) {
     cdt_info->fd   = cdt_sock;
     g_state.conductor = cdt_info;
     queue.put_sck(cdt_sock, cdt_info);
+    if (cdt_ssl) queue.adopt_tls(cdt_sock, cdt_ssl);
 
     auto* sw_info = new ConnInfo();
     sw_info->role = ConnRole::SWITCH;
     sw_info->fd   = sw_sock;
     g_state.sw = sw_info;
     queue.put_sck(sw_sock, sw_info);
+    if (sw_ssl) queue.adopt_tls(sw_sock, sw_ssl);
 
     queue.put_tun(tun_fd, nullptr);
 
