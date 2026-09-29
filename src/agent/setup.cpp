@@ -2,6 +2,7 @@
 #include <string>
 #include <chrono>
 #include <csignal>
+#include <cerrno>
 #include <cstring>
 #include <thread>
 
@@ -51,13 +52,51 @@ static AgentState g_state;
 // ---------------------------------------------------------------------------
 
 struct AgentDispatch : public Dispatch {
+    NetQueue* queue = nullptr;
+    int       tun_fd = -1;
 
     void onHeartbeat(socket_data) override {}
 
-    /* 
-     * After initial MIP the control-plane is mostly idle.
-     * Future extensions (DNS queries, IP group updates) go here.
+    /*
+     * A full IPv4 packet came off the TUN. Wrap it and hand it to the switch.
+     * The switch's black box decides where it goes.
      */
+    void onTunReady(tun_data data) override {
+        if (!queue || !g_state.sw || g_state.sw->fd < 0) return;
+        if (data.ip_buffer == nullptr || data.ip_buffer_size < 20) return;
+        if ((data.ip_buffer[0] >> 4) != 4) return;
+
+        mip::PacketIPv4Raw pkt;
+        pkt.set_payload(data.ip_buffer, data.ip_buffer_size);
+        if (!queue->send(g_state.sw->fd, PacketType::IPV4_RAW, pkt)) {
+            std::cerr << "[Agent] Failed to forward " << data.ip_buffer_size
+                      << " bytes to switch\n";
+        }
+    }
+
+    /*
+     * The switch delivered a packet for our virtual IP. One write, the whole
+     * datagram: a TUN rejects a partial packet.
+     */
+    void onIPv4Raw(socket_data data, mip::PacketIPv4Raw& pkt) override {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!info || info->role != ConnRole::SWITCH) return;
+        if (tun_fd < 0) return;
+
+        const std::string& payload = pkt.payload();
+        if (payload.empty()) return;
+
+        const uint8_t* raw = reinterpret_cast<const uint8_t*>(payload.data());
+        size_t         len = payload.size();
+        for (;;) {
+            ssize_t n = ::write(tun_fd, raw, len);
+            if (n < 0 && errno == EINTR) continue;
+            if (n != static_cast<ssize_t>(len)) {
+                perror("[Agent] tun write");
+            }
+            return;
+        }
+    }
 
     void onClose(close_data data) override {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
@@ -235,8 +274,10 @@ int main(int argc, char** argv) {
     setsockopt(sw_sock,  IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 
     AgentDispatch dispatch;
+    dispatch.tun_fd = tun_fd;
     NetworkQueueHandler handler = makeNetworkQueueHandler(&dispatch);
     NetQueue queue(handler, /*epoll_timeout_ms=*/200);
+    dispatch.queue = &queue;
 
     auto* cdt_info = new ConnInfo();
     cdt_info->role = ConnRole::CONDUCTOR;
