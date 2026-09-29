@@ -1,5 +1,6 @@
 #include "vnet/tls/session.hpp"
 
+#include <cerrno>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -63,10 +64,17 @@ namespace vnet::tls {
         SSL_set_fd(ssl, fd);
         int rc = server ? SSL_accept(ssl) : SSL_connect(ssl);
         if (rc != 1) {
+            int serr = SSL_get_error(ssl, rc);
             unsigned long err = ERR_peek_error();
-            // Docker health checks open the port and hang up. That is not a
-            // certificate failure.
-            if (ERR_GET_REASON(err) != SSL_R_UNEXPECTED_EOF_WHILE_READING)
+            // A short socket timeout, or a health check that hangs up, is a
+            // retry. It is not a certificate failure.
+            bool timed_out = serr == SSL_ERROR_WANT_READ ||
+                             serr == SSL_ERROR_WANT_WRITE ||
+                             (serr == SSL_ERROR_SYSCALL &&
+                              (errno == EAGAIN || errno == EWOULDBLOCK ||
+                               errno == ETIMEDOUT));
+            if (!timed_out &&
+                ERR_GET_REASON(err) != SSL_R_UNEXPECTED_EOF_WHILE_READING)
                 log_error(server ? "accept" : "connect");
             else
                 ERR_clear_error();

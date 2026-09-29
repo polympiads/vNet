@@ -13,6 +13,7 @@
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/tcp.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -36,7 +37,8 @@ using namespace vnet::netqueue;
 using namespace vnet::blackbox;
 using clk = std::chrono::steady_clock;
 
-static const int                  LISTEN_BACKLOG      = 64;
+static const int                  LISTEN_BACKLOG      = 1024;
+static const int                  ACCEPTS_PER_TURN    = 8;
 static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
 static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
 static std::chrono::seconds       g_dead{90};
@@ -227,6 +229,14 @@ static void install_waiting_routes(NetQueue* queue, const std::string& name, int
     g_routes_waiting.erase(it);
 }
 
+static void set_sock_timeout(int fd, int ms) {
+    timeval tv{};
+    tv.tv_sec = ms / 1000;
+    tv.tv_usec = (ms % 1000) * 1000;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+}
+
 static int dial_peer(NetQueue* queue, const PeerTarget& target) {
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (fd < 0) return -1;
@@ -264,7 +274,11 @@ static int dial_peer(NetQueue* queue, const PeerTarget& target) {
     set_blocking(fd);
     ssl_st* ssl = nullptr;
     if (vnet::tls::enabled()) {
+        // The peer may be busy accepting agents. Do not wait forever, or
+        // this switch stops accepting its own agents.
+        set_sock_timeout(fd, 1000);
         ssl = vnet::tls::handshake_client(fd);
+        set_sock_timeout(fd, 0);
         if (!ssl) {
             ::close(fd);
             return -1;
@@ -301,9 +315,13 @@ static void retry_peers(NetQueue& queue) {
     for (auto& entry : g_peer_targets) {
         PeerTarget& target = entry.second;
         if (g_state.peer_switches.count(target.name)) continue;
+        // One side dials. The other accepts on the agent listener. If both
+        // block in SSL_connect, neither ever accept()s.
+        if (!(g_switch_name < target.name)) continue;
         if (now - target.last_attempt < std::chrono::seconds(2)) continue;
         target.last_attempt = now;
         dial_peer(&queue, target);
+        return;
     }
 }
 
@@ -508,16 +526,21 @@ struct SwitchDispatch : public Dispatch {
 
         if (sw_name == g_switch_name) return;
 
-        g_peer_targets[sw_name] = PeerTarget{
-            sw_name, sw_ipv4, static_cast<uint16_t>(sw_port), clk::time_point{}
-        };
+        auto known = g_peer_targets.find(sw_name);
+        if (known == g_peer_targets.end()) {
+            g_peer_targets.emplace(sw_name, PeerTarget{
+                sw_name, sw_ipv4, static_cast<uint16_t>(sw_port), clk::time_point{}
+            });
+        } else {
+            known->second.ipv4 = sw_ipv4;
+            known->second.port = static_cast<uint16_t>(sw_port);
+        }
 
         auto it = g_state.peer_switches.find(sw_name);
         if (it != g_state.peer_switches.end()) {
             g_blackbox->on_route_update(agent_ip, it->second->fd);
         } else {
             g_routes_waiting[sw_name].push_back(agent_ip);
-            dial_peer(queue, g_peer_targets[sw_name]);
         }
 
         std::cout << "[Switch] Route update: " << ipv4_to_string(agent_ip)
@@ -814,8 +837,7 @@ int main(int argc, char** argv) {
 
     // --- 4. Event loop ---
     while (g_running) {
-        // Accept agents (non-blocking)
-        while (true) {
+        for (int accepted = 0; accepted < ACCEPTS_PER_TURN; accepted++) {
             int agent_fd = accept4(listener, nullptr, nullptr, SOCK_NONBLOCK);
             if (agent_fd < 0) break;
 
@@ -823,7 +845,9 @@ int main(int argc, char** argv) {
             set_blocking(agent_fd);
             ssl_st* ssl = nullptr;
             if (vnet::tls::enabled()) {
+                set_sock_timeout(agent_fd, 1000);
                 ssl = vnet::tls::handshake_server(agent_fd);
+                set_sock_timeout(agent_fd, 0);
                 if (!ssl) {
                     close(agent_fd);
                     continue;
@@ -841,7 +865,10 @@ int main(int argc, char** argv) {
                 delete info;
                 continue;
             }
-            if (ssl) queue.adopt_tls(agent_fd, ssl);
+            if (ssl) {
+                queue.adopt_tls(agent_fd, ssl);
+                queue.drain_tls(agent_fd);
+            }
         }
 
         // Process events
