@@ -18,7 +18,7 @@ RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
 FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libprotobuf32t64 bash iproute2 \
+    libprotobuf32t64 bash iproute2 iptables procps \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/build/switch /usr/local/bin/switch

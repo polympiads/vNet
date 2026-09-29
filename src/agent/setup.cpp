@@ -173,6 +173,10 @@ static void install_host_routes(const std::string& tun_name,
     const char* cidr = std::getenv("VNET_OVERLAY_CIDR");
     if (!cidr || !*cidr) cidr = "10.0.0.0/8";
     run_cmd("ip route replace " + std::string(cidr) + " dev " + tun_name);
+
+    const char* via_tun = std::getenv("VNET_DEFAULT_VIA_TUN");
+    if (!via_tun || std::string(via_tun) != "0")
+        run_cmd("ip route replace default dev " + tun_name);
 }
 
 static int connect_with_retry(const MachineConfig& mc, const char* label) {
