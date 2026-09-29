@@ -430,17 +430,29 @@ void NetQueue::close (int fd) {
     close(element, CLOSE_ERROR);
 }
 void NetQueue::close (NetworkElement* element, close_reason reason) {
-    if (element == nullptr || element->dead) {
+    if (element == nullptr) {
         return ;
     }
 
-    element->dead = true;
+    {
+        std::lock_guard<std::mutex> lock (fd_to_network_element_mutex);
+        if (element->dead) {
+            return ;
+        }
+        auto it = fd_to_network_element.find(element->fd);
+        // The caller still owns an element that was never put in the queue.
+        if (it == fd_to_network_element.end() || (*it).second != element) {
+            return ;
+        }
+        element->dead = true;
+    }
 
     close_data data;
     data.fd = element->fd;
     data.net_element = element;
     data.ptr_data = element->ptr;
     data.reason = reason;
+    // onClose may send on another socket, which takes the same mutex.
     handler.onClose(handler.ptr_data, data);
     free_tls(element);
 
