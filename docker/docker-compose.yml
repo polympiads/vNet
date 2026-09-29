@@ -5,6 +5,10 @@ services:
       dockerfile: docker/Dockerfile.conductor
     container_name: vnet-conductor
     networks: [vnet]
+    environment:
+      - VNET_AUTH_FILE=/etc/vnet/auth.txt
+    volumes:
+      - ./auth.txt:/etc/vnet/auth.txt:ro
     healthcheck:
       test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/5000' || exit 1"]
       interval: 3s

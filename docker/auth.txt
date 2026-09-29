@@ -1,0 +1,5 @@
+switch switch1 authkey1
+switch switch2 authkey2
+switch switch3 authkey3
+agent agent1 agentkey1
+agent agent2 agentkey2

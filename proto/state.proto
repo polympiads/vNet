@@ -14,6 +14,7 @@ message AgentState {
     string   name            = 1;
     string   assigned_switch = 2;
     int64    connected_at_ms = 3;  // unix timestamp ms
+    fixed32  virtual_ipv4    = 4;
 }
 
 message PendingToken {
