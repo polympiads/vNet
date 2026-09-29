@@ -35,6 +35,9 @@ services:
       - ./switch1.txt:/etc/vnet/config.txt:ro
     cap_add:
       - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
     devices:
       - /dev/net/tun:/dev/net/tun
     command: ["/usr/local/bin/switch", "switch1", "authkey1", "6000"]
@@ -67,6 +70,9 @@ services:
       - ./switch2.txt:/etc/vnet/config.txt:ro
     cap_add:
       - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
     devices:
       - /dev/net/tun:/dev/net/tun
     command: ["/usr/local/bin/switch", "switch2", "authkey2", "6001"]
@@ -99,6 +105,9 @@ services:
       - ./switch3.txt:/etc/vnet/config.txt:ro
     cap_add:
       - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
     devices:
       - /dev/net/tun:/dev/net/tun
     command: ["/usr/local/bin/switch", "switch3", "authkey3", "6002"]

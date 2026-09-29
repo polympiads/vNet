@@ -20,6 +20,8 @@
 #include "mip.pb.h"
 #include "common/config.h"
 #include "common/socket_utils.h"
+#include "common/tun.h"
+#include <cstdlib>
 #include "vnet/netqueue/handler.hpp"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
@@ -197,7 +199,7 @@ static void apply_decision(NetQueue* queue, const PacketDecision& decision,
         case PacketAction::FORWARD_INTERNET: {
             if (decision.target_fd < 0) break;
             ssize_t n = ::write(decision.target_fd, raw, len);
-            if (n < 0 && errno != EINTR) perror("[Switch] tun write");
+            if (n != static_cast<ssize_t>(len)) perror("[Switch] tun write");
             break;
         }
         case PacketAction::REQUEST_ROUTE:
@@ -357,6 +359,17 @@ struct SwitchDispatch : public Dispatch {
     }
 
     void onHeartbeat(socket_data) override {}
+
+    void onTunReady(tun_data data) override {
+        if (!g_blackbox || data.ip_buffer == nullptr || data.ip_buffer_size < 20)
+            return;
+        if ((data.ip_buffer[0] >> 4) != 4) return;
+
+        PacketDecision decision = g_blackbox->process(
+            SourceType::TUN, data.fd, data.ip_buffer, data.ip_buffer_size);
+        apply_decision(queue, decision, data.ip_buffer, data.ip_buffer_size,
+                       SourceType::TUN, data.fd);
+    }
 
     void onClose(close_data data) override {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
@@ -536,6 +549,51 @@ static void send_heartbeats(NetQueue& queue) {
 //  connect_to with retries (waits for the target to be up)
 // ---------------------------------------------------------------------------
 
+static bool run_cmd(const std::string& cmd) {
+    int rc = std::system(cmd.c_str());
+    if (rc != 0)
+        std::cerr << "[Switch] Command failed (" << rc << "): " << cmd << "\n";
+    return rc == 0;
+}
+
+/*
+ * Packets written to the TUN are forwarded by the kernel and masqueraded
+ * out the physical interface. Replies are routed back into the TUN, which
+ * the event loop reads as SourceType::TUN.
+ */
+static bool setup_internet(const std::string& tun_name) {
+    std::string egress;
+    uint32_t gateway = 0;
+    if (!read_default_route(egress, gateway)) {
+        std::cerr << "[Switch] No default route for NAT\n";
+        return false;
+    }
+
+    const char* cidr = std::getenv("VNET_OVERLAY_CIDR");
+    if (!cidr || !*cidr) cidr = "10.0.0.0/8";
+
+    run_cmd("sysctl -w net.ipv4.ip_forward=1");
+    run_cmd("sysctl -w net.ipv4.conf.all.rp_filter=0");
+    run_cmd("sysctl -w net.ipv4.conf." + tun_name + ".rp_filter=0");
+    run_cmd("ip route replace " + std::string(cidr) + " dev " + tun_name);
+
+    std::string nat = "iptables -t nat -C POSTROUTING -o " + egress +
+                      " -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o " +
+                      egress + " -j MASQUERADE";
+    std::string out = "iptables -C FORWARD -i " + tun_name + " -o " + egress +
+                      " -j ACCEPT 2>/dev/null || iptables -A FORWARD -i " + tun_name +
+                      " -o " + egress + " -j ACCEPT";
+    std::string back = "iptables -C FORWARD -i " + egress + " -o " + tun_name +
+                       " -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || "
+                       "iptables -A FORWARD -i " + egress + " -o " + tun_name +
+                       " -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT";
+    bool ok = run_cmd(nat) && run_cmd(out) && run_cmd(back);
+    if (ok)
+        std::cout << "[Switch] NAT " << cidr << " via " << tun_name
+                  << " -> " << egress << "\n";
+    return ok;
+}
+
 static int connect_with_retry(const MachineConfig& mc, const char* label) {
     for (int attempt = 1; attempt <= MAX_CONNECT_RETRIES; attempt++) {
         int fd = connect_to(mc);
@@ -590,7 +648,16 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    BlackBox blackbox(config, -1);  // -1 = no internet TUN yet
+    const std::string tun_name = "vnet-out";
+    int tun_fd = tun_open(tun_name, string_to_ipv4("192.0.2.1"), 32);
+    if (tun_fd < 0) {
+        std::cerr << "[Switch] Failed to open internet TUN\n";
+        return 1;
+    }
+    if (!setup_internet(tun_name))
+        std::cerr << "[Switch] Internet forwarding is not active\n";
+
+    BlackBox blackbox(config, tun_fd);
     g_blackbox = &blackbox;
 
     std::cout << "[Switch] Loaded config from " << config_path << "\n";
@@ -670,6 +737,10 @@ int main(int argc, char** argv) {
         std::cerr << "[Switch] Failed to add conductor fd to queue\n";
         return 1;
     }
+    if (queue.put_tun(tun_fd, nullptr) == nullptr) {
+        std::cerr << "[Switch] Failed to add internet TUN to queue\n";
+        return 1;
+    }
 
     // --- 4. Event loop ---
     while (g_running) {
@@ -704,6 +775,7 @@ int main(int argc, char** argv) {
     }
 
     close(listener);
+    tun_close(tun_fd, tun_name);
     std::cout << "[Switch] Shutting down.\n";
     google::protobuf::ShutdownProtobufLibrary();
     return 0;
