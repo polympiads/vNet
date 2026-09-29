@@ -4,8 +4,11 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <vector>
+#include <cstdlib>
 #include <stdexcept>
 
 #include "common/config.h"
@@ -190,4 +193,23 @@ uint32_t string_to_ipv4(const std::string& ip) {
         throw std::runtime_error("Invalid IPv4 string: " + ip);
     }
     return addr;
+}
+
+bool read_default_route(std::string& iface, uint32_t& gateway_nbo) {
+    std::ifstream in("/proc/net/route");
+    if (!in) return false;
+
+    std::string line;
+    std::getline(in, line);
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        std::istringstream iss(line);
+        std::string name, dest, gateway;
+        if (!(iss >> name >> dest >> gateway)) continue;
+        if (dest != "00000000") continue;
+        iface = name;
+        gateway_nbo = static_cast<uint32_t>(std::strtoul(gateway.c_str(), nullptr, 16));
+        return true;
+    }
+    return false;
 }

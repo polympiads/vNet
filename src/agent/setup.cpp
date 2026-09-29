@@ -3,6 +3,7 @@
 #include <chrono>
 #include <csignal>
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <thread>
 
@@ -133,6 +134,47 @@ static void send_heartbeats(NetQueue& queue) {
 //  connect_to with retries (waits for the target to be up)
 // ---------------------------------------------------------------------------
 
+static uint32_t peer_ipv4(int fd) {
+    sockaddr_in peer{};
+    socklen_t len = sizeof(peer);
+    if (getpeername(fd, reinterpret_cast<sockaddr*>(&peer), &len) != 0)
+        return 0;
+    return peer.sin_addr.s_addr;
+}
+
+static void run_cmd(const std::string& cmd) {
+    int rc = std::system(cmd.c_str());
+    if (rc != 0)
+        std::cerr << "[Agent] Command failed (" << rc << "): " << cmd << "\n";
+}
+
+/*
+ * The TUN is a /32. Other virtual IPs are reached by an explicit overlay
+ * route into the device. Conductor and switch addresses stay on the
+ * physical default route so the control sockets are not captured by the overlay.
+ */
+static void install_host_routes(const std::string& tun_name,
+                                uint32_t conductor_ip,
+                                uint32_t switch_ip) {
+    std::string iface;
+    uint32_t gateway = 0;
+    if (read_default_route(iface, gateway)) {
+        auto pin = [&](uint32_t ip) {
+            if (ip == 0) return;
+            run_cmd("ip route replace " + ipv4_to_string(ip) + "/32 via " +
+                    ipv4_to_string(gateway) + " dev " + iface);
+        };
+        pin(conductor_ip);
+        pin(switch_ip);
+    } else {
+        std::cerr << "[Agent] No default route; control-plane pins were skipped\n";
+    }
+
+    const char* cidr = std::getenv("VNET_OVERLAY_CIDR");
+    if (!cidr || !*cidr) cidr = "10.0.0.0/8";
+    run_cmd("ip route replace " + std::string(cidr) + " dev " + tun_name);
+}
+
 static int connect_with_retry(const MachineConfig& mc, const char* label) {
     for (int attempt = 1; attempt <= MAX_CONNECT_RETRIES; attempt++) {
         int fd = connect_to(mc);
@@ -255,13 +297,15 @@ int main(int argc, char** argv) {
     // ===================================================================
     
     std::string tun_name = "vnet-" + agent_name;
-    int tun_fd = tun_open(tun_name, virtual_ipv4);
+    int tun_fd = tun_open(tun_name, virtual_ipv4, 32);
     if (tun_fd < 0) {
         std::cerr << "[Agent] Failed to open TUN device\n";
         close(sw_sock);
         close(cdt_sock);
         return 1;
     }
+
+    install_host_routes(tun_name, peer_ipv4(cdt_sock), peer_ipv4(sw_sock));
 
     // ===================================================================
     //  STEP 5 — Switch both fds to non-blocking, enter event loop
