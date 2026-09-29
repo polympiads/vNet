@@ -52,6 +52,10 @@ namespace vnet::blackbox {
         routing_.remove_routes_for_switch(switch_fd);
     }
 
+    void BlackBox::retarget_switch(int old_fd, int new_fd) {
+        routing_.retarget(old_fd, new_fd);
+    }
+
     // =================================================================
     //  Accessors
     // =================================================================

@@ -24,6 +24,10 @@ namespace vnet::netqueue {
 
         std::vector<uint8_t> write_buffer;
         size_t               write_buffer_offset = 0;
+
+        /* Set once close() has taken the element. The object stays alive
+         * until the current epoll batch finishes. */
+        bool dead = false;
     
         NetworkElement (int fd, void *ptr, FiniteStateMachine state);
     };

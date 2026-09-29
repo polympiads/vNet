@@ -12,6 +12,13 @@ namespace vnet::blackbox {
         routes_.erase(dest_ipv4);
     }
 
+    void RoutingTable::retarget(int old_fd, int new_fd) {
+        for (auto& entry : routes_) {
+            if (entry.second == old_fd)
+                entry.second = new_fd;
+        }
+    }
+
     void RoutingTable::remove_routes_for_switch(int switch_fd) {
         for (auto it = routes_.begin(); it != routes_.end(); ) {
             if (it->second == switch_fd)

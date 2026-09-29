@@ -89,6 +89,15 @@ struct ConductorState {
     };
     std::vector<PendingTokenInfo> pending_tokens;
 
+    struct PublishedRoute {
+        std::string agent_name;
+        std::string switch_name;
+        uint32_t    switch_ipv4 = 0;
+        uint32_t    switch_port = 0;
+        uint32_t    agent_ipv4  = 0;
+    };
+    std::vector<PublishedRoute> published;
+
     size_t rr_index = 0;
 
     std::mt19937_64 rng{std::random_device{}()};
@@ -238,6 +247,22 @@ struct ConductorDispatch : public Dispatch {
 
         g_state.switches.push_back(info);
 
+        for (const auto& route : g_state.published) {
+            if (route.switch_name == info->name) continue;
+            bool owner_up = false;
+            for (const auto* sw : g_state.switches) {
+                if (sw->name == route.switch_name) { owner_up = true; break; }
+            }
+            if (!owner_up) continue;
+
+            mip::PacketSwitchRouteUpdate update;
+            update.set_switch_name(route.switch_name);
+            update.set_switch_ipv4(route.switch_ipv4);
+            update.set_switch_port(route.switch_port);
+            update.set_agent_ipv4(route.agent_ipv4);
+            queue->send(info->fd, PacketType::SWITCH_ROUTE_UPDATE, update);
+        }
+
         std::cout << "[Conductor] Switch registered: " << info->name
                   << " @ " << ipv4_to_string(info->sw_ipv4)
                   << ":" << info->sw_port
@@ -361,6 +386,12 @@ struct ConductorDispatch : public Dispatch {
                 queue->send(sw->fd, PacketType::SWITCH_DISCONNECTED, disc);
             }
             
+            g_state.published.erase(
+                std::remove_if(g_state.published.begin(), g_state.published.end(),
+                    [&](const ConductorState::PublishedRoute& route) {
+                        return route.switch_name == info->name;
+                    }),
+                g_state.published.end());
             g_state.remove_switch(info);
         } else if (info->role == Role::AGENT_CONN) {
             g_state.remove_agent(info);
@@ -380,6 +411,25 @@ struct ConductorDispatch : public Dispatch {
                 << " registered with IP " << ipv4_to_string(virtual_ipv4)
                 << " on switch " << sw_info->name << "\n";
 
+        g_state.pending_tokens.erase(
+            std::remove_if(g_state.pending_tokens.begin(), g_state.pending_tokens.end(),
+                [&](const ConductorState::PendingTokenInfo& t) {
+                    return t.agent_name == pkt.agent_name();
+                }),
+            g_state.pending_tokens.end());
+
+        g_state.published.erase(
+            std::remove_if(g_state.published.begin(), g_state.published.end(),
+                [&](const ConductorState::PublishedRoute& route) {
+                    return route.agent_name == pkt.agent_name() ||
+                           route.agent_ipv4 == virtual_ipv4;
+                }),
+            g_state.published.end());
+        g_state.published.push_back({
+            pkt.agent_name(), sw_info->name, sw_info->sw_ipv4,
+            sw_info->sw_port, virtual_ipv4
+        });
+
         // Broadcast route to all other switches
         mip::PacketSwitchRouteUpdate update;
         update.set_switch_name(sw_info->name);
@@ -390,6 +440,28 @@ struct ConductorDispatch : public Dispatch {
         for (auto* sw : g_state.switches) {
             if (sw->fd == data.fd) continue;  // don't send back to the same switch
             queue->send(sw->fd, PacketType::SWITCH_ROUTE_UPDATE, update);
+        }
+    }
+
+    void onAgentUnregistered(socket_data data,
+                             mip::PacketAgentUnregistered& pkt) override {
+        auto* sw_info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!sw_info || sw_info->role != Role::SWITCH_CONN) return;
+
+        g_state.published.erase(
+            std::remove_if(g_state.published.begin(), g_state.published.end(),
+                [&](const ConductorState::PublishedRoute& route) {
+                    return route.agent_ipv4 == pkt.virtual_ipv4() ||
+                           route.agent_name == pkt.agent_name();
+                }),
+            g_state.published.end());
+
+        std::cout << "[Conductor] Agent " << pkt.agent_name()
+                  << " left " << sw_info->name << "\n";
+
+        for (auto* sw : g_state.switches) {
+            if (sw->fd == data.fd) continue;
+            queue->send(sw->fd, PacketType::AGENT_UNREGISTERED, pkt);
         }
     }
 };

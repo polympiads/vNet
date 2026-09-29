@@ -33,6 +33,8 @@ namespace vnet::protocol {
         virtual void onAgentRegistered    (netqueue::socket_data data, mip::PacketAgentRegistered    &packet);
         virtual void onSwitchRouteUpdate  (netqueue::socket_data data, mip::PacketSwitchRouteUpdate  &packet);
         virtual void onSwitchDisconnected (netqueue::socket_data data, mip::PacketSwitchDisconnected &packet);
+        virtual void onSwitchHello        (netqueue::socket_data data, mip::PacketSwitchHello        &packet);
+        virtual void onAgentUnregistered  (netqueue::socket_data data, mip::PacketAgentUnregistered  &packet);
 
         virtual ~Dispatch() = default;
     };

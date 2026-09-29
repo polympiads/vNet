@@ -50,6 +50,8 @@ namespace vnet::blackbox {
 
         while (std::getline(file, raw)) {
             line_num++;
+            if (!raw.empty() && raw.back() == '\r')
+                raw.pop_back();
 
             size_t start = raw.find_first_not_of(" \t");
             if (start == std::string::npos) continue;

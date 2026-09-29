@@ -56,6 +56,17 @@ TEST(RoutingTable, RemoveRoutesForSwitch) {
     EXPECT_EQ(rt.size(), 1u);
 }
 
+TEST(RoutingTable, Retarget) {
+    RoutingTable rt;
+    rt.set_route(ip("10.0.1.1"), 7);
+    rt.set_route(ip("10.0.1.2"), 8);
+
+    rt.retarget(7, 9);
+
+    EXPECT_EQ(rt.lookup(ip("10.0.1.1")), 9);
+    EXPECT_EQ(rt.lookup(ip("10.0.1.2")), 8);
+}
+
 TEST(RoutingTable, Clear) {
     RoutingTable rt;
     rt.set_route(ip("10.0.1.1"), 7);

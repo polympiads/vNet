@@ -131,6 +131,20 @@ void Dispatch::onSocketReady(socket_data data) {
             }
             break;
         }
+        case SWITCH_HELLO: {
+            mip::PacketSwitchHello packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onSwitchHello(data, packet);
+            }
+            break;
+        }
+        case AGENT_UNREGISTERED: {
+            mip::PacketAgentUnregistered packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onAgentUnregistered(data, packet);
+            }
+            break;
+        }
         default:
             break;
     }
@@ -160,3 +174,5 @@ void Dispatch::onIPv4Raw               (socket_data, mip::PacketIPv4Raw&)       
 void Dispatch::onAgentRegistered       (socket_data, mip::PacketAgentRegistered&)       {}
 void Dispatch::onSwitchRouteUpdate     (socket_data, mip::PacketSwitchRouteUpdate&)     {}
 void Dispatch::onSwitchDisconnected    (socket_data, mip::PacketSwitchDisconnected&)    {}
+void Dispatch::onSwitchHello           (socket_data, mip::PacketSwitchHello&)           {}
+void Dispatch::onAgentUnregistered     (socket_data, mip::PacketAgentUnregistered&)     {}

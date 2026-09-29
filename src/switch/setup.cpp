@@ -52,6 +52,8 @@ struct ConnInfo {
     std::string name;
     int         fd = -1;
     clk::time_point last_hb_sent = clk::now();
+    /* Retiring a duplicate dial must not wipe routes that were moved. */
+    bool        skip_route_cleanup = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +90,17 @@ struct SwitchState {
 
 static SwitchState g_state;
 static BlackBox* g_blackbox = nullptr;
+static std::string g_switch_name;
+
+struct PeerTarget {
+    std::string     name;
+    uint32_t        ipv4 = 0;
+    uint16_t        port = 0;
+    clk::time_point last_attempt{};
+};
+
+static std::unordered_map<std::string, PeerTarget> g_peer_targets;
+static std::unordered_map<std::string, std::vector<uint32_t>> g_routes_waiting;
 
 // ---------------------------------------------------------------------------
 //  Packets waiting on a route the conductor has not pushed yet
@@ -197,6 +210,68 @@ static void apply_decision(NetQueue* queue, const PacketDecision& decision,
     }
 }
 
+static void install_waiting_routes(NetQueue* queue, const std::string& name, int fd) {
+    auto it = g_routes_waiting.find(name);
+    if (it == g_routes_waiting.end()) return;
+    for (uint32_t ip : it->second) {
+        g_blackbox->on_route_update(ip, fd);
+        flush_pending(queue, ip);
+    }
+    g_routes_waiting.erase(it);
+}
+
+static int dial_peer(NetQueue* queue, const PeerTarget& target) {
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (fd < 0) return -1;
+
+    int flag = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(target.port);
+    addr.sin_addr.s_addr = target.ipv4;
+
+    int rc = ::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+    if (rc < 0 && errno != EINPROGRESS) {
+        ::close(fd);
+        std::cerr << "[Switch] Failed to connect to peer " << target.name << "\n";
+        return -1;
+    }
+
+    auto* info = new ConnInfo();
+    info->role = ConnRole::PEER_SWITCH;
+    info->name = target.name;
+    info->fd   = fd;
+    g_state.peer_switches[target.name] = info;
+
+    if (queue->put_sck(fd, info) == nullptr) {
+        g_state.peer_switches.erase(target.name);
+        ::close(fd);
+        delete info;
+        return -1;
+    }
+
+    mip::PacketSwitchHello hello;
+    hello.set_switch_name(g_switch_name);
+    queue->send(fd, PacketType::SWITCH_HELLO, hello);
+
+    std::cout << "[Switch] Dialing peer " << target.name << "\n";
+    install_waiting_routes(queue, target.name, fd);
+    return fd;
+}
+
+static void retry_peers(NetQueue& queue) {
+    auto now = clk::now();
+    for (auto& entry : g_peer_targets) {
+        PeerTarget& target = entry.second;
+        if (g_state.peer_switches.count(target.name)) continue;
+        if (now - target.last_attempt < std::chrono::seconds(2)) continue;
+        target.last_attempt = now;
+        dial_peer(&queue, target);
+    }
+}
+
 // ---------------------------------------------------------------------------
 //  Dispatch
 // ---------------------------------------------------------------------------
@@ -293,7 +368,14 @@ struct SwitchDispatch : public Dispatch {
         }
 
         if (info->role == ConnRole::AGENT_AUTHENTICATED) {
-            // Notify BlackBox so it cleans up the agent registry
+            AgentEntry* entry = g_blackbox->agents().find_by_fd(data.fd);
+            if (entry && g_state.conductor && g_state.conductor->fd >= 0) {
+                mip::PacketAgentUnregistered gone;
+                gone.set_agent_name(entry->name);
+                gone.set_virtual_ipv4(entry->virtual_ipv4);
+                gone.set_switch_name(g_switch_name);
+                queue->send(g_state.conductor->fd, PacketType::AGENT_UNREGISTERED, gone);
+            }
             g_blackbox->on_agent_disconnected(data.fd);
             g_state.agents.erase(
                 std::remove(g_state.agents.begin(), g_state.agents.end(), info),
@@ -301,8 +383,11 @@ struct SwitchDispatch : public Dispatch {
         }
 
         if (info->role == ConnRole::PEER_SWITCH) {
-            g_blackbox->on_switch_disconnected(data.fd);
-            g_state.peer_switches.erase(info->name);
+            auto it = g_state.peer_switches.find(info->name);
+            if (it != g_state.peer_switches.end() && it->second == info)
+                g_state.peer_switches.erase(it);
+            if (!info->skip_route_cleanup)
+                g_blackbox->on_switch_disconnected(data.fd);
         }
 
         if (info == g_state.conductor) {
@@ -312,54 +397,76 @@ struct SwitchDispatch : public Dispatch {
         delete info;
     }
 
-    void onSwitchRouteUpdate(socket_data data,
+    void onSwitchHello(socket_data data, mip::PacketSwitchHello& pkt) override {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!info || info->role == ConnRole::AGENT_AUTHENTICATED) return;
+        if (info->role == ConnRole::CONDUCTOR) return;
+
+        std::string remote = pkt.switch_name();
+        if (remote.empty() || remote == g_switch_name) {
+            data.net_element->state = SCK_ERROR;
+            return;
+        }
+
+        auto existing = g_state.peer_switches.find(remote);
+        bool have = existing != g_state.peer_switches.end() && existing->second != info;
+
+        if (!have) {
+            info->role = ConnRole::PEER_SWITCH;
+            info->name = remote;
+            g_state.peer_switches[remote] = info;
+            std::cout << "[Switch] Peer " << remote << " connected inbound\n";
+            install_waiting_routes(queue, remote, data.fd);
+            return;
+        }
+
+        /* Both sides dialed. Keep the socket opened by the smaller name. */
+        if (g_switch_name < remote) {
+            data.net_element->state = SCK_ERROR;
+            return;
+        }
+
+        ConnInfo* outbound = existing->second;
+        int old_fd = outbound->fd;
+        g_blackbox->retarget_switch(old_fd, data.fd);
+        outbound->skip_route_cleanup = true;
+        g_state.peer_switches.erase(existing);
+
+        info->role = ConnRole::PEER_SWITCH;
+        info->name = remote;
+        g_state.peer_switches[remote] = info;
+        queue->close(old_fd);
+
+        std::cout << "[Switch] Collapsed duplicate link to " << remote << "\n";
+        install_waiting_routes(queue, remote, data.fd);
+    }
+
+    void onAgentUnregistered(socket_data,
+                             mip::PacketAgentUnregistered& pkt) override {
+        g_blackbox->on_route_update(pkt.virtual_ipv4(), -1);
+        std::cout << "[Switch] Route withdrawn: "
+                  << ipv4_to_string(pkt.virtual_ipv4()) << "\n";
+    }
+
+    void onSwitchRouteUpdate(socket_data,
                             mip::PacketSwitchRouteUpdate& pkt) override {
         std::string sw_name  = pkt.switch_name();
         uint32_t    sw_ipv4  = pkt.switch_ipv4();
         uint32_t    sw_port  = pkt.switch_port();
         uint32_t    agent_ip = pkt.agent_ipv4();
 
-        // Check if we already have a connection to this switch
+        if (sw_name == g_switch_name) return;
+
+        g_peer_targets[sw_name] = PeerTarget{
+            sw_name, sw_ipv4, static_cast<uint16_t>(sw_port), clk::time_point{}
+        };
+
         auto it = g_state.peer_switches.find(sw_name);
-        if (it == g_state.peer_switches.end()) {
-            // Connect to the peer switch
-            MachineConfig sw_cfg {
-                ipv4_to_string(sw_ipv4),
-                static_cast<uint16_t>(sw_port)
-            };
-
-            int sw_fd = connect_to(sw_cfg);
-            if (sw_fd < 0) {
-                std::cerr << "[Switch] Failed to connect to peer switch "
-                        << sw_name << "\n";
-                return;
-            }
-
-            set_nonblocking(sw_fd);
-            int flag = 1;
-            setsockopt(sw_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
-
-            auto* info = new ConnInfo();
-            info->role = ConnRole::PEER_SWITCH;
-            info->name = sw_name;
-            info->fd   = sw_fd;
-
-            g_state.peer_switches[sw_name] = info;
-
-            if (queue->put_sck(sw_fd, info) == nullptr) {
-                std::cerr << "[Switch] Failed to add peer switch fd to queue\n";
-                close(sw_fd);
-                delete info;
-                return;
-            }
-
-            std::cout << "[Switch] Connected to peer switch " << sw_name << "\n";
-
-            // Update routing table
-            g_blackbox->on_route_update(agent_ip, sw_fd);
-        } else {
-            // Already connected - just update the route
+        if (it != g_state.peer_switches.end()) {
             g_blackbox->on_route_update(agent_ip, it->second->fd);
+        } else {
+            g_routes_waiting[sw_name].push_back(agent_ip);
+            dial_peer(queue, g_peer_targets[sw_name]);
         }
 
         std::cout << "[Switch] Route update: " << ipv4_to_string(agent_ip)
@@ -368,17 +475,18 @@ struct SwitchDispatch : public Dispatch {
         flush_pending(queue, agent_ip);
     }
 
-    void onSwitchDisconnected(socket_data data,
+    void onSwitchDisconnected(socket_data,
                             mip::PacketSwitchDisconnected& pkt) override {
         std::string sw_name = pkt.switch_name();
+        g_peer_targets.erase(sw_name);
+        g_routes_waiting.erase(sw_name);
 
         auto it = g_state.peer_switches.find(sw_name);
         if (it == g_state.peer_switches.end()) return;
 
-        // Close the connection
-        queue->close(it->second->fd);
-
+        int fd = it->second->fd;
         std::cout << "[Switch] Peer switch disconnected: " << sw_name << "\n";
+        queue->close(fd);
     }
 
     void onIPv4Raw(socket_data data,
@@ -389,17 +497,10 @@ struct SwitchDispatch : public Dispatch {
         const std::string& payload = pkt.payload();
         if (payload.empty()) return;
 
-        /*
-         * Authenticated agents are checked for spoofing and ACL.
-         * Peer switches already did that. Inbound peer sockets are still
-         * accepted as AGENT_PENDING until the switch-hello handshake lands;
-         * those packets are switch traffic, not agent traffic.
-         */
         SourceType source_type;
         if (info->role == ConnRole::AGENT_AUTHENTICATED) {
             source_type = SourceType::AGENT;
-        } else if (info->role == ConnRole::PEER_SWITCH ||
-                   info->role == ConnRole::AGENT_PENDING) {
+        } else if (info->role == ConnRole::PEER_SWITCH) {
             source_type = SourceType::SWITCH;
         } else {
             return;
@@ -428,6 +529,7 @@ static void send_heartbeats(NetQueue& queue) {
 
     try_hb(g_state.conductor);
     for (auto* a : g_state.agents) try_hb(a);
+    for (auto& peer : g_state.peer_switches) try_hb(peer.second);
 }
 
 // ---------------------------------------------------------------------------
@@ -463,7 +565,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::string switch_name = argv[1];
+    g_switch_name = argv[1];
+    std::string switch_name = g_switch_name;
     std::string auth_key    = argv[2];
     uint16_t    port        = static_cast<uint16_t>(std::stoi(argv[3]));
 
@@ -593,6 +696,8 @@ int main(int argc, char** argv) {
         // Expire old tokens and packets that never learned a route
         g_state.expire_tokens();
         expire_pending();
+
+        retry_peers(queue);
 
         // Heartbeats
         send_heartbeats(queue);

@@ -9,6 +9,7 @@
 #include <google/protobuf/message.h>
 #include <unordered_map>
 #include <mutex>
+#include <vector>
 
 namespace vnet::netqueue {
     /**
@@ -40,6 +41,12 @@ namespace vnet::netqueue {
         std::unordered_map<int, NetworkElement*> fd_to_network_element;
         /* Mutex for all operations related to the fd_to_network_element unordered_map */
         std::mutex fd_to_network_element_mutex;
+
+        /* Elements removed from the map but not yet deleted, so an epoll
+         * batch that still holds their pointer can skip them safely. */
+        std::vector<NetworkElement*> deferred_delete;
+
+        void reap_closed();
 
         /*
          * Handler of events (e.g. receiving a packet,
@@ -134,10 +141,10 @@ namespace vnet::netqueue {
         void close (int fd);
         /**
          * Close the current network element and remove it from
-         * the queue. It also closes the file descriptor and frees
-         * the network element.
+         * the queue. Fires onClose once, closes the file descriptor,
+         * and frees the element after the current epoll batch.
          */
-        void close (NetworkElement* element);
+        void close (NetworkElement* element, close_reason reason = CLOSE_ERROR);
 
         /**
          * Take a network element (that is an object containing

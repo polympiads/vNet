@@ -41,6 +41,12 @@ namespace vnet::blackbox {
         void remove_routes_for_switch(int switch_fd);
 
         /**
+         * Point every route that used old_fd at new_fd.
+         * Used when two peer dials collapse onto one socket.
+         */
+        void retarget(int old_fd, int new_fd);
+
+        /**
          * Look up the next-hop fd for a destination IPv4.
          *
          * @return The switch fd, or -1 if no route exists.

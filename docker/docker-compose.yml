@@ -19,7 +19,6 @@ services:
     restart: unless-stopped
 
   switch1:
-    image: vnet-switch
     build:
       context: ..
       dockerfile: docker/Dockerfile.switch
@@ -52,7 +51,6 @@ services:
     restart: unless-stopped
 
   switch2:
-    image: vnet-switch
     build:
       context: ..
       dockerfile: docker/Dockerfile.switch
@@ -85,7 +83,6 @@ services:
     restart: unless-stopped
 
   switch3:
-    image: vnet-switch
     build:
       context: ..
       dockerfile: docker/Dockerfile.switch
@@ -118,7 +115,6 @@ services:
     restart: unless-stopped
 
   agent:
-    image: vnet-agent
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
@@ -147,7 +143,6 @@ services:
     restart: unless-stopped
 
   agent2:
-    image: vnet-agent
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
