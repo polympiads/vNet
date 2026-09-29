@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <iostream>
 #include <cerrno>
-#include <unordered_set>
 
 using namespace vnet::netqueue;
 
@@ -171,24 +170,32 @@ NetQueue::NetQueue (NetworkQueueHandler handler, int epoll_timeout) {
     this->handler       = handler;
 }
 
+void NetQueue::reap_closed() {
+    for (NetworkElement* element : deferred_delete)
+        delete element;
+    deferred_delete.clear();
+}
+
 void NetQueue::wait_and_process () {
+    reap_closed();
+
     struct epoll_event events[EPOLL_MAX_EVENTS];
     int nb_events = epoll_wait(epoll_fd, events, EPOLL_MAX_EVENTS, epoll_timeout);
     if (nb_events < 0) {
         return ;
     }
 
-    std::unordered_set<NetworkElement*> elements_closed;
-
     for (int i_event = 0; i_event < nb_events; i_event ++) {
         NetworkElement* current_element = (NetworkElement*) events[i_event].data.ptr;
-        if (elements_closed.find(current_element) != elements_closed.end())
+        if (current_element->dead)
             continue ;
-        
+
         bool should_close = false;
         close_reason reason = CLOSE_ERROR;
         if (events[i_event].events & EPOLLIN) {
             process(current_element);
+            if (current_element->dead)
+                continue ;
 
             if (current_element->state == SCK_ERROR || current_element->state == TUN_ERROR) {
                 should_close = true;
@@ -198,6 +205,8 @@ void NetQueue::wait_and_process () {
                 reason = CLOSE_HANGUP;
             }
         }
+        if (current_element->dead)
+            continue ;
         if (events[i_event].events & EPOLLOUT) {
             if (!flush_write_buffer(current_element)) {
                 should_close = true;
@@ -213,7 +222,7 @@ void NetQueue::wait_and_process () {
             reason = CLOSE_HANGUP;
         }
 
-        if (!should_close) {
+        if (!should_close && !current_element->dead) {
             struct epoll_event event;
             event.data.ptr = current_element;
             event.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
@@ -225,20 +234,11 @@ void NetQueue::wait_and_process () {
                 reason = CLOSE_EPOLL;
             }
         }
-        if (should_close) {
-            close_data data;
-            data.fd = current_element->fd;
-            data.net_element = current_element;
-            data.ptr_data = current_element->ptr;
-            data.reason = reason;
-
-            handler.onClose(handler.ptr_data, data);
-
-            elements_closed.insert(current_element);
-
-            close(current_element);
-        }
+        if (should_close)
+            close(current_element, reason);
     }
+
+    reap_closed();
 }
 
 void NetQueue::process (NetworkElement* element) {
@@ -366,6 +366,7 @@ NetQueue::~NetQueue () {
     }
 
     fd_to_network_element.clear();
+    reap_closed();
 
     _real_close(epoll_fd);
 }
@@ -387,24 +388,31 @@ void NetQueue::close (int fd) {
         return ;
     }
 
-    close(element);
+    close(element, CLOSE_ERROR);
 }
-void NetQueue::close (NetworkElement* element) {
-    if (element == nullptr) {
+void NetQueue::close (NetworkElement* element, close_reason reason) {
+    if (element == nullptr || element->dead) {
         return ;
     }
+
+    element->dead = true;
+
+    close_data data;
+    data.fd = element->fd;
+    data.net_element = element;
+    data.ptr_data = element->ptr;
+    data.reason = reason;
+    handler.onClose(handler.ptr_data, data);
 
     std::lock_guard<std::mutex> lock (fd_to_network_element_mutex);
-    
-    int fd = element->fd;
 
+    int fd = element->fd;
     auto it = fd_to_network_element.find(fd);
-    if (it == fd_to_network_element.end() || (*it).second != element) {
-        return ;
+    if (it != fd_to_network_element.end() && (*it).second == element) {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+        _real_close(fd);
+        fd_to_network_element.erase(it);
     }
 
-    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-    _real_close(fd);
-    delete element;
-    fd_to_network_element.erase(it);
+    deferred_delete.push_back(element);
 }

@@ -138,6 +138,12 @@ namespace vnet::blackbox {
          */
         void on_switch_disconnected(int switch_fd);
 
+        /**
+         * A peer session moved from old_fd to new_fd.
+         * Routes stay; only the socket changes.
+         */
+        void retarget_switch(int old_fd, int new_fd);
+
         // ----- Accessors (for logging, debugging) -----
 
         const AgentRegistry& agents() const;

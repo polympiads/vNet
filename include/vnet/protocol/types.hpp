@@ -27,6 +27,10 @@ namespace vnet::protocol {
         AGENT_REGISTERED,
         SWITCH_ROUTE_UPDATE,
         SWITCH_DISCONNECTED,
+
+        // Peer links and route withdrawal. Appended so older values stay put.
+        SWITCH_HELLO,
+        AGENT_UNREGISTERED,
     };
 
     PacketType    ntoh_packet_type (uint_packet_t type);

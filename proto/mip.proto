@@ -76,3 +76,13 @@ message PacketSwitchRouteUpdate {
 message PacketSwitchDisconnected {
     string switch_name = 1;
 }
+
+message PacketSwitchHello {
+    string switch_name = 1;
+}
+
+message PacketAgentUnregistered {
+    string agent_name    = 1;
+    fixed32 virtual_ipv4 = 2;
+    string switch_name   = 3;
+}
