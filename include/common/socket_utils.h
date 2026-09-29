@@ -86,3 +86,11 @@ std::string ipv4_to_string(uint32_t ipv4);
  * @brief Convert an IPv4 string to network-order uint32_t.
  */
 uint32_t string_to_ipv4(const std::string& ip);
+
+/**
+ * @brief Read the IPv4 default route from /proc/net/route.
+ * @param iface        Receives the outbound interface name.
+ * @param gateway_nbo  Receives the gateway address in network order.
+ * @return true when a default route exists.
+ */
+bool read_default_route(std::string& iface, uint32_t& gateway_nbo);
