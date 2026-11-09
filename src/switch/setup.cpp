@@ -336,6 +336,22 @@ struct SwitchDispatch : public Dispatch {
         queue = q;
     }
 
+    /*
+     * Tokens, route updates and route withdrawals are trusted only from
+     * the conductor. Any other socket that sends one is closed, or an
+     * agent could forge a token for another machine's name and log in as
+     * it.
+     */
+    bool from_conductor(const socket_data& data, const char* what) {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (info && info->role == ConnRole::CONDUCTOR) return true;
+        std::cerr << "[Switch] Dropped " << what
+                  << " from a socket that is not the conductor (fd="
+                  << data.fd << ")\n";
+        data.net_element->state = SCK_ERROR;
+        return false;
+    }
+
     void onActivity(socket_data data) override {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
         if (info) info->last_rx = clk::now();
@@ -347,6 +363,7 @@ struct SwitchDispatch : public Dispatch {
      */
     void onAgentConnectionToken(socket_data data,
                                 mip::PacketAgentConnectionToken& pkt) override {
+        if (!from_conductor(data, "agent token")) return;
         uint64_t token = pkt.connection_token();
         std::string agent = pkt.agent_name();
 
@@ -510,15 +527,17 @@ struct SwitchDispatch : public Dispatch {
         install_waiting_routes(queue, remote, data.fd);
     }
 
-    void onAgentUnregistered(socket_data,
+    void onAgentUnregistered(socket_data data,
                              mip::PacketAgentUnregistered& pkt) override {
+        if (!from_conductor(data, "route withdrawal")) return;
         g_blackbox->on_route_update(pkt.virtual_ipv4(), -1);
         std::cout << "[Switch] Route withdrawn: "
                   << ipv4_to_string(pkt.virtual_ipv4()) << "\n";
     }
 
-    void onSwitchRouteUpdate(socket_data,
+    void onSwitchRouteUpdate(socket_data data,
                             mip::PacketSwitchRouteUpdate& pkt) override {
+        if (!from_conductor(data, "route update")) return;
         std::string sw_name  = pkt.switch_name();
         uint32_t    sw_ipv4  = pkt.switch_ipv4();
         uint32_t    sw_port  = pkt.switch_port();
@@ -549,8 +568,9 @@ struct SwitchDispatch : public Dispatch {
         flush_pending(queue, agent_ip);
     }
 
-    void onSwitchDisconnected(socket_data,
+    void onSwitchDisconnected(socket_data data,
                             mip::PacketSwitchDisconnected& pkt) override {
+        if (!from_conductor(data, "switch disconnect")) return;
         std::string sw_name = pkt.switch_name();
         g_peer_targets.erase(sw_name);
         g_routes_waiting.erase(sw_name);
