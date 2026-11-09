@@ -1,11 +1,44 @@
 #include "vnet/blackbox/blackbox.hpp"
 
+#include <chrono>
 #include <iostream>
+#include <sstream>
+#include <vector>
+#include <arpa/inet.h>
 
 namespace vnet::blackbox {
 
+    static uint64_t now_ns() {
+        return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    }
+
+    const char* drop_reason_name(DropReason reason) {
+        switch (reason) {
+            case DropReason::NONE:             return "none";
+            case DropReason::MALFORMED_PACKET: return "malformed";
+            case DropReason::SOURCE_SPOOF:     return "spoof";
+            case DropReason::SOURCE_UNKNOWN:   return "unknown-source";
+            case DropReason::DEST_UNREACHABLE: return "unreachable";
+            case DropReason::ACL_DENIED:       return "acl";
+            case DropReason::RATE_LIMITED:     return "rate-limited";
+            default:                           return "?";
+        }
+    }
+
+    uint64_t Counters::dropped_total() const {
+        uint64_t total = 0;
+        for (uint64_t d : dropped) total += d;
+        return total;
+    }
+
     BlackBox::BlackBox(const Config& config, int tun_fd)
         : config_(config), tun_fd_(tun_fd) {}
+
+    void BlackBox::set_agent_limits(uint64_t pps, uint64_t bytes_per_sec) {
+        limit_pps_ = pps;
+        limit_bps_ = bytes_per_sec;
+    }
 
     // =================================================================
     //  Lifecycle hooks
@@ -24,6 +57,8 @@ namespace vnet::blackbox {
             std::cerr << "[BlackBox] Failed to register agent '" << name << "'\n";
             return false;
         }
+        entry->pps = TokenBucket(limit_pps_, limit_pps_);
+        entry->bps = TokenBucket(limit_bps_, limit_bps_);
 
         std::cout << "[BlackBox] Agent registered: " << name
                   << " (fd=" << fd << ")\n";
@@ -60,9 +95,58 @@ namespace vnet::blackbox {
     //  Accessors
     // =================================================================
 
-    const AgentRegistry& BlackBox::agents() const { return registry_; }
-    const RoutingTable&  BlackBox::routes() const  { return routing_; }
-    const Config&        BlackBox::config() const  { return config_; }
+    const AgentRegistry& BlackBox::agents() const   { return registry_; }
+    const RoutingTable&  BlackBox::routes() const   { return routing_; }
+    const Config&        BlackBox::config() const   { return config_; }
+    const Counters&      BlackBox::counters() const { return counters_; }
+
+    std::string BlackBox::summary() const {
+        std::ostringstream out;
+        out << "agents=" << registry_.size()
+            << " routes=" << routing_.size()
+            << " local=" << counters_.delivered_local
+            << " to-switch=" << counters_.forwarded_switch
+            << " to-internet=" << counters_.forwarded_internet
+            << " waited-for-route=" << counters_.route_requested
+            << " dropped=" << counters_.dropped_total();
+        for (size_t i = 1; i < static_cast<size_t>(DropReason::COUNT); i++) {
+            if (counters_.dropped[i] == 0) continue;
+            out << " " << drop_reason_name(static_cast<DropReason>(i))
+                << "=" << counters_.dropped[i];
+        }
+        return out.str();
+    }
+
+    std::string BlackBox::agent_lines() const {
+        std::ostringstream out;
+        for (const AgentEntry* a : registry_.entries()) {
+            char ip[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &a->virtual_ipv4, ip, sizeof(ip));
+            out << a->name << " " << ip << " fd=" << a->fd
+                << " in=" << a->pkts_in << "/" << a->bytes_in << "B"
+                << " out=" << a->pkts_out << "/" << a->bytes_out << "B"
+                << " dropped=" << a->dropped << "\n";
+        }
+        return out.str();
+    }
+
+    PacketDecision BlackBox::record(const PacketDecision& d, size_t len) {
+        switch (d.action) {
+            case PacketAction::DELIVER_LOCAL: {
+                counters_.delivered_local++;
+                AgentEntry* dest = registry_.find_by_fd(d.target_fd);
+                if (dest) { dest->pkts_out++; dest->bytes_out += len; }
+                break;
+            }
+            case PacketAction::FORWARD_SWITCH:   counters_.forwarded_switch++;   break;
+            case PacketAction::FORWARD_INTERNET: counters_.forwarded_internet++; break;
+            case PacketAction::REQUEST_ROUTE:    counters_.route_requested++;    break;
+            case PacketAction::DROP:
+                counters_.dropped[static_cast<size_t>(d.drop_reason)]++;
+                break;
+        }
+        return d;
+    }
 
     // =================================================================
     //  Packet processing — entry point
@@ -72,19 +156,19 @@ namespace vnet::blackbox {
                                      const uint8_t* raw_ipv4, size_t len) {
         IPv4Header hdr{};
         if (!ipv4_parse(raw_ipv4, len, hdr)) {
-            return { PacketAction::DROP, -1, 0, DropReason::MALFORMED_PACKET };
+            return record({ PacketAction::DROP, -1, 0, DropReason::MALFORMED_PACKET }, len);
         }
 
         switch (source_type) {
             case SourceType::AGENT:
-                return process_from_agent(source_fd, hdr, raw_ipv4, len);
+                return record(process_from_agent(source_fd, hdr, raw_ipv4, len), len);
             case SourceType::SWITCH:
-                return process_from_switch(source_fd, hdr, raw_ipv4, len);
+                return record(process_from_switch(source_fd, hdr, raw_ipv4, len), len);
             case SourceType::TUN:
-                return process_from_tun(hdr, raw_ipv4, len);
+                return record(process_from_tun(hdr, raw_ipv4, len), len);
         }
 
-        return { PacketAction::DROP, -1, 0, DropReason::MALFORMED_PACKET };
+        return record({ PacketAction::DROP, -1, 0, DropReason::MALFORMED_PACKET }, len);
     }
 
     // =================================================================
@@ -104,14 +188,30 @@ namespace vnet::blackbox {
             return { PacketAction::DROP, -1, 0, DropReason::SOURCE_UNKNOWN };
         }
 
-        // Step 2: Anti-spoofing — the source IP in the packet MUST
+        sender->pkts_in++;
+        sender->bytes_in += len;
+
+        // Step 2: Anti-spoofing: the source IP in the packet MUST
         //         match the virtual IP assigned to this agent.
         if (hdr.src_ip != sender->virtual_ipv4) {
+            sender->dropped++;
             return { PacketAction::DROP, -1, 0, DropReason::SOURCE_SPOOF };
         }
 
-        // Step 3: ACL + route to destination
-        return route_to_destination(sender->virtual_ipv4, hdr.dst_ip);
+        // Step 3: the agent's share of the switch. One flooding agent
+        //         must not slow every other machine on this switch.
+        if (!sender->pps.unlimited() || !sender->bps.unlimited()) {
+            uint64_t now = now_ns();
+            if (!sender->pps.take(1, now) || !sender->bps.take(len, now)) {
+                sender->dropped++;
+                return { PacketAction::DROP, -1, 0, DropReason::RATE_LIMITED };
+            }
+        }
+
+        // Step 4: ACL + route to destination
+        PacketDecision d = route_to_destination(sender->virtual_ipv4, hdr.dst_ip);
+        if (d.action == PacketAction::DROP) sender->dropped++;
+        return d;
     }
 
     // =================================================================

@@ -265,6 +265,72 @@ TEST_F(BlackBoxTest, RequestRouteWhenUnknown) {
 
 // ----- Packets from peer switch -----
 
+// ----- Rate limit and counters -----
+
+TEST_F(BlackBoxTest, RateLimitDropsBeyondBurst) {
+    BlackBox box(cfg, TUN_FD);
+    box.set_agent_limits(3, 0);
+    box.on_agent_authenticated("contestant1", 10);
+    box.on_agent_authenticated("gameserver", 11);
+
+    auto pkt = make_packet("10.0.1.1", "10.0.0.1");
+    for (int i = 0; i < 3; i++) {
+        auto d = box.process(SourceType::AGENT, 10, pkt.data(), pkt.size());
+        EXPECT_EQ(d.action, PacketAction::DELIVER_LOCAL) << "packet " << i;
+    }
+    auto d = box.process(SourceType::AGENT, 10, pkt.data(), pkt.size());
+    EXPECT_EQ(d.action, PacketAction::DROP);
+    EXPECT_EQ(d.drop_reason, DropReason::RATE_LIMITED);
+
+    // The other agent has its own bucket.
+    auto back = make_packet("10.0.0.1", "10.0.1.1");
+    EXPECT_EQ(box.process(SourceType::AGENT, 11, back.data(), back.size()).action,
+              PacketAction::DELIVER_LOCAL);
+
+    EXPECT_EQ(box.counters().delivered_local, 4u);
+    EXPECT_EQ(box.counters().dropped[static_cast<size_t>(DropReason::RATE_LIMITED)], 1u);
+    EXPECT_EQ(box.agents().find_by_name("contestant1")->dropped, 1u);
+    EXPECT_EQ(box.agents().find_by_name("contestant1")->pkts_in, 4u);
+    EXPECT_EQ(box.agents().find_by_name("gameserver")->pkts_out, 3u);
+}
+
+TEST_F(BlackBoxTest, ByteLimitCountsPacketSize) {
+    BlackBox box(cfg, TUN_FD);
+    box.set_agent_limits(0, 50);    // 50 bytes per second, burst 50
+    box.on_agent_authenticated("contestant1", 10);
+    box.on_agent_authenticated("gameserver", 11);
+
+    auto pkt = make_packet("10.0.1.1", "10.0.0.1");   // 24 bytes
+    EXPECT_EQ(box.process(SourceType::AGENT, 10, pkt.data(), pkt.size()).action,
+              PacketAction::DELIVER_LOCAL);
+    EXPECT_EQ(box.process(SourceType::AGENT, 10, pkt.data(), pkt.size()).action,
+              PacketAction::DELIVER_LOCAL);
+    auto d = box.process(SourceType::AGENT, 10, pkt.data(), pkt.size());
+    EXPECT_EQ(d.action, PacketAction::DROP);
+    EXPECT_EQ(d.drop_reason, DropReason::RATE_LIMITED);
+}
+
+TEST_F(BlackBoxTest, CountersAndSummary) {
+    BlackBox box(cfg, TUN_FD);
+    box.on_agent_authenticated("contestant1", 10);
+
+    auto spoof = make_packet("10.0.1.9", "10.0.0.1");
+    box.process(SourceType::AGENT, 10, spoof.data(), spoof.size());
+    auto denied = make_packet("10.0.1.1", "10.0.1.2");
+    box.process(SourceType::AGENT, 10, denied.data(), denied.size());
+    auto inet = make_packet("10.0.1.1", "9.9.9.9");
+    box.process(SourceType::AGENT, 10, inet.data(), inet.size());
+
+    EXPECT_EQ(box.counters().dropped_total(), 3u);
+    EXPECT_EQ(box.counters().dropped[static_cast<size_t>(DropReason::SOURCE_SPOOF)], 1u);
+    EXPECT_EQ(box.counters().dropped[static_cast<size_t>(DropReason::ACL_DENIED)], 2u);
+    std::string summary = box.summary();
+    EXPECT_NE(summary.find("dropped=3"), std::string::npos);
+    EXPECT_NE(summary.find("spoof=1"), std::string::npos);
+    EXPECT_NE(summary.find("acl=2"), std::string::npos);
+    EXPECT_NE(box.agent_lines().find("contestant1 10.0.1.1 fd=10 in=3/72B"), std::string::npos);
+}
+
 TEST_F(BlackBoxTest, SwitchDeliverLocal) {
     BlackBox box(cfg, TUN_FD);
     box.on_agent_authenticated("contestant1", 10);

@@ -3,6 +3,9 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
+
+#include "vnet/blackbox/ratelimit.hpp"
 
 namespace vnet::blackbox {
 
@@ -13,6 +16,14 @@ namespace vnet::blackbox {
         std::string name;
         uint32_t    virtual_ipv4;   // network order
         int         fd;
+
+        /* Limits on what the agent may send, set by the BlackBox. */
+        TokenBucket pps;
+        TokenBucket bps;
+
+        /* Traffic seen since the agent registered. in = from the agent. */
+        uint64_t pkts_in = 0, bytes_in = 0, pkts_out = 0, bytes_out = 0;
+        uint64_t dropped = 0;
     };
 
     /**
@@ -62,6 +73,9 @@ namespace vnet::blackbox {
 
         /** Number of registered agents. */
         size_t size() const;
+
+        /** Every registered agent, in no particular order. */
+        std::vector<const AgentEntry*> entries() const;
 
         ~AgentRegistry();
 

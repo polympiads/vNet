@@ -43,7 +43,21 @@ namespace vnet::blackbox {
         SOURCE_SPOOF,           // Source IP doesn't match the agent's registered IP
         SOURCE_UNKNOWN,         // Source fd not found in agent registry
         DEST_UNREACHABLE,       // No local agent, no route, no internet
-        ACL_DENIED              // ACL check failed (agent-to-agent or internet)
+        ACL_DENIED,             // ACL check failed (agent-to-agent or internet)
+        RATE_LIMITED,           // The agent sent more than its limit allows
+        COUNT
+    };
+
+    const char* drop_reason_name(DropReason reason);
+
+    /** What the black box decided since it was made. */
+    struct Counters {
+        uint64_t delivered_local    = 0;
+        uint64_t forwarded_switch   = 0;
+        uint64_t forwarded_internet = 0;
+        uint64_t route_requested    = 0;
+        uint64_t dropped[static_cast<size_t>(DropReason::COUNT)] = {0};
+        uint64_t dropped_total() const;
     };
 
     struct PacketDecision {
@@ -88,6 +102,13 @@ namespace vnet::blackbox {
          *                or -1 if internet is not available.
          */
         BlackBox(const Config& config, int tun_fd);
+
+        /**
+         * Limit what each agent may send: packets per second and bytes
+         * per second, each with a burst of one second's worth. 0 means
+         * no limit. Applies to agents registered after the call.
+         */
+        void set_agent_limits(uint64_t pps, uint64_t bytes_per_sec);
 
         // ----- Packet processing -----
 
@@ -149,6 +170,11 @@ namespace vnet::blackbox {
         const AgentRegistry& agents() const;
         const RoutingTable&  routes() const;
         const Config&        config() const;
+        const Counters&      counters() const;
+
+        /** The counters as one line, and one line per agent. */
+        std::string summary() const;
+        std::string agent_lines() const;
 
     private:
         PacketDecision process_from_agent(int source_fd,
@@ -164,11 +190,15 @@ namespace vnet::blackbox {
 
         PacketDecision route_to_destination(uint32_t src_ipv4,
                                             uint32_t dest_ipv4);
+        PacketDecision record(const PacketDecision& decision, size_t len);
 
         Config         config_;
         AgentRegistry  registry_;
         RoutingTable   routing_;
         int            tun_fd_;
+        uint64_t       limit_pps_ = 0;
+        uint64_t       limit_bps_ = 0;
+        Counters       counters_;
     };
 
 };

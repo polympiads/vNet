@@ -54,6 +54,7 @@ SET(VNET_SOURCE_FILES
         src/netqueue/handler.cpp
 
         src/blackbox/ipv4.cpp
+        src/blackbox/ratelimit.cpp
         src/blackbox/agent_registry.cpp
         src/blackbox/routing_table.cpp
         src/blackbox/config.cpp

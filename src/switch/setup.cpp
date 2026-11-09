@@ -153,16 +153,17 @@ struct BufferedPacket {
 
 static std::unordered_map<uint32_t, std::vector<BufferedPacket>> g_pending;
 
-static const char* drop_reason_str(DropReason reason) {
-    switch (reason) {
-        case DropReason::MALFORMED_PACKET: return "malformed";
-        case DropReason::SOURCE_SPOOF:     return "spoof";
-        case DropReason::SOURCE_UNKNOWN:   return "unknown-source";
-        case DropReason::DEST_UNREACHABLE: return "unreachable";
-        case DropReason::ACL_DENIED:       return "acl";
-        default:                           return "none";
-    }
-}
+/*
+ * Per-packet events are counted, not logged: a port scan from one
+ * contestant must not fill the disk or slow the loop. VNET_DEBUG=1 turns
+ * the per-packet lines on. Counters are printed every VNET_STATS_SEC and
+ * on SIGUSR1, which also lists every agent.
+ */
+static bool     g_debug = false;
+static uint64_t g_send_full_drops = 0;
+static uint64_t g_tun_write_errors = 0;
+static volatile sig_atomic_t g_stats_request = 0;
+static void on_sigusr1(int) { g_stats_request = 1; }
 
 static bool send_ipv4(NetQueue* queue, int fd, const uint8_t* raw, size_t len) {
     return queue->send_data(fd, PacketType::IPV4_RAW, raw, len);
@@ -175,8 +176,9 @@ static void buffer_for_route(uint32_t dest_ipv4, SourceType source_type,
     q.push_back({source_type, source_fd,
                  std::string(reinterpret_cast<const char*>(raw), len),
                  clk::now()});
-    std::cout << "[Switch] Buffered packet for " << ipv4_to_string(dest_ipv4)
-              << " (" << q.size() << " waiting)\n";
+    if (g_debug)
+        std::cout << "[Switch] Buffered packet for " << ipv4_to_string(dest_ipv4)
+                  << " (" << q.size() << " waiting)\n";
 }
 
 static void apply_decision(NetQueue* queue, const PacketDecision& decision,
@@ -223,22 +225,28 @@ static void apply_decision(NetQueue* queue, const PacketDecision& decision,
         case PacketAction::DELIVER_LOCAL:
         case PacketAction::FORWARD_SWITCH:
             if (!send_ipv4(queue, decision.target_fd, raw, len)) {
-                std::cerr << "[Switch] Failed to forward packet to fd "
-                          << decision.target_fd << "\n";
+                g_send_full_drops++;
+                if (g_debug)
+                    std::cerr << "[Switch] Link to fd " << decision.target_fd
+                              << " is full; packet dropped\n";
             }
             break;
         case PacketAction::FORWARD_INTERNET: {
             if (decision.target_fd < 0) break;
             ssize_t n = ::write(decision.target_fd, raw, len);
-            if (n != static_cast<ssize_t>(len)) perror("[Switch] tun write");
+            if (n != static_cast<ssize_t>(len)) {
+                g_tun_write_errors++;
+                if (g_debug) perror("[Switch] tun write");
+            }
             break;
         }
         case PacketAction::REQUEST_ROUTE:
             buffer_for_route(decision.dest_ipv4, source_type, source_fd, raw, len);
             break;
         case PacketAction::DROP:
-            std::cerr << "[Switch] Drop (" << drop_reason_str(decision.drop_reason)
-                      << ")\n";
+            if (g_debug)
+                std::cerr << "[Switch] Drop (" << drop_reason_name(decision.drop_reason)
+                          << ")\n";
             break;
     }
 }
@@ -870,6 +878,24 @@ static void maybe_dial_conductor(NetQueue& queue) {
 }
 
 // ---------------------------------------------------------------------------
+//  Stats
+// ---------------------------------------------------------------------------
+
+static void print_stats(bool with_agents) {
+    std::cout << "[Switch] Stats: " << g_blackbox->summary()
+              << " link-full-drops=" << g_send_full_drops
+              << " tun-write-errors=" << g_tun_write_errors
+              << " peers=" << g_state.peer_switches.size()
+              << " pending-tokens=" << g_state.pending_tokens.size()
+              << " conductor=" << (g_state.conductor && g_state.conductor->connected ? "up" : "down")
+              << "\n";
+    if (with_agents) {
+        std::string lines = g_blackbox->agent_lines();
+        if (!lines.empty()) std::cout << "[Switch] Agents:\n" << lines;
+    }
+}
+
+// ---------------------------------------------------------------------------
 //  Main
 // ---------------------------------------------------------------------------
 
@@ -881,6 +907,7 @@ int main(int argc, char** argv) {
     signal(SIGINT,  on_signal);
     signal(SIGTERM, on_signal);
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGUSR1, on_sigusr1);
 
     if (argc != 3 && argc != 4) {
         std::cerr << "Usage: ./switch <name> [auth_key] <port>\n"
@@ -891,12 +918,17 @@ int main(int argc, char** argv) {
 
     long hb_sec = g_heartbeat.count(), dead_sec = g_dead.count();
     long cdt_port = 0;
+    long stats_sec = 60, agent_pps = 20000, agent_mbps = 200;
     if (!env_int("VNET_HEARTBEAT_SEC", 1, 3600, hb_sec) ||
         !env_int("VNET_DEAD_SEC", 1, 86400, dead_sec) ||
-        !env_int("CONDUCTOR_PORT", 1, 65535, cdt_port))
+        !env_int("CONDUCTOR_PORT", 1, 65535, cdt_port) ||
+        !env_int("VNET_STATS_SEC", 0, 86400, stats_sec) ||
+        !env_int("VNET_AGENT_PPS", 0, 100000000, agent_pps) ||
+        !env_int("VNET_AGENT_MBPS", 0, 100000, agent_mbps))
         return 1;
     g_heartbeat = std::chrono::seconds(hb_sec);
     g_dead      = std::chrono::seconds(dead_sec);
+    g_debug     = env_or("VNET_DEBUG", "0") == "1";
 
     g_switch_name = argv[1];
     if (!valid_name(g_switch_name, SWITCH_NAME_MAX)) {
@@ -959,7 +991,11 @@ int main(int argc, char** argv) {
         std::cerr << "[Switch] Internet forwarding is not active\n";
 
     BlackBox blackbox(config, tun_fd);
+    blackbox.set_agent_limits(static_cast<uint64_t>(agent_pps),
+                              static_cast<uint64_t>(agent_mbps) * 1000000ULL / 8ULL);
     g_blackbox = &blackbox;
+    std::cout << "[Switch] Per-agent limit: " << agent_pps << " pps, "
+              << agent_mbps << " Mbit/s (0 = none)\n";
 
     std::cout << "[Switch] Loaded config from " << config_path << "\n";
 
@@ -1003,6 +1039,7 @@ int main(int argc, char** argv) {
     }
 
     dial_conductor(queue);
+    auto last_stats = clk::now();
 
     // --- 4. Event loop ---
     while (g_running) {
@@ -1047,8 +1084,18 @@ int main(int argc, char** argv) {
         // Heartbeats
         send_heartbeats(queue);
         reap_dead(queue);
+
+        if (g_stats_request) {
+            g_stats_request = 0;
+            print_stats(/*with_agents=*/true);
+            last_stats = clk::now();
+        } else if (stats_sec > 0 && clk::now() - last_stats >= std::chrono::seconds(stats_sec)) {
+            print_stats(/*with_agents=*/false);
+            last_stats = clk::now();
+        }
     }
 
+    print_stats(/*with_agents=*/true);
     close(listener);
     tun_close(tun_fd, tun_name);
     std::cout << "[Switch] Shutting down.\n";
