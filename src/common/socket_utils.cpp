@@ -3,6 +3,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
+#include <cerrno>
 #include <sys/time.h>
 #include <cstring>
 #include <fstream>
@@ -49,6 +51,35 @@ int connect_to(const MachineConfig& mc) {
     }
 
     freeaddrinfo(result);
+    return sock;
+}
+
+int connect_start(const std::string& host, uint16_t port) {
+    struct addrinfo hints{}, *result = nullptr;
+    hints.ai_family   = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    std::string port_str = std::to_string(port);
+    if (getaddrinfo(host.c_str(), port_str.c_str(), &hints, &result) != 0 || !result) {
+        if (result) freeaddrinfo(result);
+        return -1;
+    }
+
+    int sock = socket(result->ai_family, result->ai_socktype | SOCK_NONBLOCK,
+                      result->ai_protocol);
+    if (sock < 0) {
+        freeaddrinfo(result);
+        return -1;
+    }
+    int flag = 1;
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
+    int rc = connect(sock, result->ai_addr, result->ai_addrlen);
+    freeaddrinfo(result);
+    if (rc < 0 && errno != EINPROGRESS) {
+        close(sock);
+        return -1;
+    }
     return sock;
 }
 

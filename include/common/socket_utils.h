@@ -14,6 +14,15 @@
 int connect_to(const MachineConfig& mc);
 
 /**
+ * @brief Start a non-blocking connect to host:port (IPv4; host may be a
+ *        name). The connect may still be in progress when this returns;
+ *        NetQueue::put_sck_connecting finishes it.
+ * @return the socket fd, or -1 when the name does not resolve or the
+ *         connect fails at once.
+ */
+int connect_start(const std::string& host, uint16_t port);
+
+/**
  * @brief Set a file descriptor to non-blocking mode.
  * @return true on success.
  */

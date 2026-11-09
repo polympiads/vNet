@@ -279,13 +279,26 @@ struct AuthRecord {
 static std::unordered_map<std::string, AuthRecord> g_auth;
 static bool g_auth_required = false;
 
+/*
+ * What the conductor itself handed out: the key the agent used and the
+ * network it named. Lost on restart.
+ */
 struct RememberedAgent {
     std::string auth_key;
     std::string network;
+};
+static std::unordered_map<std::string, RememberedAgent> g_remembered;
+
+/*
+ * Where each agent is, as the switches report it with AGENT_REGISTERED.
+ * Switches re-announce their agents when they register, so this survives
+ * a conductor restart once they have reconnected.
+ */
+struct AgentLocation {
     std::string switch_name;
     uint32_t    virtual_ipv4 = 0;
 };
-static std::unordered_map<std::string, RememberedAgent> g_remembered;
+static std::unordered_map<std::string, AgentLocation> g_agent_location;
 
 static bool load_auth_file(const std::string& path) {
     std::ifstream in(path);
@@ -353,13 +366,21 @@ struct ConductorDispatch : public Dispatch {
             queue->close(data.fd);
             return;
         }
+        // A switch whose link to us broke dials again before we notice
+        // the old socket is dead. The key holder proved itself, so the
+        // new connection wins; closing the old one withdraws its routes,
+        // and the re-announcement that follows this MIP restores them.
+        int old_fd = -1;
         for (const auto* existing : g_state.switches) {
-            if (existing->name == pkt.name()) {
-                std::cerr << "[Conductor] Rejected duplicate switch: "
-                          << pkt.name() << "\n";
-                queue->close(data.fd);
-                return;
+            if (existing->name == pkt.name() && existing != info) {
+                old_fd = existing->fd;
+                break;
             }
+        }
+        if (old_fd >= 0) {
+            std::cout << "[Conductor] Switch " << pkt.name()
+                      << " registered again; closing fd " << old_fd << "\n";
+            queue->close(old_fd);
         }
         info->role     = Role::SWITCH_CONN;
         info->name     = pkt.name();
@@ -478,9 +499,7 @@ struct ConductorDispatch : public Dispatch {
         });
 
         g_state.agents.push_back(info);
-        g_remembered[info->name] = {
-            info->auth_key, info->network, info->assigned_switch_name, 0
-        };
+        g_remembered[info->name] = { info->auth_key, info->network };
     }
 
     void onAgentMRP(socket_data data, mip::PacketAgentMRP& pkt) override {
@@ -507,14 +526,27 @@ struct ConductorDispatch : public Dispatch {
         info->fd       = data.fd;
         info->connected_at_ms = now_ms();
 
+        // Without an auth file, the key an agent first used is the only
+        // thing that ties a rejoin to it; hold it to that when known.
         auto mem = g_remembered.find(pkt.name());
+        if (!g_auth_required && mem != g_remembered.end() &&
+            !keys_equal(mem->second.auth_key, pkt.auth_key())) {
+            std::cerr << "[Conductor] Rejected agent reauth: " << pkt.name()
+                      << " (key changed)\n";
+            queue->close(data.fd);
+            return;
+        }
+        if (mem != g_remembered.end()) info->network = mem->second.network;
+
+        // The switch that holds the agent told us so, before or after a
+        // restart here; its link must be up for the rejoin to mean anything.
         ConnInfo* sw = nullptr;
-        if (mem != g_remembered.end() && mem->second.auth_key == pkt.auth_key()) {
-            info->network = mem->second.network;
-            info->assigned_switch_name = mem->second.switch_name;
-            info->virtual_ipv4 = mem->second.virtual_ipv4;
+        auto loc = g_agent_location.find(pkt.name());
+        if (loc != g_agent_location.end()) {
+            info->assigned_switch_name = loc->second.switch_name;
+            info->virtual_ipv4         = loc->second.virtual_ipv4;
             for (auto* candidate : g_state.switches) {
-                if (candidate->name == info->assigned_switch_name) {
+                if (candidate->name == loc->second.switch_name) {
                     sw = candidate;
                     break;
                 }
@@ -594,11 +626,7 @@ struct ConductorDispatch : public Dispatch {
                 agent->assigned_switch = sw_info;
             }
         }
-        auto remembered = g_remembered.find(pkt.agent_name());
-        if (remembered != g_remembered.end()) {
-            remembered->second.switch_name = sw_info->name;
-            remembered->second.virtual_ipv4 = virtual_ipv4;
-        }
+        g_agent_location[pkt.agent_name()] = { sw_info->name, virtual_ipv4 };
 
         std::cout << "[Conductor] Agent " << pkt.agent_name()
                 << " registered with IP " << ipv4_to_string(virtual_ipv4)
@@ -648,6 +676,10 @@ struct ConductorDispatch : public Dispatch {
                            route.agent_name == pkt.agent_name();
                 }),
             g_state.published.end());
+
+        auto loc = g_agent_location.find(pkt.agent_name());
+        if (loc != g_agent_location.end() && loc->second.switch_name == sw_info->name)
+            g_agent_location.erase(loc);
 
         std::cout << "[Conductor] Agent " << pkt.agent_name()
                   << " left " << sw_info->name << "\n";

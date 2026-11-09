@@ -7,7 +7,6 @@
 #include <vector>
 #include <algorithm>
 #include <chrono>
-#include <thread>
 #include <csignal>
 #include <cerrno>
 #include <cstring>
@@ -48,8 +47,8 @@ static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
 static std::chrono::seconds       g_dead{90};
 static const std::chrono::seconds IDENTIFY_TIMEOUT    {10};
 static const std::chrono::seconds TOKEN_EXPIRY        {60};
-static const int                  MAX_CONNECT_RETRIES = 20;
-static const int                  RETRY_DELAY_MS      = 2000;
+/* Time between attempts to reach the conductor when the link is down. */
+static const std::chrono::seconds CONDUCTOR_RETRY     {2};
 
 static volatile sig_atomic_t g_running = 1;
 static void on_signal(int) { g_running = 0; }
@@ -109,6 +108,17 @@ struct SwitchState {
 
 static SwitchState g_state;
 static std::string g_overlay_cidr = "10.0.0.0/8";
+
+/* What this switch tells the conductor about itself, kept for re-registration. */
+struct SwitchIdentity {
+    std::string   name;
+    std::string   auth_key;
+    std::string   network = "::internet";
+    uint16_t      port = 0;
+    MachineConfig conductor{"", 0};
+};
+static SwitchIdentity   g_identity;
+static clk::time_point  g_last_conductor_dial{};
 
 /* Accepted sockets that may still be waiting to authenticate or say hello. */
 static std::unordered_set<ConnInfo*> g_unidentified;
@@ -351,6 +361,35 @@ struct SwitchDispatch : public Dispatch {
             std::cout << "[Switch] Peer " << info->name << " link up (dialed)\n";
             install_waiting_routes(queue, info->name, data.fd);
         }
+
+        if (info->role == ConnRole::CONDUCTOR) {
+            mip::PacketSwitchMIP mip_pkt;
+            mip_pkt.set_name(g_identity.name);
+            mip_pkt.set_auth_key(g_identity.auth_key);
+            mip_pkt.set_network(g_identity.network);
+            mip_pkt.set_port(g_identity.port);
+            if (!queue->send(data.fd, PacketType::SWITCH_MIP, mip_pkt)) {
+                std::cerr << "[Switch] Failed to send MIP\n";
+                return;
+            }
+            std::cout << "[Switch] Registered with conductor as " << g_identity.name
+                      << " on port " << g_identity.port << "\n";
+
+            // A conductor that restarted knows nothing: tell it who is
+            // here, so it can publish the routes again.
+            size_t announced = 0;
+            for (ConnInfo* agent : g_state.agents) {
+                AgentEntry* entry = g_blackbox->agents().find_by_fd(agent->fd);
+                if (!entry) continue;
+                mip::PacketAgentRegistered reg;
+                reg.set_agent_name(entry->name);
+                reg.set_virtual_ipv4(entry->virtual_ipv4);
+                queue->send(data.fd, PacketType::AGENT_REGISTERED, reg);
+                announced++;
+            }
+            if (announced > 0)
+                std::cout << "[Switch] Re-announced " << announced << " agent(s)\n";
+        }
     }
 
     /*
@@ -481,6 +520,8 @@ struct SwitchDispatch : public Dispatch {
 
         if (info == g_state.conductor) {
             g_state.conductor = nullptr;
+            std::cerr << "[Switch] Conductor link lost; agents keep their data "
+                      << "path, retrying every " << CONDUCTOR_RETRY.count() << "s\n";
         }
 
         g_unidentified.erase(info);
@@ -618,7 +659,7 @@ static void send_heartbeats(NetQueue& queue) {
         }
     };
 
-    try_hb(g_state.conductor);
+    if (g_state.conductor && g_state.conductor->connected) try_hb(g_state.conductor);
     for (auto* a : g_state.agents) try_hb(a);
     for (auto& peer : g_state.peer_switches)
         if (peer.second->connected) try_hb(peer.second);
@@ -631,7 +672,14 @@ static void reap_dead(NetQueue& queue) {
         if (c && c->fd >= 0 && now - c->last_rx >= g_dead)
             dead.push_back(c->fd);
     };
-    check(g_state.conductor);
+    if (g_state.conductor && !g_state.conductor->connected) {
+        if (now - g_state.conductor->dialed_at >= DIAL_TIMEOUT) {
+            std::cerr << "[Switch] Conductor did not answer the dial\n";
+            dead.push_back(g_state.conductor->fd);
+        }
+    } else {
+        check(g_state.conductor);
+    }
     for (auto* agent : g_state.agents) check(agent);
     for (auto& peer : g_state.peer_switches) {
         ConnInfo* c = peer.second;
@@ -721,16 +769,51 @@ static bool setup_internet(const std::string& tun_name) {
     return ok;
 }
 
-static int connect_with_retry(const MachineConfig& mc, const char* label) {
-    for (int attempt = 1; attempt <= MAX_CONNECT_RETRIES; attempt++) {
-        int fd = connect_to(mc);
-        if (fd >= 0) return fd;
+/*
+ * Start a connection to the conductor. The connect and handshake finish
+ * inside the queue; onConnected sends the MIP and re-announces the agents
+ * already on this switch. Called at startup and whenever the link is
+ * down, so a conductor restart needs no action here.
+ */
+static void dial_conductor(NetQueue& queue) {
+    g_last_conductor_dial = clk::now();
 
-        std::cerr << "[Switch] " << label << " attempt " << attempt
-                  << "/" << MAX_CONNECT_RETRIES << " failed, retrying...\n";
-        std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
+    int fd = connect_start(g_identity.conductor.ip, g_identity.conductor.port);
+    if (fd < 0) {
+        std::cerr << "[Switch] Cannot start a connection to the conductor at "
+                  << g_identity.conductor.ip << ":" << g_identity.conductor.port << "\n";
+        return;
     }
-    return -1;
+
+    auto* info = new ConnInfo();
+    info->role      = ConnRole::CONDUCTOR;
+    info->name      = "conductor";
+    info->fd        = fd;
+    info->dialed    = true;
+    info->connected = false;
+    info->dialed_at = clk::now();
+
+    ssl_st* ssl = vnet::tls::enabled() ? vnet::tls::new_session(fd) : nullptr;
+    if (vnet::tls::enabled() && !ssl) {
+        ::close(fd);
+        delete info;
+        return;
+    }
+    if (queue.put_sck_connecting(fd, info, ssl) == nullptr) {
+        vnet::tls::free_session(ssl);
+        ::close(fd);
+        delete info;
+        return;
+    }
+    g_state.conductor = info;
+    std::cout << "[Switch] Connecting to conductor at "
+              << g_identity.conductor.ip << ":" << g_identity.conductor.port << "\n";
+}
+
+static void maybe_dial_conductor(NetQueue& queue) {
+    if (g_state.conductor) return;
+    if (clk::now() - g_last_conductor_dial < CONDUCTOR_RETRY) return;
+    dial_conductor(queue);
 }
 
 // ---------------------------------------------------------------------------
@@ -827,51 +910,12 @@ int main(int argc, char** argv) {
 
     std::cout << "[Switch] Loaded config from " << config_path << "\n";
 
-    MachineConfig conductor_cfg {
-        cdt_ip_env,
-        static_cast<uint16_t>(cdt_port)
-    };
-
-    // --- 1. Connect to conductor (blocking) and send Switch MIP ---
-    std::cout << "[Switch] Connecting to conductor at "
-              << conductor_cfg.ip << ":" << conductor_cfg.port << " ...\n";
-
-    int cdt_sock = connect_with_retry(conductor_cfg, "conductor");
-    if (cdt_sock < 0) {
-        std::cerr << "[Switch] Cannot reach conductor after "
-                  << MAX_CONNECT_RETRIES << " attempts\n";
-        return 1;
-    }
-
-    ssl_st* cdt_ssl = nullptr;
-    if (vnet::tls::enabled()) {
-        cdt_ssl = vnet::tls::handshake_client(cdt_sock);
-        if (!cdt_ssl) {
-            close(cdt_sock);
-            return 1;
-        }
-    }
-
-    mip::PacketSwitchMIP mip_pkt;
-    mip_pkt.set_name(switch_name);
-    mip_pkt.set_auth_key(auth_key);
-    mip_pkt.set_network("::internet");   // reachable from any network
-    mip_pkt.set_port(port);
-
-    if (!send_protobuf_packet(cdt_sock, PacketType::SWITCH_MIP, mip_pkt, cdt_ssl)) {
-        std::cerr << "[Switch] Failed to send MIP\n";
-        close(cdt_sock);
-        return 1;
-    }
-
-    std::cout << "[Switch] Registered with conductor as " << switch_name
-              << " on port " << port << "\n";
-
-    // Switch the conductor fd to non-blocking for the event loop
-    set_nonblocking(cdt_sock);
+    g_identity.name      = switch_name;
+    g_identity.auth_key  = auth_key;
+    g_identity.port      = port;
+    g_identity.conductor = MachineConfig{cdt_ip_env, static_cast<uint16_t>(cdt_port)};
 
     int flag = 1;
-    setsockopt(cdt_sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 
     // --- 2. Create listener for agents ---
     int listener = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -900,25 +944,16 @@ int main(int argc, char** argv) {
     NetQueue queue(handler, /*epoll_timeout_ms=*/200);
     dispatch.set_queue(&queue);
 
-    // Add conductor connection to the queue
-    auto* cdt_info = new ConnInfo();
-    cdt_info->role = ConnRole::CONDUCTOR;
-    cdt_info->name = "conductor";
-    cdt_info->fd   = cdt_sock;
-    g_state.conductor = cdt_info;
-
-    if (queue.put_sck(cdt_sock, cdt_info) == nullptr) {
-        std::cerr << "[Switch] Failed to add conductor fd to queue\n";
-        return 1;
-    }
-    if (cdt_ssl) queue.adopt_tls(cdt_sock, cdt_ssl);
     if (queue.put_tun(tun_fd, nullptr) == nullptr) {
         std::cerr << "[Switch] Failed to add internet TUN to queue\n";
         return 1;
     }
 
+    dial_conductor(queue);
+
     // --- 4. Event loop ---
     while (g_running) {
+        maybe_dial_conductor(queue);
         for (int accepted = 0; accepted < ACCEPTS_PER_TURN; accepted++) {
             int agent_fd = accept4(listener, nullptr, nullptr, SOCK_NONBLOCK);
             if (agent_fd < 0) break;
