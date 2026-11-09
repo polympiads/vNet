@@ -367,8 +367,13 @@ void NetQueue::process (NetworkElement* element) {
 
                 handler.onSocketReady(handler.ptr_data, sck_data);
 
+                // The handler may have closed the element, or rejected the
+                // peer by setting an error state; both must stick.
+                if (element->dead)
+                    return ;
                 element->net_buffer_used = 0;
-                element->state = SCK_HEADER;
+                if (element->state == SCK_READY)
+                    element->state = SCK_HEADER;
                 break ;
             }
             case SCK_ERROR:
