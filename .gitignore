@@ -5,4 +5,4 @@ build
 compile_commands.json
 config/
 docker/certs/
-docker/scale/out/
+docker/scale/out/__pycache__/
