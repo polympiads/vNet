@@ -103,6 +103,10 @@ When a process dies, its unit restarts it; the others recover as described above
 
 `docker/scale/run.sh` starts one conductor, 10 switches, and 100 agents on a private Docker network. `SWITCHES` and `AGENTS` override those counts. Generated files stay in `docker/scale/out/` and are not committed. `docker/certs.sh` makes the certificates `docker/docker-compose.yml` expects.
 
+## Known limits
+
+The overlay rides TCP (with TLS) between agent and switch and between switches, so loss on the physical network is retried by both the inner and the outer connection; keep the physical path clean, and measure before an event that crosses the internet. Each switch is one thread; one machine saturating its switch is held back by the per-agent limit, not by more cores. The conductor is a single process: while it is down, machines already connected keep their data path and nothing can join.
+
 ## Tests
 
 `cmake --build build --target coverage` and `--target memcheck` run the unit tests, as the CI does. `sudo tests/integration/run.sh build` runs the conductor, two switches and three agents in network namespaces with TLS, and checks registration and ACL, forged messages from a raw client, conductor and switch restarts, a cut link, route restore, lockdown, config reload, the per-agent limit under a flood, and throughput.

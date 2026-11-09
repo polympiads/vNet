@@ -16,10 +16,10 @@ struct ssl_st;
 
 namespace vnet::netqueue {
     /**
-     * Maximum number for events returned
-     * by a single call to epoll_wait
+     * Maximum number of events returned by a single call to epoll_wait.
+     * A switch with hundreds of agents gets most of them in one turn.
      */
-    const int EPOLL_MAX_EVENTS = 32;
+    const int EPOLL_MAX_EVENTS = 256;
 
     /**
      * Instances of this class represents a general

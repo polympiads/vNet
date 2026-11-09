@@ -12,6 +12,8 @@ ExecStart=/usr/local/bin/switch ${VNET_SWITCH_NAME} ${VNET_SWITCH_PORT}
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=2
+# One socket per machine, plus the peers; the default 1024 is too few.
+LimitNOFILE=65536
 # Needs the TUN device, routes and iptables: runs as root.
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
 DeviceAllow=/dev/net/tun rw

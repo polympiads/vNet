@@ -9,6 +9,8 @@ EnvironmentFile=/etc/vnet/conductor.env
 ExecStart=/usr/local/bin/conductor
 Restart=always
 RestartSec=2
+# One socket per machine, plus the peers; the default 1024 is too few.
+LimitNOFILE=65536
 # SIGHUP reloads the auth file; SIGUSR1 writes the state dump at once.
 ExecReload=/bin/kill -HUP $MAINPID
 
