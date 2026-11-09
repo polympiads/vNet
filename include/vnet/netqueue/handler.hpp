@@ -44,11 +44,15 @@ namespace vnet::netqueue {
     void doNothingOnClose       (void* ptr_data, close_data  close_content);
     void doNothingOnSocketReady (void* ptr_data, socket_data data);
     void doNothingOnTunReady    (void* ptr_data, tun_data    data);
+    void doNothingOnConnected   (void* ptr_data, socket_data data);
 
     struct NetworkQueueHandler {
         void (*onClose)       (void* ptr_data, close_data  close_content) = &doNothingOnClose;
         void (*onSocketReady) (void* ptr_data, socket_data data)          = &doNothingOnSocketReady;
         void (*onTunReady)    (void* ptr_data, tun_data    data)          = &doNothingOnTunReady;
+        /* A socket put in with a connect or a TLS handshake pending has
+         * finished both and is ready for packets. packet fields are unset. */
+        void (*onConnected)   (void* ptr_data, socket_data data)          = &doNothingOnConnected;
         
         void* ptr_data = nullptr;
     };

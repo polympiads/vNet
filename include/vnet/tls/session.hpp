@@ -17,6 +17,13 @@ namespace vnet::tls {
     ssl_st* handshake_client(int fd);
     ssl_st* handshake_server(int fd);
 
+    /**
+     * A session bound to fd with no handshake done yet, for the
+     * non-blocking handshake that NetQueue drives. Null when TLS is off or
+     * the session cannot be made.
+     */
+    ssl_st* new_session(int fd);
+
     void free_session(ssl_st* ssl);
 
 }

@@ -84,6 +84,17 @@ namespace vnet::tls {
         return ssl;
     }
 
+    ssl_st* new_session(int fd) {
+        if (!g_enabled) return nullptr;
+        SSL* ssl = SSL_new(g_ctx);
+        if (!ssl) return nullptr;
+        if (SSL_set_fd(ssl, fd) != 1) {
+            SSL_free(ssl);
+            return nullptr;
+        }
+        return ssl;
+    }
+
     ssl_st* handshake_client(int fd) { return handshake(fd, false); }
     ssl_st* handshake_server(int fd) { return handshake(fd, true); }
 

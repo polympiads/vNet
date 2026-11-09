@@ -25,6 +25,14 @@ namespace vnet::netqueue {
         SCK_PAYLOAD,
         SCK_READY,
         SCK_ERROR,
-        SCK_EOF
+        SCK_EOF,
+
+        /* A connect() that returned EINPROGRESS; waiting for the socket
+         * to become writable. */
+        SCK_CONNECTING,
+        /* TLS handshake in progress, driven by SSL_accept or SSL_connect
+         * as the socket becomes readable or writable. */
+        SCK_TLS_ACCEPT,
+        SCK_TLS_CONNECT
     };
 };

@@ -11,9 +11,11 @@ namespace vnet::protocol {
     public:
         void onSocketReady (netqueue::socket_data data);
 
-        virtual void onActivity (netqueue::socket_data data);
-        virtual void onClose    (netqueue::close_data close_content);
-        virtual void onTunReady (netqueue::tun_data   data);
+        virtual void onActivity  (netqueue::socket_data data);
+        virtual void onClose     (netqueue::close_data close_content);
+        virtual void onTunReady  (netqueue::tun_data   data);
+        /** A pending connect or TLS handshake finished; packets can flow. */
+        virtual void onConnected (netqueue::socket_data data);
 
         virtual void onHeartbeat (netqueue::socket_data data);
 

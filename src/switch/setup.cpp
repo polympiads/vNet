@@ -32,7 +32,6 @@
 #include "vnet/blackbox/config.hpp"
 #include "vnet/protocol/types.hpp"
 #include "vnet/tls/session.hpp"
-#include <poll.h>
 
 using namespace vnet::protocol;
 using namespace vnet::netqueue;
@@ -40,7 +39,10 @@ using namespace vnet::blackbox;
 using clk = std::chrono::steady_clock;
 
 static const int                  LISTEN_BACKLOG      = 1024;
-static const int                  ACCEPTS_PER_TURN    = 8;
+/* Handshakes run inside the queue, so a turn can take a whole burst. */
+static const int                  ACCEPTS_PER_TURN    = 64;
+/* A dialed peer that has not finished connecting and handshaking. */
+static const std::chrono::seconds DIAL_TIMEOUT        {5};
 static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
 static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
 static std::chrono::seconds       g_dead{90};
@@ -67,6 +69,10 @@ struct ConnInfo {
     clk::time_point accepted_at = clk::now();
     /* Retiring a duplicate dial must not wipe routes that were moved. */
     bool        skip_route_cleanup = false;
+    /* Peer links: this side dialed, and whether the link is up yet. */
+    bool        dialed    = false;
+    bool        connected = true;
+    clk::time_point dialed_at{};
 };
 
 // ---------------------------------------------------------------------------
@@ -235,6 +241,11 @@ static void install_waiting_routes(NetQueue* queue, const std::string& name, int
     g_routes_waiting.erase(it);
 }
 
+/*
+ * Start a connection to a peer switch. The connect and the TLS handshake
+ * finish inside the queue; onConnected sends the hello. Nothing here
+ * waits, so a peer that is down costs this switch no forwarding time.
+ */
 static int dial_peer(NetQueue* queue, const PeerTarget& target) {
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (fd < 0) return -1;
@@ -253,58 +264,30 @@ static int dial_peer(NetQueue* queue, const PeerTarget& target) {
         std::cerr << "[Switch] Failed to connect to peer " << target.name << "\n";
         return -1;
     }
-    if (rc < 0) {
-        pollfd pfd{};
-        pfd.fd = fd;
-        pfd.events = POLLOUT;
-        if (poll(&pfd, 1, 3000) <= 0) {
-            ::close(fd);
-            return -1;
-        }
-        int soerr = 0;
-        socklen_t slen = sizeof(soerr);
-        getsockopt(fd, SOL_SOCKET, SO_ERROR, &soerr, &slen);
-        if (soerr != 0) {
-            ::close(fd);
-            return -1;
-        }
-    }
-    set_blocking(fd);
-    ssl_st* ssl = nullptr;
-    if (vnet::tls::enabled()) {
-        // The peer may be busy accepting agents. Do not wait forever, or
-        // this switch stops accepting its own agents.
-        set_socket_timeout(fd, 1000);
-        ssl = vnet::tls::handshake_client(fd);
-        set_socket_timeout(fd, 0);
-        if (!ssl) {
-            ::close(fd);
-            return -1;
-        }
-    }
-    set_nonblocking(fd);
 
     auto* info = new ConnInfo();
-    info->role = ConnRole::PEER_SWITCH;
-    info->name = target.name;
-    info->fd   = fd;
-    g_state.peer_switches[target.name] = info;
+    info->role      = ConnRole::PEER_SWITCH;
+    info->name      = target.name;
+    info->fd        = fd;
+    info->dialed    = true;
+    info->connected = false;
+    info->dialed_at = clk::now();
 
-    if (queue->put_sck(fd, info) == nullptr) {
-        g_state.peer_switches.erase(target.name);
+    ssl_st* ssl = vnet::tls::enabled() ? vnet::tls::new_session(fd) : nullptr;
+    if (vnet::tls::enabled() && !ssl) {
+        ::close(fd);
+        delete info;
+        return -1;
+    }
+    if (queue->put_sck_connecting(fd, info, ssl) == nullptr) {
         vnet::tls::free_session(ssl);
         ::close(fd);
         delete info;
         return -1;
     }
-    if (ssl) queue->adopt_tls(fd, ssl);
-
-    mip::PacketSwitchHello hello;
-    hello.set_switch_name(g_switch_name);
-    queue->send(fd, PacketType::SWITCH_HELLO, hello);
+    g_state.peer_switches[target.name] = info;
 
     std::cout << "[Switch] Dialing peer " << target.name << "\n";
-    install_waiting_routes(queue, target.name, fd);
     return fd;
 }
 
@@ -353,6 +336,21 @@ struct SwitchDispatch : public Dispatch {
     void onActivity(socket_data data) override {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
         if (info) info->last_rx = clk::now();
+    }
+
+    void onConnected(socket_data data) override {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!info) return;
+        info->connected = true;
+        info->last_rx   = clk::now();
+
+        if (info->role == ConnRole::PEER_SWITCH && info->dialed) {
+            mip::PacketSwitchHello hello;
+            hello.set_switch_name(g_switch_name);
+            queue->send(data.fd, PacketType::SWITCH_HELLO, hello);
+            std::cout << "[Switch] Peer " << info->name << " link up (dialed)\n";
+            install_waiting_routes(queue, info->name, data.fd);
+        }
     }
 
     /*
@@ -622,7 +620,8 @@ static void send_heartbeats(NetQueue& queue) {
 
     try_hb(g_state.conductor);
     for (auto* a : g_state.agents) try_hb(a);
-    for (auto& peer : g_state.peer_switches) try_hb(peer.second);
+    for (auto& peer : g_state.peer_switches)
+        if (peer.second->connected) try_hb(peer.second);
 }
 
 static void reap_dead(NetQueue& queue) {
@@ -634,7 +633,18 @@ static void reap_dead(NetQueue& queue) {
     };
     check(g_state.conductor);
     for (auto* agent : g_state.agents) check(agent);
-    for (auto& peer : g_state.peer_switches) check(peer.second);
+    for (auto& peer : g_state.peer_switches) {
+        ConnInfo* c = peer.second;
+        if (!c->connected) {
+            if (now - c->dialed_at >= DIAL_TIMEOUT) {
+                std::cerr << "[Switch] Peer " << c->name
+                          << " did not answer the dial\n";
+                dead.push_back(c->fd);
+            }
+            continue;
+        }
+        check(c);
+    }
     for (int fd : dead) {
         std::cerr << "[Switch] Heartbeat timeout on fd " << fd << "\n";
         queue.close(fd);
@@ -914,34 +924,27 @@ int main(int argc, char** argv) {
             if (agent_fd < 0) break;
 
             setsockopt(agent_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
-            set_blocking(agent_fd);
-            ssl_st* ssl = nullptr;
-            if (vnet::tls::enabled()) {
-                set_socket_timeout(agent_fd, 1000);
-                ssl = vnet::tls::handshake_server(agent_fd);
-                set_socket_timeout(agent_fd, 0);
-                if (!ssl) {
-                    close(agent_fd);
-                    continue;
-                }
-            }
-            set_nonblocking(agent_fd);
 
             auto* info = new ConnInfo();
             info->role = ConnRole::AGENT_PENDING;
             info->fd   = agent_fd;
 
-            if (queue.put_sck(agent_fd, info) == nullptr) {
-                vnet::tls::free_session(ssl);
+            // The TLS handshake runs inside the queue; the identify
+            // timeout closes a socket that never finishes it.
+            NetworkElement* element = nullptr;
+            if (vnet::tls::enabled()) {
+                ssl_st* ssl = vnet::tls::new_session(agent_fd);
+                element = queue.put_sck_tls_server(agent_fd, info, ssl);
+                if (!element) vnet::tls::free_session(ssl);
+            } else {
+                element = queue.put_sck(agent_fd, info);
+            }
+            if (element == nullptr) {
                 close(agent_fd);
                 delete info;
                 continue;
             }
             g_unidentified.insert(info);
-            if (ssl) {
-                queue.adopt_tls(agent_fd, ssl);
-                queue.drain_tls(agent_fd);
-            }
         }
 
         // Process events

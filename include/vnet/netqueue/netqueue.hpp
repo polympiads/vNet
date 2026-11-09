@@ -11,6 +11,9 @@
 #include <mutex>
 #include <vector>
 
+/* OpenSSL session type, declared here so no copy of it lands in this namespace. */
+struct ssl_st;
+
 namespace vnet::netqueue {
     /**
      * Maximum number for events returned
@@ -21,7 +24,11 @@ namespace vnet::netqueue {
     /**
      * Instances of this class represents a general
      * purpose pool of file descriptors intended to
-     * represent a queue for incoming network packets. 
+     * represent a queue for incoming network packets.
+     *
+     * The process must ignore SIGPIPE: a write to a peer that hung up,
+     * including the TLS alert OpenSSL sends on a failed handshake, is
+     * reported as an error on that socket instead of ending the process.
      */
     struct NetQueue {
     private:
@@ -62,6 +69,12 @@ namespace vnet::netqueue {
         * Returns false if the connection should be closed.
         */
         bool flush_write_buffer(NetworkElement* element);
+
+        /* Advance a pending connect or handshake. Returns false when the
+         * element is not ready yet and process() should stop. */
+        bool step_connecting(NetworkElement* element);
+        bool step_handshake(NetworkElement* element);
+        void fire_connected(NetworkElement* element);
 
         /**
         * Shared body of send and send_data. With drop_when_full, a write
@@ -240,10 +253,34 @@ namespace vnet::netqueue {
         NetworkElement* put_sck (int fd, void* ptr);
 
         /**
+         * Put a socket whose connect() is in progress (EINPROGRESS) or
+         * just completed. When the connection is up, the TLS handshake
+         * runs on it if ssl is given (a client session from
+         * tls::new_session), and onConnected fires once packets can flow.
+         * The queue owns ssl from here on.
+         */
+        NetworkElement* put_sck_connecting (int fd, void* ptr, ssl_st* ssl);
+
+        /**
+         * Put an accepted socket that must complete a TLS handshake as the
+         * server before any packet is read. ssl is a fresh session from
+         * tls::new_session; the queue owns it. onConnected fires when the
+         * handshake is done.
+         */
+        NetworkElement* put_sck_tls_server (int fd, void* ptr, ssl_st* ssl);
+
+        /**
+         * Put a connected socket that must complete a TLS handshake as the
+         * client before any packet is read. Same ownership and callback as
+         * put_sck_tls_server.
+         */
+        NetworkElement* put_sck_tls_client (int fd, void* ptr, ssl_st* ssl);
+
+        /**
          * Attach a finished TLS session to a socket already in the queue.
          * Later reads and writes go through SSL_read / SSL_write.
          */
-        void adopt_tls(int fd, struct ssl_st* ssl) {
+        void adopt_tls(int fd, ssl_st* ssl) {
             NetworkElement* element = get_network_element_from_fd(fd);
             if (!element) return;
             element->ssl = ssl;

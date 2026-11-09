@@ -19,6 +19,9 @@ static void _dispatch_on_socket_ready(void* ptr_data, socket_data data) {
 static void _dispatch_on_tun_ready(void* ptr_data, tun_data data) {
     static_cast<Dispatch*>(ptr_data)->onTunReady(data);
 }
+static void _dispatch_on_connected(void* ptr_data, socket_data data) {
+    static_cast<Dispatch*>(ptr_data)->onConnected(data);
+}
 
 NetworkQueueHandler vnet::protocol::makeNetworkQueueHandler(Dispatch* dispatch) {
     NetworkQueueHandler handler;
@@ -26,6 +29,7 @@ NetworkQueueHandler vnet::protocol::makeNetworkQueueHandler(Dispatch* dispatch) 
     handler.onClose       = _dispatch_on_close;
     handler.onSocketReady = _dispatch_on_socket_ready;
     handler.onTunReady    = _dispatch_on_tun_ready;
+    handler.onConnected   = _dispatch_on_connected;
     return handler;
 }
 
@@ -156,6 +160,7 @@ void Dispatch::onSocketReady(socket_data data) {
 void Dispatch::onActivity   (socket_data)                                         {}
 void Dispatch::onClose       (close_data)                                          {}
 void Dispatch::onTunReady    (tun_data)                                            {}
+void Dispatch::onConnected   (socket_data)                                         {}
 void Dispatch::onHeartbeat   (socket_data)                                         {}
 
 void Dispatch::onSwitchMIP   (socket_data, mip::PacketSwitchMIP&)                 {}

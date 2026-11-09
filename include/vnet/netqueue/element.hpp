@@ -9,6 +9,9 @@
 #include "vnet/const.hpp"
 #include "vnet/netqueue/fsm.hpp"
 
+/* OpenSSL session type, declared here so no copy of it lands in this namespace. */
+struct ssl_st;
+
 namespace vnet::netqueue {
 
     /* Bytes a peer may have waiting on a slow socket before the queue
@@ -34,7 +37,10 @@ namespace vnet::netqueue {
         bool dead = false;
 
         /* Optional TLS session. Null means the fd is plaintext. */
-        struct ssl_st* ssl = nullptr;
+        ssl_st* ssl = nullptr;
+
+        /* A handshake step asked for the socket to become writable. */
+        bool want_write = false;
     
         NetworkElement (int fd, void *ptr, FiniteStateMachine state);
     };

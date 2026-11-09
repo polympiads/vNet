@@ -38,8 +38,8 @@ using sysclk = std::chrono::system_clock;
 
 static const uint16_t             LISTEN_PORT         = 5000;
 static const int                  LISTEN_BACKLOG      = 1024;
-static const int                  ACCEPTS_PER_TURN    = 8;
-static const int                  HANDSHAKE_TIMEOUT_MS = 1000;
+/* Handshakes run inside the queue, so a turn can take a whole burst. */
+static const int                  ACCEPTS_PER_TURN    = 64;
 static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
 static const std::chrono::seconds DUMP_INTERVAL       {5};
 static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
@@ -789,8 +789,6 @@ int main() {
 
     // --- Event loop ---
     while (g_running) {
-        // A few handshakes, then back to epoll, so a burst of agents
-        // cannot stall route updates and heartbeats.
         for (int accepted = 0; accepted < ACCEPTS_PER_TURN; accepted++) {
             sockaddr_in peer{};
             socklen_t plen = sizeof(peer);
@@ -800,36 +798,27 @@ int main() {
             int flag = 1;
             setsockopt(client, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 
-            set_blocking(client);
-            ssl_st* ssl = nullptr;
-            if (vnet::tls::enabled()) {
-                // A peer that never speaks TLS must not stall every
-                // other registration and heartbeat.
-                set_socket_timeout(client, HANDSHAKE_TIMEOUT_MS);
-                ssl = vnet::tls::handshake_server(client);
-                set_socket_timeout(client, 0);
-                if (!ssl) {
-                    close(client);
-                    continue;
-                }
-            }
-            set_nonblocking(client);
-
             auto* info = new ConnInfo();
             info->fd = client;
 
-            if (queue.put_sck(client, info) == nullptr) {
+            // The TLS handshake runs inside the queue as the socket
+            // becomes readable, so a silent peer stalls nothing. The
+            // identify timeout closes it if it never finishes.
+            NetworkElement* element = nullptr;
+            if (vnet::tls::enabled()) {
+                ssl_st* ssl = vnet::tls::new_session(client);
+                element = queue.put_sck_tls_server(client, info, ssl);
+                if (!element) vnet::tls::free_session(ssl);
+            } else {
+                element = queue.put_sck(client, info);
+            }
+            if (element == nullptr) {
                 std::cerr << "[Conductor] Failed to add fd " << client << " to queue\n";
-                vnet::tls::free_session(ssl);
                 close(client);
                 delete info;
                 continue;
             }
             g_unidentified.insert(info);
-            if (ssl) {
-                queue.adopt_tls(client, ssl);
-                queue.drain_tls(client);
-            }
         }
 
         // Process epoll events

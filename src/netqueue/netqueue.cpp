@@ -3,10 +3,12 @@
 #include "vnet/protocol/header.hpp"
 
 #include <sys/epoll.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include <iostream>
 #include <cerrno>
 #include <cstring>
+#include <openssl/err.h>
 #include <openssl/ssl.h>
 
 using namespace vnet::netqueue;
@@ -59,6 +61,31 @@ NetworkElement* NetQueue::put_sck (int sck_fd, void* data) {
     return put(sck_fd, data, FiniteStateMachine::SCK_HEADER);
 }
 
+NetworkElement* NetQueue::put_sck_connecting (int sck_fd, void* data, ssl_st* ssl) {
+    NetworkElement* element = put(sck_fd, data, FiniteStateMachine::SCK_CONNECTING);
+    if (!element) return nullptr;
+    element->ssl = ssl;
+    return element;
+}
+NetworkElement* NetQueue::put_sck_tls_server (int sck_fd, void* data, ssl_st* ssl) {
+    if (!ssl) return nullptr;
+    NetworkElement* element = put(sck_fd, data, FiniteStateMachine::SCK_TLS_ACCEPT);
+    if (!element) return nullptr;
+    element->ssl = ssl;
+    return element;
+}
+NetworkElement* NetQueue::put_sck_tls_client (int sck_fd, void* data, ssl_st* ssl) {
+    if (!ssl) return nullptr;
+    NetworkElement* element = put(sck_fd, data, FiniteStateMachine::SCK_TLS_CONNECT);
+    if (!element) return nullptr;
+    element->ssl = ssl;
+    return element;
+}
+
+static bool is_pending_state(FiniteStateMachine state) {
+    return state == SCK_CONNECTING || state == SCK_TLS_ACCEPT || state == SCK_TLS_CONNECT;
+}
+
 NetworkElement* NetQueue::put (int fd, void* data, FiniteStateMachine state) {
     std::lock_guard<std::mutex> lock_fd_to_network_element (fd_to_network_element_mutex);
 
@@ -73,6 +100,10 @@ NetworkElement* NetQueue::put (int fd, void* data, FiniteStateMachine state) {
     struct epoll_event event;
     event.data.ptr = element;
     event.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
+    // A connect in progress completes with the socket becoming writable,
+    // and a TLS client must get a first turn to send its ClientHello.
+    if (state == SCK_CONNECTING || state == SCK_TLS_CONNECT)
+        event.events |= EPOLLOUT;
 
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event) < 0) {
         delete element;
@@ -222,7 +253,8 @@ bool NetQueue::send_heartbeat(int fd) {
 
 NetQueue::NetQueue (NetworkQueueHandler handler) : NetQueue(handler, -1) {}
 NetQueue::NetQueue (NetworkQueueHandler handler, int epoll_timeout) {
-    if (handler.onClose == nullptr || handler.onSocketReady == nullptr || handler.onTunReady == nullptr) {
+    if (handler.onClose == nullptr || handler.onSocketReady == nullptr ||
+        handler.onTunReady == nullptr || handler.onConnected == nullptr) {
         throw std::invalid_argument( "handlers should exist" );
     }
 
@@ -280,8 +312,10 @@ void NetQueue::wait_and_process () {
                 reason = CLOSE_ERROR;
             }
         }
+        bool pending = is_pending_state(current_element->state);
         if (!should_close && current_element->write_buffer.empty() &&
-            (events[i_event].events & EPOLLIN)) {
+            ((events[i_event].events & EPOLLIN) ||
+             (pending && (events[i_event].events & EPOLLOUT)))) {
             process(current_element);
             if (current_element->dead)
                 continue ;
@@ -309,7 +343,9 @@ void NetQueue::wait_and_process () {
             struct epoll_event event;
             event.data.ptr = current_element;
             event.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
-            if (!current_element->write_buffer.empty()) {
+            if (!current_element->write_buffer.empty() ||
+                current_element->want_write ||
+                current_element->state == SCK_CONNECTING) {
                 event.events |= EPOLLOUT;
             }
             if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, current_element->fd, &event) < 0) {
@@ -324,9 +360,92 @@ void NetQueue::wait_and_process () {
     reap_closed();
 }
 
+bool NetQueue::step_connecting(NetworkElement* element) {
+    int soerr = 0;
+    socklen_t slen = sizeof(soerr);
+    if (getsockopt(element->fd, SOL_SOCKET, SO_ERROR, &soerr, &slen) < 0) {
+        element->state = SCK_ERROR;
+        return true;
+    }
+    if (soerr == EINPROGRESS || soerr == EALREADY) {
+        // Not there yet; EPOLLOUT will say when.
+        return false;
+    }
+    if (soerr != 0) {
+        errno = soerr;
+        element->state = SCK_ERROR;
+        return true;
+    }
+    if (element->ssl) {
+        element->state = SCK_TLS_CONNECT;
+    } else {
+        element->state = SCK_HEADER;
+        fire_connected(element);
+    }
+    return true;
+}
+
+bool NetQueue::step_handshake(NetworkElement* element) {
+    SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    if (!ssl) {
+        element->state = SCK_ERROR;
+        return true;
+    }
+    ERR_clear_error();
+    int rc = element->state == SCK_TLS_ACCEPT ? SSL_accept(ssl) : SSL_connect(ssl);
+    if (rc == 1) {
+        element->want_write = false;
+        element->state = SCK_HEADER;
+        fire_connected(element);
+        return true;
+    }
+    int err = SSL_get_error(ssl, rc);
+    if (err == SSL_ERROR_WANT_READ) {
+        element->want_write = false;
+        return false;
+    }
+    if (err == SSL_ERROR_WANT_WRITE) {
+        element->want_write = true;
+        return false;
+    }
+    element->want_write = false;
+    if (err == SSL_ERROR_ZERO_RETURN ||
+        (err == SSL_ERROR_SYSCALL && (rc == 0 || errno == 0 || errno == ECONNRESET || errno == EPIPE))) {
+        // The peer went away mid-handshake: a port probe, not a fault here.
+        ERR_clear_error();
+        element->state = SCK_EOF;
+        return true;
+    }
+    if (err == SSL_ERROR_SSL) {
+        std::cerr << "[TLS] handshake failed on fd " << element->fd << "\n";
+        ERR_print_errors_fp(stderr);
+    }
+    element->state = SCK_ERROR;
+    return true;
+}
+
+void NetQueue::fire_connected(NetworkElement* element) {
+    socket_data sck_data{};
+    sck_data.fd = element->fd;
+    sck_data.ptr_data = element->ptr;
+    sck_data.net_element = element;
+    handler.onConnected(handler.ptr_data, sck_data);
+}
+
 void NetQueue::process (NetworkElement* element) {
     while (1) {
         switch (element->state) {
+            case SCK_CONNECTING: {
+                if (!step_connecting(element)) return ;
+                break ;
+            }
+            case SCK_TLS_ACCEPT:
+            case SCK_TLS_CONNECT: {
+                if (!step_handshake(element)) return ;
+                // The handler may have closed or rejected the element.
+                if (element->dead) return ;
+                break ;
+            }
             case SCK_HEADER: {
                 ssize_t nb_rem  = protocol::PACKET_HEADER_SIZE - element->net_buffer_used;
                 ssize_t nb_read = io_read(element, element->net_buffer + element->net_buffer_used, nb_rem);
@@ -360,6 +479,11 @@ void NetQueue::process (NetworkElement* element) {
                 protocol::PacketHeader* header = (protocol::PacketHeader*) element->net_buffer;
                 
                 size_t  buffer_size = header->get_payload_size() + protocol::PACKET_HEADER_SIZE;
+                if (element->net_buffer_used == buffer_size) {
+                    // Header-only packet, such as a heartbeat: nothing to read.
+                    element->state = SCK_READY;
+                    break ;
+                }
                 ssize_t number_read = io_read(element, element->net_buffer + element->net_buffer_used, buffer_size - element->net_buffer_used);
                 if (number_read < 0) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK)
