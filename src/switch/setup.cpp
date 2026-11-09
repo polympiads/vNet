@@ -490,6 +490,18 @@ struct SwitchDispatch : public Dispatch {
             return;
         }
 
+        // The same agent on an older socket: it rejoined before the old
+        // link timed out. The registry already points at the new fd, so
+        // closing the old one withdraws nothing.
+        for (ConnInfo* old : g_state.agents) {
+            if (old->name == agent_name && old != info) {
+                std::cout << "[Switch] Agent " << agent_name
+                          << " authenticated again; closing fd " << old->fd << "\n";
+                queue->close(old->fd);
+                break;
+            }
+        }
+
         info->role = ConnRole::AGENT_AUTHENTICATED;
         info->name = agent_name;
         g_state.agents.push_back(info);

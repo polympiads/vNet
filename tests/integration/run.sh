@@ -291,6 +291,28 @@ scenario_auth_reload() {
   pass auth_reload
 }
 
+scenario_duplicate_identity() {
+  topo_up duplicate_identity
+  start_conductor; sleep 0.5
+  start_switch 1; sleep 1.5
+  start_agent 1; start_agent 2; sleep 2
+  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail duplicate_identity "agents did not register"; return; }
+  # agent1 freezes (a VM paused, say) and a machine with the same identity
+  # appears in a3. Its sockets are silent, not closed: the newcomer must
+  # replace them on the switch and on the conductor.
+  kill -STOP "${PID[agent1]}"
+  ip netns exec a3 env "${HB[@]}" $(tls_env agent1) CONDUCTOR_IP=172.31.3.1 CONDUCTOR_PORT=5000 \
+      VNET_AUTH_KEY=k1 "$BIN/agent" agent1 >> "$LOGS/agent1-copy.log" 2>&1 &
+  PID[agent1copy]=$!
+  wait_for "$LOGS/switch1.log" "authenticated again; closing" 1 15 || { fail duplicate_identity "switch kept the frozen socket"; return; }
+  wait_for "$LOGS/conductor.log" "registered again; closing" 1 15 || { fail duplicate_identity "conductor kept the frozen socket"; return; }
+  sleep 1
+  [ "$(pings 3 10.0.1.2 3)" = 3 ] || { fail duplicate_identity "the newcomer cannot ping"; return; }
+  kill -CONT "${PID[agent1]}"; stop agent1 KILL
+  say "a second machine with agent1's identity took over both sockets"
+  pass duplicate_identity
+}
+
 scenario_flood() {
   command -v iperf3 >/dev/null || { echo "SKIP flood (no iperf3)"; return; }
   topo_up flood
@@ -334,7 +356,7 @@ scenario_throughput() {
 # ---------------------------------------------------------------- main
 
 make_certs
-ALL="basic attacks conductor_restart switch_restart switch_link agent_exit lockdown config auth_reload flood throughput"
+ALL="basic attacks conductor_restart switch_restart switch_link agent_exit duplicate_identity lockdown config auth_reload flood throughput"
 for s in ${@:-$ALL}; do
   echo "== $s"
   topo_down
