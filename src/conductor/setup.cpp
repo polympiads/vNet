@@ -2,7 +2,6 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
-#include <random>
 #include <algorithm>
 #include <csignal>
 #include <cstring>
@@ -16,6 +15,8 @@
 #include <netinet/tcp.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <openssl/crypto.h>
+#include <openssl/rand.h>
 
 #include "mip.pb.h"
 #include "state.pb.h"
@@ -43,6 +44,8 @@ static const std::chrono::seconds DUMP_INTERVAL       {5};
 static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
 static std::chrono::seconds       g_dead{90};
 static const std::chrono::seconds IDENTIFY_TIMEOUT    {10};
+/* A switch forgets a token after 60 s; forget it here at the same time. */
+static const int64_t              TOKEN_EXPIRY_MS      = 60 * 1000;
 
 static const char* DEFAULT_DUMP_PATH = "/var/vnet-dump.bin";
 
@@ -115,10 +118,30 @@ struct ConductorState {
 
     size_t rr_index = 0;
 
-    std::mt19937_64 rng{std::random_device{}()};
-
+    /*
+     * Tokens come from the OpenSSL CSPRNG. A seeded PRNG would let an
+     * agent that saw its own token predict the tokens handed to every
+     * other machine and log in as them.
+     */
     uint64_t generate_token() {
-        return rng();
+        uint64_t token = 0;
+        do {
+            if (RAND_bytes(reinterpret_cast<unsigned char*>(&token),
+                           sizeof(token)) != 1) {
+                std::cerr << "[Conductor] RAND_bytes failed\n";
+                std::abort();
+            }
+        } while (token == 0);
+        return token;
+    }
+
+    void expire_tokens(int64_t now) {
+        pending_tokens.erase(
+            std::remove_if(pending_tokens.begin(), pending_tokens.end(),
+                [&](const PendingTokenInfo& t) {
+                    return now - t.created_at_ms > TOKEN_EXPIRY_MS;
+                }),
+            pending_tokens.end());
     }
 
     ConnInfo* pick_switch(const std::string& agent_network) {
@@ -281,12 +304,19 @@ static bool load_auth_file(const std::string& path) {
     return !g_auth.empty();
 }
 
+/* Equal length and equal bytes, in time that does not depend on where
+ * the first difference is. */
+static bool keys_equal(const std::string& a, const std::string& b) {
+    if (a.size() != b.size()) return false;
+    return CRYPTO_memcmp(a.data(), b.data(), a.size()) == 0;
+}
+
 static bool auth_ok(const std::string& role, const std::string& name,
                     const std::string& key) {
     if (!g_auth_required) return true;
     auto it = g_auth.find(name);
     if (it == g_auth.end()) return false;
-    return it->second.role == role && it->second.key == key;
+    return it->second.role == role && keys_equal(it->second.key, key);
 }
 
 struct ConductorDispatch : public Dispatch {
@@ -298,8 +328,20 @@ struct ConductorDispatch : public Dispatch {
         if (info) info->last_rx = clk::now();
     }
 
+    /* A connection identifies itself once. A second MIP or MRP on it
+     * would let a registered machine take on another name or role. */
+    bool already_identified(socket_data data, const char* what) {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!info || info->role == Role::UNKNOWN) return false;
+        std::cerr << "[Conductor] Rejected " << what << " on the already "
+                  << "registered connection of " << info->name << "\n";
+        queue->close(data.fd);
+        return true;
+    }
+
     void onSwitchMIP(socket_data data, mip::PacketSwitchMIP& pkt) override {
         auto* info     = static_cast<ConnInfo*>(data.ptr_data);
+        if (already_identified(data, "switch MIP")) return;
         if (!auth_ok("switch", pkt.name(), pkt.auth_key())) {
             std::cerr << "[Conductor] Rejected switch auth: " << pkt.name() << "\n";
             queue->close(data.fd);
@@ -354,6 +396,7 @@ struct ConductorDispatch : public Dispatch {
 
     void onAgentMIP(socket_data data, mip::PacketAgentMIP& pkt) override {
         auto* info     = static_cast<ConnInfo*>(data.ptr_data);
+        if (already_identified(data, "agent MIP")) return;
         if (!auth_ok("agent", pkt.name(), pkt.auth_key())) {
             std::cerr << "[Conductor] Rejected agent auth: " << pkt.name() << "\n";
             queue->close(data.fd);
@@ -366,14 +409,21 @@ struct ConductorDispatch : public Dispatch {
         info->fd       = data.fd;
         info->connected_at_ms = now_ms();
 
-        // Reject if an agent with this name is already connected
+        // The key holder proved itself again: the newer connection wins,
+        // as with MRP. An agent whose switch link dropped closes its
+        // conductor socket and re-registers, and the close may still be
+        // in flight when the new MIP arrives.
+        int old_fd = -1;
         for (const auto* existing : g_state.agents) {
-            if (existing->name == pkt.name()) {
-                std::cerr << "[Conductor] Rejected duplicate agent: "
-                        << pkt.name() << "\n";
-                queue->close(data.fd);
-                return;
+            if (existing->name == pkt.name() && existing != info) {
+                old_fd = existing->fd;
+                break;
             }
+        }
+        if (old_fd >= 0) {
+            std::cout << "[Conductor] Agent " << pkt.name()
+                      << " registered again; closing fd " << old_fd << "\n";
+            queue->close(old_fd);
         }
 
         ConnInfo* sw = g_state.pick_switch(pkt.network());
@@ -390,8 +440,7 @@ struct ConductorDispatch : public Dispatch {
         uint64_t token = g_state.generate_token();
 
         std::cout << "[Conductor] Agent " << pkt.name()
-                  << " → switch " << sw->name
-                  << " (token=" << token << ")\n";
+                  << " -> switch " << sw->name << "\n";
 
         // 1) Tell the agent which switch to connect to
         mip::PacketConnectToSwitch resp;
@@ -430,6 +479,7 @@ struct ConductorDispatch : public Dispatch {
 
     void onAgentMRP(socket_data data, mip::PacketAgentMRP& pkt) override {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (already_identified(data, "agent MRP")) return;
         if (!auth_ok("agent", pkt.name(), pkt.auth_key())) {
             std::cerr << "[Conductor] Rejected agent reauth: " << pkt.name() << "\n";
             queue->close(data.fd);
@@ -780,6 +830,7 @@ int main() {
         // Heartbeats
         send_heartbeats(queue);
         reap_dead(queue);
+        g_state.expire_tokens(now_ms());
 
         // Periodic dump
         auto now = clk::now();

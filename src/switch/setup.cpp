@@ -367,8 +367,7 @@ struct SwitchDispatch : public Dispatch {
 
         g_state.pending_tokens[token] = { agent, clk::now() };
 
-        std::cout << "[Switch] Expecting agent " << agent
-                  << " (token=" << token << ")\n";
+        std::cout << "[Switch] Expecting agent " << agent << "\n";
     }
 
     /*
@@ -382,8 +381,8 @@ struct SwitchDispatch : public Dispatch {
 
         auto it = g_state.pending_tokens.find(token);
         if (it == g_state.pending_tokens.end()) {
-            std::cerr << "[Switch] Rejected agent: invalid token "
-                    << token << "\n";
+            std::cerr << "[Switch] Rejected agent: unknown token (fd="
+                    << data.fd << ")\n";
             data.net_element->state = SCK_ERROR;
             return;
         }
