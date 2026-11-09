@@ -33,7 +33,7 @@ namespace vnet::blackbox {
         DELIVER_LOCAL,      // Write the raw IPv4 payload to target_fd (local agent)
         FORWARD_SWITCH,     // Send as IPV4_RAW to target_fd (peer switch)
         FORWARD_INTERNET,   // Write the raw IPv4 payload to the TUN fd
-        REQUEST_ROUTE,      // No route known; caller should send PacketPrepareRouteForTarget
+        REQUEST_ROUTE,      // Destination is configured but its route is not known yet; hold the packet
         DROP                // Drop the packet
     };
 
@@ -88,7 +88,7 @@ namespace vnet::blackbox {
      * Lifecycle hooks:
      *   - on_agent_authenticated() : called after MIP, populates agent registry
      *   - on_agent_disconnected()  : called on fd close, cleans up
-     *   - on_route_update()        : called on PacketNextForTarget from conductor
+     *   - on_route_update()        : called on SWITCH_ROUTE_UPDATE and AGENT_UNREGISTERED from the conductor
      *   - on_switch_disconnected() : called when a peer switch drops
      */
     class BlackBox {
@@ -152,8 +152,8 @@ namespace vnet::blackbox {
         void on_agent_disconnected(int fd);
 
         /**
-         * Received PacketNextForTarget from the conductor.
-         * Updates the routing table.
+         * The conductor published or withdrew the route to an agent on
+         * another switch. Updates the routing table.
          *
          * @param dest_ipv4       Target IP (network order).
          * @param next_switch_fd  The peer switch fd to forward to,

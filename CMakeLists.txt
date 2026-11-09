@@ -64,7 +64,9 @@ SET(VNET_SOURCE_FILES
 
 add_library(vnet STATIC ${VNET_SOURCE_FILES})
 target_link_libraries(vnet PUBLIC vnet_proto OpenSSL::SSL)
-target_link_libraries(vnet PRIVATE gcov)
+if (ENABLE_COVERAGE)
+    target_link_libraries(vnet PRIVATE gcov)
+endif()
 target_include_directories(vnet PUBLIC include)
 
 #############################################################

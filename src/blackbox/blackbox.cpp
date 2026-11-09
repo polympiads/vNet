@@ -310,7 +310,8 @@ namespace vnet::blackbox {
                 return { PacketAction::FORWARD_SWITCH, next_switch, 0, DropReason::NONE };
             }
 
-            // No route yet — ask the conductor
+            // No route yet. The conductor pushes every route as agents
+            // register; the switch holds the packet briefly meanwhile.
             return { PacketAction::REQUEST_ROUTE, -1, dest_ipv4, DropReason::NONE };
         }
 

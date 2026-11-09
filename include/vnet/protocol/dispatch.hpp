@@ -32,8 +32,6 @@ namespace vnet::protocol {
         virtual void onAgentMRP (netqueue::socket_data data, mip::PacketAgentMRP &packet);
 
         /** Routing */
-        virtual void onPrepareRouteForTarget(netqueue::socket_data data, mip::PacketPrepareRouteForTarget &packet);
-        virtual void onNextForTarget(netqueue::socket_data data, mip::PacketNextForTarget &packet);
         /** One IPv4 datagram, as it was read from a TUN: no protobuf wrapper. */
         virtual void onIPv4Raw(netqueue::socket_data data, const uint8_t* raw, size_t len);
         virtual void onAgentRegistered    (netqueue::socket_data data, mip::PacketAgentRegistered    &packet);

@@ -94,20 +94,6 @@ void Dispatch::onSocketReady(socket_data data) {
             }
             break;
         }
-        case PREPARE_ROUTE_FOR_TARGET: {
-            mip::PacketPrepareRouteForTarget packet;
-            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
-                onPrepareRouteForTarget(data, packet);
-            }
-            break;
-        }
-        case NEXT_FOR_TARGET: {
-            mip::PacketNextForTarget packet;
-            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
-                onNextForTarget(data, packet);
-            }
-            break;
-        }
         case IPV4_RAW: {
             if (data.payload_size > 0)
                 onIPv4Raw(data, data.packet_buffer, data.payload_size);
@@ -187,8 +173,6 @@ void Dispatch::onConnectionAccepted  (socket_data, mip::PacketConnectionAccepted
 
 void Dispatch::onAgentMRP (socket_data, mip::PacketAgentMRP&)                      {}
 
-void Dispatch::onPrepareRouteForTarget (socket_data, mip::PacketPrepareRouteForTarget&) {}
-void Dispatch::onNextForTarget         (socket_data, mip::PacketNextForTarget&)         {}
 void Dispatch::onIPv4Raw               (socket_data, const uint8_t*, size_t)           {}
 void Dispatch::onAgentRegistered       (socket_data, mip::PacketAgentRegistered&)       {}
 void Dispatch::onSwitchRouteUpdate     (socket_data, mip::PacketSwitchRouteUpdate&)     {}

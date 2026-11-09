@@ -5,34 +5,38 @@
 namespace vnet::protocol {
     using uint_packet_t = uint16_t;
 
+    /*
+     * Wire values are fixed: a type keeps its number for as long as the
+     * protocol lives, and a removed type's number is not reused.
+     */
     enum PacketType : uint16_t {
-        HEARTBEAT = 0,
+        HEARTBEAT              = 0,
 
-        // MIP
-        SWITCH_MIP,
-        AGENT_MIP,
+        // Machine initialization: registration with the conductor and
+        // the token handshake with a switch.
+        SWITCH_MIP             = 1,
+        AGENT_MIP              = 2,
+        CONNECT_TO_SWITCH      = 3,
+        AGENT_CONNECTION_TOKEN = 4,
+        AUTH_CONNECT_TO_SWITCH = 5,
+        CONNECTION_ACCEPTED    = 6,
 
-        CONNECT_TO_SWITCH,
-        AGENT_CONNECTION_TOKEN,
-        AUTH_CONNECT_TO_SWITCH,
-        CONNECTION_ACCEPTED,
+        // Control-plane reconnection of an agent that kept its switch.
+        AGENT_MRP              = 7,
 
-        // Reconnection
-        AGENT_MRP,
+        // 8 and 9 were route requests that were never sent.
 
-        // Routing
-        PREPARE_ROUTE_FOR_TARGET,
-        NEXT_FOR_TARGET,
-        IPV4_RAW,
-        AGENT_REGISTERED,
-        SWITCH_ROUTE_UPDATE,
-        SWITCH_DISCONNECTED,
+        // Data and routes.
+        IPV4_RAW               = 10,
+        AGENT_REGISTERED       = 11,
+        SWITCH_ROUTE_UPDATE    = 12,
+        SWITCH_DISCONNECTED    = 13,
 
-        // Peer links and route withdrawal. Appended so older values stay put.
-        SWITCH_HELLO,
-        AGENT_UNREGISTERED,
-        PEER_TOKEN,
-        SWITCH_CONFIG,
+        // Peer links, route withdrawal, pair tokens, config fingerprints.
+        SWITCH_HELLO           = 14,
+        AGENT_UNREGISTERED     = 15,
+        PEER_TOKEN             = 16,
+        SWITCH_CONFIG          = 17,
     };
 
     PacketType    ntoh_packet_type (uint_packet_t type);
