@@ -23,8 +23,11 @@ if (ENABLE_COVERAGE)
         COMMAND lcov --directory . --zerocounters --rc branch_coverage=1
         COMMAND ctest
 
-        COMMAND lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch --rc branch_coverage=1
-        COMMAND lcov --remove coverage.info '/usr/*' '*test*' --output-file coverage_filtered.info --rc branch_coverage=1 --ignore-errors unused
+        # gcov reports a test body's end line past its last statement; lcov 2.x
+        # calls that "inconsistent" (newer versions make it an error) and older
+        # ones "mismatch". Neither changes the figures, so both are ignored.
+        COMMAND lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch,inconsistent --rc branch_coverage=1
+        COMMAND lcov --remove coverage.info '/usr/*' '*test*' --output-file coverage_filtered.info --rc branch_coverage=1 --ignore-errors unused,inconsistent
         COMMAND genhtml coverage_filtered.info --output-directory html_report --rc branch_coverage=1
     )
 endif()
