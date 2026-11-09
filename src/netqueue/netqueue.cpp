@@ -317,6 +317,13 @@ void NetQueue::process (NetworkElement* element) {
 
                 element->net_buffer_used += nb_read;
                 if (element->net_buffer_used == protocol::PACKET_HEADER_SIZE) {
+                    // The payload is read into net_buffer right after the
+                    // header, so a larger size would write past its end.
+                    protocol::PacketHeader* header = (protocol::PacketHeader*) element->net_buffer;
+                    if (header->get_payload_size() > protocol::MAX_PAYLOAD_SIZE) {
+                        element->state = SCK_ERROR;
+                        break ;
+                    }
                     element->state = SCK_PAYLOAD;
                 }
                 

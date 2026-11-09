@@ -164,6 +164,7 @@ bool read_protobuf_packet(int sock, PacketType expected_type,
     // expected type (or any non-heartbeat).
     while (type == PacketType::HEARTBEAT) {
         // Heartbeat has zero-length payload, but honour the field anyway
+        if (len > MAX_PAYLOAD_SIZE) return false;
         if (len > 0) {
             std::vector<char> skip(len);
             if (!read_n_bytes(sock, skip.data(), len, ssl)) return false;
@@ -174,6 +175,7 @@ bool read_protobuf_packet(int sock, PacketType expected_type,
     }
 
     if (type != expected_type) return false;
+    if (len > MAX_PAYLOAD_SIZE) return false;
 
     if (len == 0) {
         msg.Clear();
@@ -192,6 +194,7 @@ bool read_raw_packet(int sock, PacketType& type, std::vector<char>& buffer) {
 
     type          = hdr.get_packet_type();
     uint32_t len  = hdr.get_payload_size();
+    if (len > MAX_PAYLOAD_SIZE) return false;
 
     buffer.resize(len);
     if (len > 0) {

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstddef>
 
+#include "vnet/const.hpp"
 #include "vnet/protocol/types.hpp"
 
 namespace vnet::protocol {
@@ -22,4 +23,11 @@ namespace vnet::protocol {
     #pragma pack(pop)
 
     const size_t PACKET_HEADER_SIZE = sizeof(PacketHeader);
+
+    /**
+     * Largest payload a peer may announce in a header. A packet must fit
+     * in a NetworkElement receive buffer, so anything larger is a protocol
+     * error and the connection is dropped.
+     */
+    const uint32_t MAX_PAYLOAD_SIZE = NET_BUFFER_SIZE - PACKET_HEADER_SIZE;
 };

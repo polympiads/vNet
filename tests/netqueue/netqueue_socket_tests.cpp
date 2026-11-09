@@ -54,6 +54,40 @@ TEST(NetQueueSocket, ProcessHeader_Success) {
     close(fd_server);
 }
 
+TEST(NetQueueSocket, ProcessHeader_OversizedPayload) {
+    PREPARE_NETWORK_TEST(SCK_HEADER)
+
+    PacketHeader header(MAX_PAYLOAD_SIZE + 1, (PacketType) 0x32);
+    EXPECT_EQ( write(fd_server, &header, sizeof(header)), sizeof(header) );
+
+    NetQueue* queue = new NetQueue(NetworkQueueHandler());
+    queue->process(element);
+
+    EXPECT_EQ( element->state, SCK_ERROR );
+
+    delete queue;
+    delete element;
+    close(fd_client);
+    close(fd_server);
+}
+TEST(NetQueueSocket, ProcessHeader_MaxPayloadAccepted) {
+    PREPARE_NETWORK_TEST(SCK_HEADER)
+
+    PacketHeader header(MAX_PAYLOAD_SIZE, (PacketType) 0x32);
+    EXPECT_EQ( write(fd_server, &header, sizeof(header)), sizeof(header) );
+
+    NetQueue* queue = new NetQueue(NetworkQueueHandler());
+    queue->process(element);
+
+    EXPECT_EQ( element->net_buffer_used, sizeof(header) );
+    EXPECT_EQ( element->state, SCK_PAYLOAD );
+
+    delete queue;
+    delete element;
+    close(fd_client);
+    close(fd_server);
+}
+
 TEST(NetQueueSocket, ProcessPayload_Failure) {
     PREPARE_NETWORK_TEST(SCK_PAYLOAD)
 
