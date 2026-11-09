@@ -147,9 +147,7 @@ static const char* drop_reason_str(DropReason reason) {
 }
 
 static bool send_ipv4(NetQueue* queue, int fd, const uint8_t* raw, size_t len) {
-    mip::PacketIPv4Raw fwd;
-    fwd.set_payload(raw, len);
-    return queue->send(fd, PacketType::IPV4_RAW, fwd);
+    return queue->send_data(fd, PacketType::IPV4_RAW, raw, len);
 }
 
 static void buffer_for_route(uint32_t dest_ipv4, SourceType source_type,
@@ -591,13 +589,9 @@ struct SwitchDispatch : public Dispatch {
         queue->close(fd);
     }
 
-    void onIPv4Raw(socket_data data,
-                    mip::PacketIPv4Raw& pkt) override {
+    void onIPv4Raw(socket_data data, const uint8_t* raw, size_t len) override {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
         if (!info) return;
-
-        const std::string& payload = pkt.payload();
-        if (payload.empty()) return;
 
         SourceType source_type;
         if (info->role == ConnRole::AGENT_AUTHENTICATED) {
@@ -607,9 +601,6 @@ struct SwitchDispatch : public Dispatch {
         } else {
             return;
         }
-
-        const uint8_t* raw = reinterpret_cast<const uint8_t*>(payload.data());
-        size_t         len = payload.size();
 
         PacketDecision decision = g_blackbox->process(source_type, data.fd, raw, len);
         apply_decision(queue, decision, raw, len, source_type, data.fd);

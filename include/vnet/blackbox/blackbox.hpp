@@ -31,7 +31,7 @@ namespace vnet::blackbox {
 
     enum class PacketAction {
         DELIVER_LOCAL,      // Write the raw IPv4 payload to target_fd (local agent)
-        FORWARD_SWITCH,     // Wrap in PacketIPv4Raw and send to target_fd (peer switch)
+        FORWARD_SWITCH,     // Send as IPV4_RAW to target_fd (peer switch)
         FORWARD_INTERNET,   // Write the raw IPv4 payload to the TUN fd
         REQUEST_ROUTE,      // No route known; caller should send PacketPrepareRouteForTarget
         DROP                // Drop the packet

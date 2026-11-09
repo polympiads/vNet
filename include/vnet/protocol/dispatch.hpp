@@ -1,6 +1,8 @@
 #pragma once
 
 #include "vnet/netqueue/handler.hpp"
+#include <cstdint>
+#include <cstddef>
 #include "mip.pb.h"
 
 namespace vnet::protocol {
@@ -30,7 +32,8 @@ namespace vnet::protocol {
         /** Routing */
         virtual void onPrepareRouteForTarget(netqueue::socket_data data, mip::PacketPrepareRouteForTarget &packet);
         virtual void onNextForTarget(netqueue::socket_data data, mip::PacketNextForTarget &packet);
-        virtual void onIPv4Raw(netqueue::socket_data data, mip::PacketIPv4Raw &packet);
+        /** One IPv4 datagram, as it was read from a TUN: no protobuf wrapper. */
+        virtual void onIPv4Raw(netqueue::socket_data data, const uint8_t* raw, size_t len);
         virtual void onAgentRegistered    (netqueue::socket_data data, mip::PacketAgentRegistered    &packet);
         virtual void onSwitchRouteUpdate  (netqueue::socket_data data, mip::PacketSwitchRouteUpdate  &packet);
         virtual void onSwitchDisconnected (netqueue::socket_data data, mip::PacketSwitchDisconnected &packet);

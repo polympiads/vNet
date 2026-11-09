@@ -11,7 +11,11 @@
 
 namespace vnet::netqueue {
 
-    static constexpr size_t WRITE_BUFFER_MAX = 65536; // 64KB
+    /* Bytes a peer may have waiting on a slow socket before the queue
+     * stops taking data for it: data packets are dropped, control packets
+     * close the link. A peer link carries many agents, so this is well
+     * above one 64 KB packet. */
+    static constexpr size_t WRITE_BUFFER_MAX = 2 * 1024 * 1024;
 
     struct NetworkElement {
         FiniteStateMachine state;

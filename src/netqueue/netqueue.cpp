@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <cerrno>
+#include <cstring>
 #include <openssl/ssl.h>
 
 using namespace vnet::netqueue;
@@ -122,24 +123,31 @@ bool NetQueue::flush_write_buffer(NetworkElement* element) {
 }
 
 bool NetQueue::send(int fd, const void* data, size_t n) {
+    return send_impl(fd, data, n, /*drop_when_full=*/false);
+}
+
+bool NetQueue::send_impl(int fd, const void* data, size_t n, bool drop_when_full) {
     NetworkElement* element = get_network_element_from_fd(fd);
-    if (!element) return false;
+    if (!element || element->dead) return false;
 
     const uint8_t* ptr   = static_cast<const uint8_t*>(data);
     size_t         total = 0;
 
     // If there's already buffered data, append to it to preserve order
     if (!element->write_buffer.empty()) {
-        size_t already_buffered = element->write_buffer.size()
-                                    - element->write_buffer_offset;
+        auto& buf = element->write_buffer;
+        size_t already_buffered = buf.size() - element->write_buffer_offset;
         if (already_buffered + n > WRITE_BUFFER_MAX) {
+            if (drop_when_full) return false;
             element->state = SCK_ERROR;
             return false;
         }
-        element->write_buffer.reserve(element->write_buffer.size() + n);
-        for (size_t i = 0; i < n; i++) {
-            element->write_buffer.push_back(ptr[i]);
+        // Drop the bytes already written before growing the vector.
+        if (element->write_buffer_offset > 0) {
+            buf.erase(buf.begin(), buf.begin() + element->write_buffer_offset);
+            element->write_buffer_offset = 0;
         }
+        buf.insert(buf.end(), ptr, ptr + n);
         return true;
     }
 
@@ -149,7 +157,9 @@ bool NetQueue::send(int fd, const void* data, size_t n) {
         if (r < 0) {
             if (errno == EINTR) continue;
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // Buffer the remainder
+                // Buffer the remainder. A packet partly written cannot be
+                // dropped, so the full-buffer case closes the link; n is
+                // at most one packet, far below WRITE_BUFFER_MAX.
                 size_t remaining = n - total;
                 if (remaining > WRITE_BUFFER_MAX) {
                     element->state = SCK_ERROR;
@@ -176,16 +186,33 @@ bool NetQueue::send(int fd, const void* data, size_t n) {
 
 bool NetQueue::send(int fd, protocol::PacketType type,
                     const google::protobuf::Message& msg) {
-    std::string body;
-    if (!msg.SerializeToString(&body)) return false;
+    size_t body_size = msg.ByteSizeLong();
+    if (body_size > protocol::MAX_PAYLOAD_SIZE) return false;
 
-    protocol::PacketHeader hdr(static_cast<uint32_t>(body.size()), type);
+    // Header and body leave in one write: one system call per packet,
+    // and a full buffer cannot split them.
+    std::string frame(protocol::PACKET_HEADER_SIZE + body_size, '\0');
+    protocol::PacketHeader hdr(static_cast<uint32_t>(body_size), type);
+    memcpy(&frame[0], &hdr, protocol::PACKET_HEADER_SIZE);
+    if (body_size > 0 &&
+        !msg.SerializeToArray(&frame[protocol::PACKET_HEADER_SIZE],
+                              static_cast<int>(body_size)))
+        return false;
 
-    if (!send(fd, &hdr, protocol::PACKET_HEADER_SIZE)) return false;
-    if (!body.empty()) {
-        if (!send(fd, body.data(), body.size())) return false;
-    }
-    return true;
+    return send(fd, frame.data(), frame.size());
+}
+
+bool NetQueue::send_data(int fd, protocol::PacketType type,
+                         const void* data, size_t n) {
+    if (n > protocol::MAX_PAYLOAD_SIZE) return false;
+
+    uint8_t frame[protocol::PACKET_HEADER_SIZE + NET_BUFFER_SIZE];
+    protocol::PacketHeader hdr(static_cast<uint32_t>(n), type);
+    memcpy(frame, &hdr, protocol::PACKET_HEADER_SIZE);
+    memcpy(frame + protocol::PACKET_HEADER_SIZE, data, n);
+
+    return send_impl(fd, frame, protocol::PACKET_HEADER_SIZE + n,
+                     /*drop_when_full=*/true);
 }
 
 bool NetQueue::send_heartbeat(int fd) {

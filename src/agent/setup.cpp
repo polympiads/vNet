@@ -86,28 +86,20 @@ struct AgentDispatch : public Dispatch {
         if (data.ip_buffer == nullptr || data.ip_buffer_size < 20) return;
         if ((data.ip_buffer[0] >> 4) != 4) return;
 
-        mip::PacketIPv4Raw pkt;
-        pkt.set_payload(data.ip_buffer, data.ip_buffer_size);
-        if (!queue->send(g_state.sw->fd, PacketType::IPV4_RAW, pkt)) {
-            std::cerr << "[Agent] Failed to forward " << data.ip_buffer_size
-                      << " bytes to switch\n";
-        }
+        // A full buffer drops the datagram, as a busy link would.
+        queue->send_data(g_state.sw->fd, PacketType::IPV4_RAW,
+                         data.ip_buffer, data.ip_buffer_size);
     }
 
     /*
      * The switch delivered a packet for our virtual IP. One write, the whole
      * datagram: a TUN rejects a partial packet.
      */
-    void onIPv4Raw(socket_data data, mip::PacketIPv4Raw& pkt) override {
+    void onIPv4Raw(socket_data data, const uint8_t* raw, size_t len) override {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
         if (!info || info->role != ConnRole::SWITCH) return;
         if (tun_fd < 0) return;
 
-        const std::string& payload = pkt.payload();
-        if (payload.empty()) return;
-
-        const uint8_t* raw = reinterpret_cast<const uint8_t*>(payload.data());
-        size_t         len = payload.size();
         for (;;) {
             ssize_t n = ::write(tun_fd, raw, len);
             if (n < 0 && errno == EINTR) continue;

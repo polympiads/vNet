@@ -23,6 +23,7 @@ create_test(netqueue_socket_tests netqueue/netqueue_socket_tests.cpp)
 create_test(netqueue_epoll_tests  netqueue/netqueue_epoll_tests.cpp)
 create_test(netqueue_tun_tests    netqueue/netqueue_tun_tests.cpp)
 create_test(netqueue_tests        netqueue/netqueue_tests.cpp)
+create_test(netqueue_send_tests   netqueue/netqueue_send_tests.cpp)
 
 # testing utils
 create_test(tun_wrapper_tests utils/tun_wrapper_tests.cpp)

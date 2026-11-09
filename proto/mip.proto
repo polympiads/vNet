@@ -57,10 +57,6 @@ message PacketNextForTarget {
     string  next_switch_name = 4;
 }
 
-message PacketIPv4Raw {
-    bytes payload = 1;
-}
-
 message PacketAgentRegistered {
     string agent_name    = 1;
     fixed32 virtual_ipv4 = 2;

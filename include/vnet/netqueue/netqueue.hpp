@@ -63,6 +63,13 @@ namespace vnet::netqueue {
         */
         bool flush_write_buffer(NetworkElement* element);
 
+        /**
+        * Shared body of send and send_data. With drop_when_full, a write
+        * buffer that cannot take n more bytes makes the call return
+        * false and leaves the connection alone.
+        */
+        bool send_impl(int fd, const void* data, size_t n, bool drop_when_full);
+
     public:
 
         /**
@@ -83,9 +90,17 @@ namespace vnet::netqueue {
 
         /**
         * Send a protobuf message with the 6-byte packet header
-        * through the queue's write path.
+        * through the queue's write path, as one write.
         */
         bool send(int fd, protocol::PacketType type, const google::protobuf::Message& msg);
+
+        /**
+        * Send a data packet: a 6-byte header of the given type followed by
+        * the bytes as they are. When the peer's write buffer is full the
+        * packet is dropped and false is returned; the connection stays
+        * open, since the overlay's own transport retransmits.
+        */
+        bool send_data(int fd, protocol::PacketType type, const void* data, size_t n);
 
         /**
         * Send a heartbeat (header-only) through the queue's write path.
