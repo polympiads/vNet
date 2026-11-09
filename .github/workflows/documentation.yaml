@@ -18,7 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
       - name: Install dependencies
         run: |
-          sudo apt-get install python3-sphinx
+          sudo apt-get update
+          sudo apt-get install -y python3-sphinx
       - name: Sphinx build
         run: |
           branches=`python3 doc/listbranches.py`

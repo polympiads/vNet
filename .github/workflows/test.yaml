@@ -57,6 +57,12 @@ jobs:
           cmake --build . --target conductor switch agent vnet-state -- -j"$(nproc)"
       - name: run scenarios
         run: sudo tests/integration/run.sh build
+      - name: make the logs readable, drop the test keys
+        if: always()
+        run: |
+          [ -d build/integration ] || exit 0
+          sudo chown -R "$(id -u):$(id -g)" build/integration
+          rm -rf build/integration/certs
       - name: keep logs
         if: always()
         uses: actions/upload-artifact@v4
