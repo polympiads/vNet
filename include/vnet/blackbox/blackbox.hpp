@@ -110,6 +110,14 @@ namespace vnet::blackbox {
          */
         void set_agent_limits(uint64_t pps, uint64_t bytes_per_sec);
 
+        /**
+         * Put a newly loaded config in force. Rules apply to the next
+         * packet. Agents already registered keep the virtual IP they
+         * were given; a changed or removed assignment takes effect when
+         * that agent next connects.
+         */
+        void replace_config(const Config& config);
+
         // ----- Packet processing -----
 
         /**

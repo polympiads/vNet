@@ -51,7 +51,9 @@ static const std::chrono::seconds TOKEN_EXPIRY        {60};
 static const std::chrono::seconds CONDUCTOR_RETRY     {2};
 
 static volatile sig_atomic_t g_running = 1;
+static volatile sig_atomic_t g_reload_request = 0;
 static void on_signal(int) { g_running = 0; }
+static void on_sighup(int) { g_reload_request = 1; }
 
 // ---------------------------------------------------------------------------
 //  Connection metadata
@@ -116,6 +118,8 @@ struct SwitchIdentity {
     std::string   network = "::internet";
     uint16_t      port = 0;
     MachineConfig conductor{"", 0};
+    std::string   config_path;
+    std::string   config_hash;
 };
 static SwitchIdentity   g_identity;
 static clk::time_point  g_last_conductor_dial{};
@@ -405,6 +409,7 @@ struct SwitchDispatch : public Dispatch {
             mip_pkt.set_auth_key(g_identity.auth_key);
             mip_pkt.set_network(g_identity.network);
             mip_pkt.set_port(g_identity.port);
+            mip_pkt.set_config_hash(g_identity.config_hash);
             if (!queue->send(data.fd, PacketType::SWITCH_MIP, mip_pkt)) {
                 std::cerr << "[Switch] Failed to send MIP\n";
                 return;
@@ -908,6 +913,7 @@ int main(int argc, char** argv) {
     signal(SIGTERM, on_signal);
     signal(SIGPIPE, SIG_IGN);
     signal(SIGUSR1, on_sigusr1);
+    signal(SIGHUP,  on_sighup);
 
     if (argc != 3 && argc != 4) {
         std::cerr << "Usage: ./switch <name> [auth_key] <port>\n"
@@ -999,10 +1005,13 @@ int main(int argc, char** argv) {
 
     std::cout << "[Switch] Loaded config from " << config_path << "\n";
 
-    g_identity.name      = switch_name;
-    g_identity.auth_key  = auth_key;
-    g_identity.port      = port;
-    g_identity.conductor = MachineConfig{cdt_ip_env, static_cast<uint16_t>(cdt_port)};
+    g_identity.name        = switch_name;
+    g_identity.auth_key    = auth_key;
+    g_identity.port        = port;
+    g_identity.conductor   = MachineConfig{cdt_ip_env, static_cast<uint16_t>(cdt_port)};
+    g_identity.config_path = config_path;
+    g_identity.config_hash = config.fingerprint();
+    std::cout << "[Switch] Config fingerprint " << g_identity.config_hash.substr(0, 12) << "\n";
 
     int flag = 1;
 
@@ -1084,6 +1093,24 @@ int main(int argc, char** argv) {
         // Heartbeats
         send_heartbeats(queue);
         reap_dead(queue);
+
+        if (g_reload_request) {
+            g_reload_request = 0;
+            vnet::blackbox::Config fresh;
+            if (fresh.load(g_identity.config_path)) {
+                blackbox.replace_config(fresh);
+                g_identity.config_hash = fresh.fingerprint();
+                std::cout << "[Switch] Config reloaded, fingerprint "
+                          << g_identity.config_hash.substr(0, 12) << "\n";
+                if (g_state.conductor && g_state.conductor->connected) {
+                    mip::PacketSwitchConfig cfg_pkt;
+                    cfg_pkt.set_config_hash(g_identity.config_hash);
+                    queue.send(g_state.conductor->fd, PacketType::SWITCH_CONFIG, cfg_pkt);
+                }
+            } else {
+                std::cerr << "[Switch] Config reload failed; the previous config stays in force\n";
+            }
+        }
 
         if (g_stats_request) {
             g_stats_request = 0;

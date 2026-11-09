@@ -32,6 +32,7 @@ namespace vnet::protocol {
         SWITCH_HELLO,
         AGENT_UNREGISTERED,
         PEER_TOKEN,
+        SWITCH_CONFIG,
     };
 
     PacketType    ntoh_packet_type (uint_packet_t type);

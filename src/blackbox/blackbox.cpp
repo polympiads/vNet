@@ -40,6 +40,10 @@ namespace vnet::blackbox {
         limit_bps_ = bytes_per_sec;
     }
 
+    void BlackBox::replace_config(const Config& config) {
+        config_ = config;
+    }
+
     // =================================================================
     //  Lifecycle hooks
     // =================================================================

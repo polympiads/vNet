@@ -8,6 +8,14 @@ message PacketSwitchMIP {
     string network  = 3;
 
     uint32 port = 4;
+
+    // Fingerprint of the switch config; every switch must hold the same.
+    string config_hash = 5;
+}
+
+// Switch to conductor after a config reload: the new fingerprint.
+message PacketSwitchConfig {
+    string config_hash = 1;
 }
 
 message PacketAgentMIP {

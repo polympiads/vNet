@@ -75,6 +75,7 @@ struct ConnInfo {
     /* Switch-only fields */
     uint16_t    sw_port = 0;
     uint32_t    sw_ipv4 = 0;
+    std::string config_hash;
 
     /* Agent-only fields */
     std::string assigned_switch_name;
@@ -278,6 +279,8 @@ struct AuthRecord {
 };
 static std::unordered_map<std::string, AuthRecord> g_auth;
 static bool g_auth_required = false;
+/* Every switch must apply the same ACL; VNET_CONFIG_HASH_CHECK=0 turns this off. */
+static bool g_config_hash_check = true;
 
 /*
  * What the conductor itself handed out: the key the agent used and the
@@ -393,6 +396,22 @@ struct ConductorDispatch : public Dispatch {
                       << " registered again; closing fd " << old_fd << "\n";
             queue->close(old_fd);
         }
+
+        // A switch with a different config would apply a different ACL
+        // to the same machines. Refuse it and say which switch disagrees.
+        if (g_config_hash_check && !pkt.config_hash().empty()) {
+            for (const auto* other : g_state.switches) {
+                if (other->config_hash.empty() || other->config_hash == pkt.config_hash())
+                    continue;
+                std::cerr << "[Conductor] Rejected switch " << pkt.name()
+                          << ": its config (" << pkt.config_hash().substr(0, 12)
+                          << ") differs from " << other->name << "'s ("
+                          << other->config_hash.substr(0, 12) << ")\n";
+                queue->close(data.fd);
+                return;
+            }
+        }
+        info->config_hash = pkt.config_hash();
         info->role     = Role::SWITCH_CONN;
         info->name     = pkt.name();
         info->auth_key = pkt.auth_key();
@@ -694,6 +713,22 @@ struct ConductorDispatch : public Dispatch {
         }
     }
 
+    /* A switch reloaded its config. Rolling reloads disagree for a
+     * while; that is logged, not refused. */
+    void onSwitchConfig(socket_data data, mip::PacketSwitchConfig& pkt) override {
+        auto* sw_info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!sw_info || sw_info->role != Role::SWITCH_CONN) return;
+        sw_info->config_hash = pkt.config_hash();
+        std::cout << "[Conductor] Switch " << sw_info->name << " reloaded its config ("
+                  << pkt.config_hash().substr(0, 12) << ")\n";
+        for (const auto* other : g_state.switches) {
+            if (other == sw_info || other->config_hash.empty()) continue;
+            if (other->config_hash != sw_info->config_hash)
+                std::cerr << "[Conductor] Config mismatch: " << sw_info->name
+                          << " and " << other->name << " apply different ACLs\n";
+        }
+    }
+
     void onAgentUnregistered(socket_data data,
                              mip::PacketAgentUnregistered& pkt) override {
         auto* sw_info = static_cast<ConnInfo*>(data.ptr_data);
@@ -798,6 +833,8 @@ int main() {
         return 1;
     g_heartbeat = std::chrono::seconds(hb_sec);
     g_dead      = std::chrono::seconds(dead_sec);
+
+    g_config_hash_check = env_or("VNET_CONFIG_HASH_CHECK", "1") != "0";
 
     if (const char* auth_path = std::getenv("VNET_AUTH_FILE")) {
         g_auth_required = true;

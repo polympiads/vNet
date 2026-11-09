@@ -28,8 +28,9 @@ namespace vnet::blackbox {
      *       Allows bidirectional communication between two agents.
      *
      *     agent_name  ::internet:ip_address
-     *       Allows this agent to reach a specific internet IP.
-     *       Return traffic from that IP is also allowed.
+     *     agent_name  ::internet:a.b.c.d/n
+     *       Allows this agent to reach a specific internet IP, or every
+     *       address in a prefix. Return traffic from there is also allowed.
      *
      * Example:
      *   # IP assignments
@@ -50,13 +51,24 @@ namespace vnet::blackbox {
         /**
          * Load and parse a config file.
          *
-         * IP assignments must appear before ACL rules that reference
-         * agent names (so that agent names can be validated).
+         * Assignments and rules may come in any order. Agent names must
+         * be 1 to 10 characters from [A-Za-z0-9_-].
+         *
+         * On failure this object is left as it was, so a reload that
+         * fails keeps the previous config in force.
          *
          * @param path  Path to the config file.
          * @return true on success, false on parse error or I/O failure.
          */
         bool load(const std::string& path);
+
+        /**
+         * SHA-256, as hex, of the parsed content in a canonical order:
+         * two files that mean the same have the same fingerprint however
+         * they are written. The conductor refuses a switch whose
+         * fingerprint differs from the others'.
+         */
+        std::string fingerprint() const;
 
         // ----- IP assignment lookups -----
 
@@ -99,10 +111,16 @@ namespace vnet::blackbox {
         std::unordered_map<uint32_t, std::unordered_set<uint32_t>> agent_acl_;
 
         // ACL: agent-to-internet
-        // agent_ipv4 → set of internet IPs it can reach
-        std::unordered_map<uint32_t, std::unordered_set<uint32_t>> internet_acl_;
+        // agent_ipv4 -> prefixes (address and mask, network order) it can reach
+        struct Prefix {
+            uint32_t addr;
+            uint32_t mask;
+            int      length;
+        };
+        std::unordered_map<uint32_t, std::vector<Prefix>> internet_acl_;
 
         static bool is_ipv4(const std::string& s);
+        bool parse_into(const std::string& path);
     };
 
 };
