@@ -230,3 +230,90 @@ TEST_F(NetQueueTls, PlaintextPeerFailsHandshake) {
     close(fd_client);
     delete queue;
 }
+
+/*
+ * A dial that fails while it still holds an unused TLS session must not
+ * disturb the other TLS links in the queue.
+ */
+TEST_F(NetQueueTls, FailedTlsDialLeavesOtherLinksAlone) {
+    PREPARE_SOCKET_PAIR
+    NetQueue* queue = new NetQueue(handlerWithConnected(), 100);
+
+    ssl_st* server_ssl = vnet::tls::new_session(fd_server);
+    ssl_st* client_ssl = vnet::tls::new_session(fd_client);
+    ASSERT_NE(queue->put_sck_tls_server(fd_server, nullptr, server_ssl), nullptr);
+    ASSERT_NE(queue->put_sck_tls_client(fd_client, nullptr, client_ssl), nullptr);
+    for (int i = 0; i < 100 && connected_datas.size() < 2; i++) queue->wait_and_process();
+    ASSERT_EQ(connected_datas.size(), 2u);
+
+    // A dial to a port nobody listens on, with a session attached.
+    uint16_t port = 0;
+    int listener = listen_local(port);
+    close(listener);
+    int dial = start_connect(port);
+    ssl_st* dial_ssl = vnet::tls::new_session(dial);
+    ASSERT_NE(queue->put_sck_connecting(dial, (void*) 0xD, dial_ssl), nullptr);
+    for (int i = 0; i < 50 && close_datas.empty(); i++) queue->wait_and_process();
+    ASSERT_EQ(close_datas.size(), 1u);
+    EXPECT_EQ(close_datas[0].fd, dial);
+
+    // The TLS link still carries packets both ways.
+    PacketHeader header(0, (PacketType) 0x32);
+    EXPECT_TRUE(queue->send(fd_client, &header, sizeof(header)));
+    EXPECT_TRUE(queue->send(fd_server, &header, sizeof(header)));
+    for (int i = 0; i < 100 && socket_datas.size() < 2; i++) queue->wait_and_process();
+    EXPECT_EQ(socket_datas.size(), 2u);
+    EXPECT_EQ(close_datas.size(), 1u);
+
+    delete queue;
+}
+
+/*
+ * A TLS peer that vanishes without close_notify leaves an error in the
+ * OpenSSL error queue. That must be reported as a hangup on that socket,
+ * and the next read on a healthy TLS socket must not inherit it.
+ */
+TEST_F(NetQueueTls, VanishedPeerDoesNotPoisonOtherLinks) {
+    NetQueue* queue = new NetQueue(handlerWithConnected(), 100);
+
+    int a[2], b[2];
+    ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, a), 0);
+    ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, b), 0);
+    ASSERT_NE(queue->put_sck_tls_server(a[0], (void*) 0xA0, vnet::tls::new_session(a[0])), nullptr);
+    ASSERT_NE(queue->put_sck_tls_client(a[1], (void*) 0xA1, vnet::tls::new_session(a[1])), nullptr);
+    ASSERT_NE(queue->put_sck_tls_server(b[0], (void*) 0xB0, vnet::tls::new_session(b[0])), nullptr);
+    ASSERT_NE(queue->put_sck_tls_client(b[1], (void*) 0xB1, vnet::tls::new_session(b[1])), nullptr);
+    for (int i = 0; i < 200 && connected_datas.size() < 4; i++) queue->wait_and_process();
+    ASSERT_EQ(connected_datas.size(), 4u);
+
+    // Pair A: the server side is torn down like a killed process (no
+    // close_notify); the client side sees an unexpected EOF.
+    queue->close(a[0]);
+    ASSERT_EQ(close_datas.size(), 1u);
+    for (int i = 0; i < 50 && close_datas.size() < 2; i++) queue->wait_and_process();
+    ASSERT_EQ(close_datas.size(), 2u);
+    EXPECT_EQ(close_datas[1].fd, a[1]);
+    EXPECT_EQ(close_datas[1].reason, CLOSE_HANGUP);
+
+    // What a switch does next: dial the conductor again, which fails.
+    uint16_t port = 0;
+    int listener = listen_local(port);
+    close(listener);
+    int dial = start_connect(port);
+    ASSERT_NE(queue->put_sck_connecting(dial, (void*) 0xD, vnet::tls::new_session(dial)), nullptr);
+    for (int i = 0; i < 50 && close_datas.size() < 3; i++) queue->wait_and_process();
+    ASSERT_EQ(close_datas.size(), 3u);
+
+    // Pair B still carries packets both ways, several times over.
+    PacketHeader header(0, (PacketType) 0x32);
+    for (int round = 0; round < 3; round++) {
+        size_t before = socket_datas.size();
+        EXPECT_TRUE(queue->send(b[0], &header, sizeof(header)));
+        EXPECT_TRUE(queue->send(b[1], &header, sizeof(header)));
+        for (int i = 0; i < 100 && socket_datas.size() < before + 2; i++) queue->wait_and_process();
+        EXPECT_EQ(socket_datas.size(), before + 2) << "round " << round;
+    }
+    EXPECT_EQ(close_datas.size(), 3u);
+
+    delete queue;
+}

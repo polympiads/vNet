@@ -17,6 +17,7 @@
 #include "common/config.h"
 #include "common/socket_utils.h"
 #include "vnet/protocol/header.hpp"
+#include <openssl/err.h>
 #include <openssl/ssl.h>
 
 using namespace vnet::protocol;
@@ -114,11 +115,15 @@ bool set_socket_timeout(int fd, int ms) {
            setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) == 0;
 }
 
+/* The error queue is per thread: clear it around every OpenSSL call so one
+ * socket's failure is never read as another's. */
 static ssize_t io_write_fd(int sock, ssl_st* ssl, const void* buf, size_t n) {
     if (!ssl) return ::write(sock, buf, n);
+    ERR_clear_error();
     int r = SSL_write(reinterpret_cast<SSL*>(ssl), buf, static_cast<int>(n));
     if (r > 0) return r;
     int err = SSL_get_error(reinterpret_cast<SSL*>(ssl), r);
+    ERR_clear_error();
     if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
         errno = EAGAIN;
         return -1;
@@ -128,14 +133,16 @@ static ssize_t io_write_fd(int sock, ssl_st* ssl, const void* buf, size_t n) {
 
 static ssize_t io_read_fd(int sock, ssl_st* ssl, void* buf, size_t n) {
     if (!ssl) return ::read(sock, buf, n);
+    ERR_clear_error();
     int r = SSL_read(reinterpret_cast<SSL*>(ssl), buf, static_cast<int>(n));
     if (r > 0) return r;
     int err = SSL_get_error(reinterpret_cast<SSL*>(ssl), r);
+    ERR_clear_error();
     if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
         errno = EAGAIN;
         return -1;
     }
-    if (err == SSL_ERROR_ZERO_RETURN) return 0;
+    if (err == SSL_ERROR_ZERO_RETURN || (err == SSL_ERROR_SYSCALL && r == 0)) return 0;
     return -1;
 }
 

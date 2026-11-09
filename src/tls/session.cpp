@@ -68,6 +68,7 @@ namespace vnet::tls {
         SSL* ssl = SSL_new(g_ctx);
         if (!ssl) return nullptr;
         SSL_set_fd(ssl, fd);
+        ERR_clear_error();
         int rc = server ? SSL_accept(ssl) : SSL_connect(ssl);
         if (rc != 1) {
             int serr = SSL_get_error(ssl, rc);

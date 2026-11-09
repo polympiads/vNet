@@ -23,10 +23,16 @@ static void free_tls(NetworkElement* element) {
     element->ssl = nullptr;
 }
 
+/*
+ * SSL_get_error reads the thread's error queue, so an error left there by
+ * one socket would be reported for the next socket's call. Clear it before
+ * every OpenSSL call and after every failure.
+ */
 static ssize_t io_read(NetworkElement* element, void* buf, size_t n) {
     if (!element->ssl)
         return ::read(element->fd, buf, n);
     SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    ERR_clear_error();
     int r = SSL_read(ssl, buf, static_cast<int>(n));
     if (r > 0) return r;
     int err = SSL_get_error(ssl, r);
@@ -35,6 +41,14 @@ static ssize_t io_read(NetworkElement* element, void* buf, size_t n) {
         return -1;
     }
     if (err == SSL_ERROR_ZERO_RETURN) return 0;
+    // A peer that vanished without close_notify: an EOF, not a fault.
+    if ((err == SSL_ERROR_SYSCALL && r == 0) ||
+        (err == SSL_ERROR_SSL &&
+         ERR_GET_REASON(ERR_peek_error()) == SSL_R_UNEXPECTED_EOF_WHILE_READING)) {
+        ERR_clear_error();
+        return 0;
+    }
+    ERR_clear_error();
     errno = EIO;
     return -1;
 }
@@ -43,6 +57,7 @@ static ssize_t io_write(NetworkElement* element, const void* buf, size_t n) {
     if (!element->ssl)
         return ::write(element->fd, buf, n);
     SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    ERR_clear_error();
     int r = SSL_write(ssl, buf, static_cast<int>(n));
     if (r > 0) return r;
     int err = SSL_get_error(ssl, r);
@@ -50,6 +65,7 @@ static ssize_t io_write(NetworkElement* element, const void* buf, size_t n) {
         errno = EAGAIN;
         return -1;
     }
+    ERR_clear_error();
     errno = EIO;
     return -1;
 }
