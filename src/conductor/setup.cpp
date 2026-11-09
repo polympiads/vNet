@@ -9,6 +9,7 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -41,6 +42,7 @@ static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
 static const std::chrono::seconds DUMP_INTERVAL       {5};
 static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
 static std::chrono::seconds       g_dead{90};
+static const std::chrono::seconds IDENTIFY_TIMEOUT    {10};
 
 static const char* DEFAULT_DUMP_PATH = "/var/vnet-dump.bin";
 
@@ -78,8 +80,12 @@ struct ConnInfo {
     uint32_t        virtual_ipv4 = 0;
     clk::time_point last_hb_sent  = clk::now();
     clk::time_point last_rx       = clk::now();
+    clk::time_point accepted_at   = clk::now();
     int64_t         connected_at_ms = 0;  // unix timestamp ms
 };
+
+/* Accepted sockets that may still be waiting for their MIP. */
+static std::unordered_set<ConnInfo*> g_unidentified;
 
 // ---------------------------------------------------------------------------
 //  Conductor state
@@ -514,6 +520,7 @@ struct ConductorDispatch : public Dispatch {
             g_state.remove_agent(info);
         }
 
+        g_unidentified.erase(info);
         delete info;
     }
 
@@ -625,6 +632,25 @@ static void reap_dead(NetQueue& queue) {
     for (auto* c : g_state.agents) check(c);
     for (int fd : dead) {
         std::cerr << "[Conductor] Heartbeat timeout on fd " << fd << "\n";
+        queue.close(fd);
+    }
+
+    // A socket that never sends its MIP holds an fd and is never
+    // heartbeat-checked, since it is in neither list above.
+    std::vector<int> silent;
+    for (auto it = g_unidentified.begin(); it != g_unidentified.end(); ) {
+        ConnInfo* c = *it;
+        if (c->role != Role::UNKNOWN) {
+            it = g_unidentified.erase(it);
+            continue;
+        }
+        if (now - c->accepted_at >= IDENTIFY_TIMEOUT)
+            silent.push_back(c->fd);
+        ++it;
+    }
+    for (int fd : silent) {
+        std::cerr << "[Conductor] No MIP within "
+                  << IDENTIFY_TIMEOUT.count() << "s on fd " << fd << "\n";
         queue.close(fd);
     }
 }
@@ -741,6 +767,7 @@ int main() {
                 delete info;
                 continue;
             }
+            g_unidentified.insert(info);
             if (ssl) {
                 queue.adopt_tls(client, ssl);
                 queue.drain_tls(client);
