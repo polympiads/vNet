@@ -11,6 +11,10 @@ message PacketSwitchMIP {
 
     // Fingerprint of the switch config; every switch must hold the same.
     string config_hash = 5;
+
+    // Address agents and peers should dial, when the one the conductor
+    // sees is not it (NAT, several interfaces). 0 = use the peer address.
+    fixed32 advertise_ipv4 = 6;
 }
 
 // Switch to conductor after a config reload: the new fingerprint.

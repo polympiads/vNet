@@ -36,14 +36,14 @@ using sysclk = std::chrono::system_clock;
 //  Constants
 // ---------------------------------------------------------------------------
 
-static const uint16_t             LISTEN_PORT         = 5000;
+static const long                 DEFAULT_PORT        = 5000;
 static const int                  LISTEN_BACKLOG      = 1024;
 /* Handshakes run inside the queue, so a turn can take a whole burst. */
 static const int                  ACCEPTS_PER_TURN    = 64;
-static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
-static const std::chrono::seconds DUMP_INTERVAL       {5};
-static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
-static std::chrono::seconds       g_dead{90};
+/* A dead peer is noticed within g_dead; both can be set per process. */
+static std::chrono::seconds       g_heartbeat{10};
+static std::chrono::seconds       g_dead{30};
+static std::chrono::seconds       g_dump_interval{60};
 static const std::chrono::seconds IDENTIFY_TIMEOUT    {10};
 /* A switch forgets a token after 60 s; forget it here at the same time. */
 static const int64_t              TOKEN_EXPIRY_MS      = 60 * 1000;
@@ -99,6 +99,27 @@ static std::unordered_set<ConnInfo*> g_unidentified;
 struct ConductorState {
     std::vector<ConnInfo*> switches;
     std::vector<ConnInfo*> agents;
+    /* The same connections by name, for lookups that must not walk
+     * every agent when a thousand of them join at once. */
+    std::unordered_map<std::string, ConnInfo*> switch_by_name;
+    std::unordered_map<std::string, ConnInfo*> agent_by_name;
+
+    ConnInfo* find_switch(const std::string& name) const {
+        auto it = switch_by_name.find(name);
+        return it == switch_by_name.end() ? nullptr : it->second;
+    }
+    ConnInfo* find_agent(const std::string& name) const {
+        auto it = agent_by_name.find(name);
+        return it == agent_by_name.end() ? nullptr : it->second;
+    }
+    void add_switch(ConnInfo* info) {
+        switches.push_back(info);
+        switch_by_name[info->name] = info;
+    }
+    void add_agent(ConnInfo* info) {
+        agents.push_back(info);
+        agent_by_name[info->name] = info;
+    }
 
     // token → (agent_name, switch_name, created_at_ms)
     struct PendingTokenInfo {
@@ -172,6 +193,9 @@ struct ConductorState {
     }
 
     void remove_switch(ConnInfo* info) {
+        auto by_name = switch_by_name.find(info->name);
+        if (by_name != switch_by_name.end() && by_name->second == info)
+            switch_by_name.erase(by_name);
         switches.erase(
             std::remove(switches.begin(), switches.end(), info),
             switches.end());
@@ -184,6 +208,9 @@ struct ConductorState {
             pending_tokens.end());
     }
     void remove_agent(ConnInfo* info) {
+        auto by_name = agent_by_name.find(info->name);
+        if (by_name != agent_by_name.end() && by_name->second == info)
+            agent_by_name.erase(by_name);
         agents.erase(
             std::remove(agents.begin(), agents.end(), info),
             agents.end());
@@ -384,17 +411,11 @@ struct ConductorDispatch : public Dispatch {
         // the old socket is dead. The key holder proved itself, so the
         // new connection wins; closing the old one withdraws its routes,
         // and the re-announcement that follows this MIP restores them.
-        int old_fd = -1;
-        for (const auto* existing : g_state.switches) {
-            if (existing->name == pkt.name() && existing != info) {
-                old_fd = existing->fd;
-                break;
-            }
-        }
-        if (old_fd >= 0) {
+        ConnInfo* existing = g_state.find_switch(pkt.name());
+        if (existing && existing != info) {
             std::cout << "[Conductor] Switch " << pkt.name()
-                      << " registered again; closing fd " << old_fd << "\n";
-            queue->close(old_fd);
+                      << " registered again; closing fd " << existing->fd << "\n";
+            queue->close(existing->fd);
         }
 
         // A switch with a different config would apply a different ACL
@@ -420,14 +441,19 @@ struct ConductorDispatch : public Dispatch {
         info->fd       = data.fd;
         info->connected_at_ms = now_ms();
 
-        // Obtain the switch's IP from the TCP peer address
-        sockaddr_in peer{};
-        socklen_t plen = sizeof(peer);
-        if (getpeername(data.fd, (sockaddr*)&peer, &plen) == 0) {
-            info->sw_ipv4 = peer.sin_addr.s_addr;
+        // The address agents and peers dial: what the switch advertises,
+        // or where its connection came from.
+        if (pkt.advertise_ipv4() != 0) {
+            info->sw_ipv4 = pkt.advertise_ipv4();
+        } else {
+            sockaddr_in peer{};
+            socklen_t plen = sizeof(peer);
+            if (getpeername(data.fd, (sockaddr*)&peer, &plen) == 0) {
+                info->sw_ipv4 = peer.sin_addr.s_addr;
+            }
         }
 
-        g_state.switches.push_back(info);
+        g_state.add_switch(info);
 
         // One fresh token per pair: whichever side dials shows it in its
         // hello, the other side checks it. Issued before the routes, so a
@@ -448,11 +474,7 @@ struct ConductorDispatch : public Dispatch {
 
         for (const auto& route : g_state.published) {
             if (route.switch_name == info->name) continue;
-            bool owner_up = false;
-            for (const auto* sw : g_state.switches) {
-                if (sw->name == route.switch_name) { owner_up = true; break; }
-            }
-            if (!owner_up) continue;
+            if (!g_state.find_switch(route.switch_name)) continue;
 
             mip::PacketSwitchRouteUpdate update;
             update.set_switch_name(route.switch_name);
@@ -488,17 +510,11 @@ struct ConductorDispatch : public Dispatch {
         // as with MRP. An agent whose switch link dropped closes its
         // conductor socket and re-registers, and the close may still be
         // in flight when the new MIP arrives.
-        int old_fd = -1;
-        for (const auto* existing : g_state.agents) {
-            if (existing->name == pkt.name() && existing != info) {
-                old_fd = existing->fd;
-                break;
-            }
-        }
-        if (old_fd >= 0) {
+        ConnInfo* existing = g_state.find_agent(pkt.name());
+        if (existing && existing != info) {
             std::cout << "[Conductor] Agent " << pkt.name()
-                      << " registered again; closing fd " << old_fd << "\n";
-            queue->close(old_fd);
+                      << " registered again; closing fd " << existing->fd << "\n";
+            queue->close(existing->fd);
         }
 
         ConnInfo* sw = g_state.pick_switch(pkt.network());
@@ -546,7 +562,7 @@ struct ConductorDispatch : public Dispatch {
             pkt.name(), sw->name, now_ms(), token
         });
 
-        g_state.agents.push_back(info);
+        g_state.add_agent(info);
         g_remembered[info->name] = { info->auth_key, info->network };
     }
 
@@ -560,14 +576,8 @@ struct ConductorDispatch : public Dispatch {
             return;
         }
 
-        int old_fd = -1;
-        for (const auto* existing : g_state.agents) {
-            if (existing->name == pkt.name() && existing != info) {
-                old_fd = existing->fd;
-                break;
-            }
-        }
-        if (old_fd >= 0) queue->close(old_fd);
+        ConnInfo* existing = g_state.find_agent(pkt.name());
+        if (existing && existing != info) queue->close(existing->fd);
 
         info->role     = Role::AGENT_CONN;
         info->name     = pkt.name();
@@ -594,12 +604,7 @@ struct ConductorDispatch : public Dispatch {
         if (loc != g_agent_location.end()) {
             info->assigned_switch_name = loc->second.switch_name;
             info->virtual_ipv4         = loc->second.virtual_ipv4;
-            for (auto* candidate : g_state.switches) {
-                if (candidate->name == loc->second.switch_name) {
-                    sw = candidate;
-                    break;
-                }
-            }
+            sw = g_state.find_switch(loc->second.switch_name);
         }
         info->assigned_switch = sw;
 
@@ -610,7 +615,7 @@ struct ConductorDispatch : public Dispatch {
             return;
         }
 
-        g_state.agents.push_back(info);
+        g_state.add_agent(info);
         std::cout << "[Conductor] Agent reconnected: " << pkt.name()
                   << " on " << sw->name << "\n";
     }
@@ -668,12 +673,10 @@ struct ConductorDispatch : public Dispatch {
 
         uint32_t virtual_ipv4 = pkt.virtual_ipv4();
 
-        for (auto* agent : g_state.agents) {
-            if (agent->name == pkt.agent_name()) {
-                agent->virtual_ipv4 = virtual_ipv4;
-                agent->assigned_switch_name = sw_info->name;
-                agent->assigned_switch = sw_info;
-            }
+        if (ConnInfo* agent = g_state.find_agent(pkt.agent_name())) {
+            agent->virtual_ipv4 = virtual_ipv4;
+            agent->assigned_switch_name = sw_info->name;
+            agent->assigned_switch = sw_info;
         }
         g_agent_location[pkt.agent_name()] = { sw_info->name, virtual_ipv4 };
 
@@ -828,11 +831,33 @@ int main() {
     std::cout << "[Conductor] State dump path: " << g_dump_path << "\n";
 
     long hb_sec = g_heartbeat.count(), dead_sec = g_dead.count();
+    long dump_sec = g_dump_interval.count(), port = DEFAULT_PORT;
     if (!env_int("VNET_HEARTBEAT_SEC", 1, 3600, hb_sec) ||
-        !env_int("VNET_DEAD_SEC", 1, 86400, dead_sec))
+        !env_int("VNET_DEAD_SEC", 1, 86400, dead_sec) ||
+        !env_int("VNET_DUMP_SEC", 1, 86400, dump_sec) ||
+        !env_int("CONDUCTOR_PORT", 1, 65535, port))
         return 1;
-    g_heartbeat = std::chrono::seconds(hb_sec);
-    g_dead      = std::chrono::seconds(dead_sec);
+    g_heartbeat     = std::chrono::seconds(hb_sec);
+    g_dead          = std::chrono::seconds(dead_sec);
+    g_dump_interval = std::chrono::seconds(dump_sec);
+    if (g_dead <= g_heartbeat) {
+        std::cerr << "[Conductor] VNET_DEAD_SEC must be larger than VNET_HEARTBEAT_SEC\n";
+        return 1;
+    }
+
+    // An event runs with an auth file and TLS. Running without either is
+    // for a lab, and must be asked for.
+    bool allow_insecure = env_or("VNET_ALLOW_INSECURE", "0") == "1";
+    if (!std::getenv("VNET_AUTH_FILE") && !allow_insecure) {
+        std::cerr << "[Conductor] No VNET_AUTH_FILE: every name and key would be "
+                  << "accepted. Set it, or VNET_ALLOW_INSECURE=1 for a lab.\n";
+        return 1;
+    }
+    if (!vnet::tls::enabled() && !allow_insecure) {
+        std::cerr << "[Conductor] TLS is off: keys and routes would cross the network "
+                  << "in the clear. Set VNET_TLS=1, or VNET_ALLOW_INSECURE=1 for a lab.\n";
+        return 1;
+    }
 
     g_config_hash_check = env_or("VNET_CONFIG_HASH_CHECK", "1") != "0";
 
@@ -866,7 +891,7 @@ int main() {
 
     sockaddr_in addr{};
     addr.sin_family      = AF_INET;
-    addr.sin_port        = htons(LISTEN_PORT);
+    addr.sin_port        = htons(static_cast<uint16_t>(port));
     addr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(listener, (sockaddr*)&addr, sizeof(addr)) < 0) {
@@ -876,7 +901,7 @@ int main() {
         perror("listen"); return 1;
     }
 
-    std::cout << "[Conductor] Listening on port " << LISTEN_PORT << "\n";
+    std::cout << "[Conductor] Listening on port " << port << "\n";
 
     // --- NetQueue setup ---
     ConductorDispatch dispatch;
@@ -930,7 +955,7 @@ int main() {
 
         // Periodic dump
         auto now = clk::now();
-        if (now - last_dump >= DUMP_INTERVAL) {
+        if (now - last_dump >= g_dump_interval) {
             write_dump();
             last_dump = now;
         }

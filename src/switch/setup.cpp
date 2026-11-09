@@ -42,9 +42,9 @@ static const int                  LISTEN_BACKLOG      = 1024;
 static const int                  ACCEPTS_PER_TURN    = 64;
 /* A dialed peer that has not finished connecting and handshaking. */
 static const std::chrono::seconds DIAL_TIMEOUT        {5};
-static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
-static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
-static std::chrono::seconds       g_dead{90};
+/* A dead peer is noticed within g_dead; both can be set per process. */
+static std::chrono::seconds       g_heartbeat{10};
+static std::chrono::seconds       g_dead{30};
 static const std::chrono::seconds IDENTIFY_TIMEOUT    {10};
 static const std::chrono::seconds TOKEN_EXPIRY        {60};
 /* Time between attempts to reach the conductor when the link is down. */
@@ -120,6 +120,7 @@ struct SwitchIdentity {
     MachineConfig conductor{"", 0};
     std::string   config_path;
     std::string   config_hash;
+    uint32_t      advertise_ipv4 = 0;
 };
 static SwitchIdentity   g_identity;
 static clk::time_point  g_last_conductor_dial{};
@@ -410,6 +411,7 @@ struct SwitchDispatch : public Dispatch {
             mip_pkt.set_network(g_identity.network);
             mip_pkt.set_port(g_identity.port);
             mip_pkt.set_config_hash(g_identity.config_hash);
+            mip_pkt.set_advertise_ipv4(g_identity.advertise_ipv4);
             if (!queue->send(data.fd, PacketType::SWITCH_MIP, mip_pkt)) {
                 std::cerr << "[Switch] Failed to send MIP\n";
                 return;
@@ -935,6 +937,15 @@ int main(int argc, char** argv) {
     g_heartbeat = std::chrono::seconds(hb_sec);
     g_dead      = std::chrono::seconds(dead_sec);
     g_debug     = env_or("VNET_DEBUG", "0") == "1";
+    if (g_dead <= g_heartbeat) {
+        std::cerr << "[Switch] VNET_DEAD_SEC must be larger than VNET_HEARTBEAT_SEC\n";
+        return 1;
+    }
+    if (!vnet::tls::enabled() && env_or("VNET_ALLOW_INSECURE", "0") != "1") {
+        std::cerr << "[Switch] TLS is off: keys and routes would cross the network "
+                  << "in the clear. Set VNET_TLS=1, or VNET_ALLOW_INSECURE=1 for a lab.\n";
+        return 1;
+    }
 
     g_switch_name = argv[1];
     if (!valid_name(g_switch_name, SWITCH_NAME_MAX)) {
@@ -1011,6 +1022,19 @@ int main(int argc, char** argv) {
     g_identity.conductor   = MachineConfig{cdt_ip_env, static_cast<uint16_t>(cdt_port)};
     g_identity.config_path = config_path;
     g_identity.config_hash = config.fingerprint();
+    g_identity.network     = env_or("VNET_NETWORK", "::internet");
+    {
+        // Behind NAT or on a host with several addresses, the address the
+        // conductor sees is not the one agents and peers can dial.
+        std::string adv = env_or("VNET_ADVERTISE_IP", "");
+        if (!adv.empty()) {
+            g_identity.advertise_ipv4 = resolve_ipv4(adv);
+            if (g_identity.advertise_ipv4 == 0) {
+                std::cerr << "[Switch] VNET_ADVERTISE_IP does not resolve: " << adv << "\n";
+                return 1;
+            }
+        }
+    }
     std::cout << "[Switch] Config fingerprint " << g_identity.config_hash.substr(0, 12) << "\n";
 
     int flag = 1;

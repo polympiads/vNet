@@ -28,9 +28,9 @@ using namespace vnet::protocol;
 using namespace vnet::netqueue;
 using clk = std::chrono::steady_clock;
 
-static const std::chrono::seconds HEARTBEAT_INTERVAL {30};
-static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
-static std::chrono::seconds       g_dead{90};
+/* A dead peer is noticed within g_dead; both can be set per process. */
+static std::chrono::seconds       g_heartbeat{10};
+static std::chrono::seconds       g_dead{30};
 static std::string g_agent_name;
 static std::string g_auth_key;
 static std::string g_overlay_cidr = "10.0.0.0/8";
@@ -602,6 +602,15 @@ int main(int argc, char** argv) {
         return 1;
     g_heartbeat = std::chrono::seconds(hb_sec);
     g_dead      = std::chrono::seconds(dead_sec);
+    if (g_dead <= g_heartbeat) {
+        std::cerr << "[Agent] VNET_DEAD_SEC must be larger than VNET_HEARTBEAT_SEC\n";
+        return 1;
+    }
+    if (!vnet::tls::enabled() && env_or("VNET_ALLOW_INSECURE", "0") != "1") {
+        std::cerr << "[Agent] TLS is off: keys would cross the network in the clear. "
+                  << "Set VNET_TLS=1, or VNET_ALLOW_INSECURE=1 for a lab.\n";
+        return 1;
+    }
 
     g_agent_name = argv[1];
     if (!valid_name(g_agent_name, AGENT_NAME_MAX)) {
