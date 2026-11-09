@@ -6,12 +6,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <thread>
+#include <vector>
 
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <poll.h>
 #include <sys/socket.h>
-#include <vector>
 #include <netinet/tcp.h>
 #include <unistd.h>
 
@@ -37,8 +37,13 @@ static std::string g_overlay_cidr = "10.0.0.0/8";
 static bool        g_default_via_tun = true;
 static MachineConfig g_conductor_cfg{"", 0};
 static clk::time_point g_last_reconn{};
-static const int MAX_CONNECT_RETRIES  = 20;
+
+/* Time between attempts while the conductor or the switch cannot be reached. */
 static const int RETRY_DELAY_MS       = 2000;
+/* A blocking step of the join (connect, or waiting for one reply). */
+static const int STEP_TIMEOUT_MS      = 10000;
+/* Tries on the assigned switch before asking the conductor again. */
+static const int SWITCH_TRIES         = 3;
 
 static volatile sig_atomic_t g_running = 1;
 static void on_signal(int) { g_running = 0; }
@@ -54,6 +59,9 @@ struct ConnInfo {
     int      fd = -1;
     clk::time_point last_hb_sent = clk::now();
     clk::time_point last_rx = clk::now();
+    /* Conductor rejoin through the queue: not yet connected. */
+    bool            connected = true;
+    clk::time_point dialed_at{};
 };
 
 struct AgentState {
@@ -63,7 +71,7 @@ struct AgentState {
 static AgentState g_state;
 
 // ---------------------------------------------------------------------------
-//  Dispatch — handles packets arriving via NetQueue
+//  Dispatch: handles packets arriving via NetQueue
 // ---------------------------------------------------------------------------
 
 struct AgentDispatch : public Dispatch {
@@ -77,9 +85,23 @@ struct AgentDispatch : public Dispatch {
         if (info) info->last_rx = clk::now();
     }
 
+    /* The control socket dialed by maybe_reconnect_conductor is up. */
+    void onConnected(socket_data data) override {
+        auto* info = static_cast<ConnInfo*>(data.ptr_data);
+        if (!info || info->role != ConnRole::CONDUCTOR) return;
+        info->connected = true;
+        info->last_rx   = clk::now();
+
+        mip::PacketAgentMRP mrp;
+        mrp.set_name(g_agent_name);
+        mrp.set_auth_key(g_auth_key);
+        queue->send(data.fd, PacketType::AGENT_MRP, mrp);
+        std::cout << "[Agent] Control plane reconnected\n";
+    }
+
     /*
-     * A full IPv4 packet came off the TUN. Wrap it and hand it to the switch.
-     * The switch's black box decides where it goes.
+     * A full IPv4 packet came off the TUN. Hand it to the switch, whose
+     * black box decides where it goes.
      */
     void onTunReady(tun_data data) override {
         if (!queue || !g_state.sw || g_state.sw->fd < 0) return;
@@ -103,7 +125,7 @@ struct AgentDispatch : public Dispatch {
         for (;;) {
             ssize_t n = ::write(tun_fd, raw, len);
             if (n < 0 && errno == EINTR) continue;
-            if (n != static_cast<ssize_t>(len)) {
+            if (n != static_cast<ssize_t>(len) && errno != EAGAIN) {
                 perror("[Agent] tun write");
             }
             return;
@@ -114,8 +136,8 @@ struct AgentDispatch : public Dispatch {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
         if (!info) return;
 
-        std::cout << "[Agent] Connection closed: fd=" << data.fd
-                  << " role=" << (int)info->role << "\n";
+        std::cout << "[Agent] Connection closed: fd=" << data.fd << " "
+                  << (info->role == ConnRole::SWITCH ? "(switch)" : "(conductor)") << "\n";
 
         if (info == g_state.conductor) g_state.conductor = nullptr;
         if (info == g_state.sw)        g_state.sw        = nullptr;
@@ -131,7 +153,7 @@ struct AgentDispatch : public Dispatch {
 static void send_heartbeats(NetQueue& queue) {
     auto now = clk::now();
     auto try_hb = [&](ConnInfo* c) {
-        if (c && c->fd >= 0 && now - c->last_hb_sent >= g_heartbeat) {
+        if (c && c->fd >= 0 && c->connected && now - c->last_hb_sent >= g_heartbeat) {
             queue.send_heartbeat(c->fd);
             c->last_hb_sent = now;
         }
@@ -145,7 +167,13 @@ static void reap_dead(NetQueue& queue) {
     auto now = clk::now();
     std::vector<int> dead;
     auto check = [&](ConnInfo* c) {
-        if (c && c->fd >= 0 && now - c->last_rx >= g_dead)
+        if (!c || c->fd < 0) return;
+        if (!c->connected) {
+            if (now - c->dialed_at >= std::chrono::milliseconds(STEP_TIMEOUT_MS))
+                dead.push_back(c->fd);
+            return;
+        }
+        if (now - c->last_rx >= g_dead)
             dead.push_back(c->fd);
     };
     check(g_state.conductor);
@@ -156,76 +184,45 @@ static void reap_dead(NetQueue& queue) {
     }
 }
 
+/*
+ * The control socket died while the switch link is fine: dial the
+ * conductor again through the queue and send an MRP when it is up. The
+ * data path keeps running meanwhile.
+ */
 static void maybe_reconnect_conductor(NetQueue& queue) {
     if (g_state.conductor) return;
     if (!g_state.sw) return;
     auto now = clk::now();
-    if (now - g_last_reconn < std::chrono::seconds(2)) return;
+    if (now - g_last_reconn < std::chrono::milliseconds(RETRY_DELAY_MS)) return;
     g_last_reconn = now;
 
-    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    int fd = connect_start(g_conductor_cfg.ip, g_conductor_cfg.port);
     if (fd < 0) return;
 
-    addrinfo hints{};
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    addrinfo* result = nullptr;
-    std::string port = std::to_string(g_conductor_cfg.port);
-    if (getaddrinfo(g_conductor_cfg.ip.c_str(), port.c_str(), &hints, &result) != 0 || !result) {
-        ::close(fd);
-        return;
-    }
-    int rc = ::connect(fd, result->ai_addr, result->ai_addrlen);
-    freeaddrinfo(result);
-    if (rc < 0 && errno != EINPROGRESS) {
-        ::close(fd);
-        return;
-    }
-    if (rc < 0) {
-        pollfd pfd{};
-        pfd.fd = fd;
-        pfd.events = POLLOUT;
-        if (poll(&pfd, 1, 3000) <= 0) {
-            ::close(fd);
-            return;
-        }
-    }
-    set_blocking(fd);
-
-    ssl_st* ssl = nullptr;
-    if (vnet::tls::enabled()) {
-        ssl = vnet::tls::handshake_client(fd);
-        if (!ssl) {
-            ::close(fd);
-            return;
-        }
-    }
-    set_nonblocking(fd);
-
-    int flag = 1;
-    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
-
     auto* info = new ConnInfo();
-    info->role = ConnRole::CONDUCTOR;
-    info->fd = fd;
-    if (queue.put_sck(fd, info) == nullptr) {
+    info->role      = ConnRole::CONDUCTOR;
+    info->fd        = fd;
+    info->connected = false;
+    info->dialed_at = now;
+
+    ssl_st* ssl = vnet::tls::enabled() ? vnet::tls::new_session(fd) : nullptr;
+    if (vnet::tls::enabled() && !ssl) {
+        ::close(fd);
+        delete info;
+        return;
+    }
+    if (queue.put_sck_connecting(fd, info, ssl) == nullptr) {
         vnet::tls::free_session(ssl);
         ::close(fd);
         delete info;
         return;
     }
-    if (ssl) queue.adopt_tls(fd, ssl);
     g_state.conductor = info;
-
-    mip::PacketAgentMRP mrp;
-    mrp.set_name(g_agent_name);
-    mrp.set_auth_key(g_auth_key);
-    queue.send(fd, PacketType::AGENT_MRP, mrp);
     std::cout << "[Agent] Reconnecting control plane\n";
 }
 
 // ---------------------------------------------------------------------------
-//  connect_to with retries (waits for the target to be up)
+//  Host routes
 // ---------------------------------------------------------------------------
 
 static uint32_t peer_ipv4(int fd) {
@@ -237,6 +234,41 @@ static uint32_t peer_ipv4(int fd) {
 }
 
 /*
+ * The physical default route as it was before the first join, and the
+ * /32 pins installed through it. Once the default route points into the
+ * TUN, /proc/net/route no longer says where the physical gateway was, so
+ * it is read once and kept.
+ */
+struct HostRoutes {
+    bool        saved = false;
+    bool        had_default = false;
+    std::string iface;
+    uint32_t    gateway = 0;
+    std::vector<uint32_t> pins;
+};
+static HostRoutes g_host;
+
+static void save_physical_default() {
+    if (g_host.saved) return;
+    g_host.saved = true;
+    g_host.had_default = read_default_route(g_host.iface, g_host.gateway);
+    if (g_host.had_default && !valid_name(g_host.iface, 15)) {
+        std::cerr << "[Agent] Unexpected interface name '" << g_host.iface << "'\n";
+        g_host.had_default = false;
+    }
+    if (!g_host.had_default)
+        std::cerr << "[Agent] No default route; control-plane pins are skipped\n";
+}
+
+static void pin_route(uint32_t ip) {
+    if (ip == 0 || !g_host.had_default) return;
+    for (uint32_t p : g_host.pins) if (p == ip) return;
+    if (run_program({"ip", "route", "replace", ipv4_to_string(ip) + "/32",
+                     "via", ipv4_to_string(g_host.gateway), "dev", g_host.iface}, "[Agent]"))
+        g_host.pins.push_back(ip);
+}
+
+/*
  * The TUN is a /32. Other virtual IPs are reached by an explicit overlay
  * route into the device. Conductor and switch addresses stay on the
  * physical default route so the control sockets are not captured by the overlay.
@@ -244,40 +276,169 @@ static uint32_t peer_ipv4(int fd) {
 static void install_host_routes(const std::string& tun_name,
                                 uint32_t conductor_ip,
                                 uint32_t switch_ip) {
-    std::string iface;
-    uint32_t gateway = 0;
-    if (read_default_route(iface, gateway)) {
-        auto pin = [&](uint32_t ip) {
-            if (ip == 0) return;
-            run_program({"ip", "route", "replace", ipv4_to_string(ip) + "/32",
-                         "via", ipv4_to_string(gateway), "dev", iface}, "[Agent]");
-        };
-        pin(conductor_ip);
-        pin(switch_ip);
-    } else {
-        std::cerr << "[Agent] No default route; control-plane pins were skipped\n";
-    }
+    save_physical_default();
+    pin_route(conductor_ip);
+    pin_route(switch_ip);
 
     run_program({"ip", "route", "replace", g_overlay_cidr, "dev", tun_name}, "[Agent]");
 
-    if (g_default_via_tun)
+    if (g_default_via_tun && g_host.had_default)
         run_program({"ip", "route", "replace", "default", "dev", tun_name}, "[Agent]");
 }
 
-static int connect_with_retry(const MachineConfig& mc, const char* label) {
-    for (int attempt = 1; attempt <= MAX_CONNECT_RETRIES; attempt++) {
-        int fd = connect_to(mc);
-        if (fd >= 0) return fd;
-
-        std::cerr << "[Agent] " << label << " attempt " << attempt
-                  << "/" << MAX_CONNECT_RETRIES << " failed, retrying...\n";
-        std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
+/* Put the machine's routing back the way it was before the first join. */
+static void restore_host_routes() {
+    if (!g_host.saved) return;
+    if (g_default_via_tun && g_host.had_default) {
+        run_program({"ip", "route", "replace", "default", "via",
+                     ipv4_to_string(g_host.gateway), "dev", g_host.iface}, "[Agent]");
     }
-    return -1;
+    for (uint32_t ip : g_host.pins)
+        run_program({"ip", "route", "del", ipv4_to_string(ip) + "/32"}, "[Agent]", true);
+    g_host.pins.clear();
 }
 
 // ---------------------------------------------------------------------------
-//  Main — runs the sequential MIP then enters the event loop
+//  Join: register with the conductor, then authenticate to the switch
+// ---------------------------------------------------------------------------
+
+/* Blocking connect bounded by STEP_TIMEOUT_MS; returns a blocking fd. */
+static int connect_bounded(const std::string& host, uint16_t port) {
+    int fd = connect_start(host, port);
+    if (fd < 0) return -1;
+
+    pollfd pfd{};
+    pfd.fd = fd;
+    pfd.events = POLLOUT;
+    int rc = poll(&pfd, 1, STEP_TIMEOUT_MS);
+    int soerr = 0;
+    socklen_t slen = sizeof(soerr);
+    if (rc <= 0 || getsockopt(fd, SOL_SOCKET, SO_ERROR, &soerr, &slen) < 0 || soerr != 0) {
+        ::close(fd);
+        return -1;
+    }
+    set_blocking(fd);
+    set_socket_timeout(fd, STEP_TIMEOUT_MS);
+    return fd;
+}
+
+struct Session {
+    int      conductor_fd = -1;
+    int      switch_fd    = -1;
+    ssl_st*  conductor_ssl = nullptr;
+    ssl_st*  switch_ssl    = nullptr;
+    uint32_t virtual_ipv4  = 0;
+    std::string switch_name;
+};
+
+static void close_session(Session& s) {
+    vnet::tls::free_session(s.conductor_ssl);
+    vnet::tls::free_session(s.switch_ssl);
+    if (s.conductor_fd >= 0) ::close(s.conductor_fd);
+    if (s.switch_fd >= 0) ::close(s.switch_fd);
+    s = Session{};
+}
+
+static void wait_retry() {
+    for (int waited = 0; waited < RETRY_DELAY_MS && g_running; waited += 100)
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+}
+
+/*
+ * One attempt at the whole procedure. Returns true with a filled session;
+ * false to try again. Each blocking step is bounded, so a conductor or
+ * switch that hangs cannot hold the agent forever.
+ */
+static bool try_join(Session& s) {
+    // Once the default route points into the TUN, a new control address
+    // is reachable only through a pin, so pin before connecting.
+    save_physical_default();
+    pin_route(resolve_ipv4(g_conductor_cfg.ip));
+
+    s.conductor_fd = connect_bounded(g_conductor_cfg.ip, g_conductor_cfg.port);
+    if (s.conductor_fd < 0) {
+        std::cerr << "[Agent] Conductor " << g_conductor_cfg.ip << ":"
+                  << g_conductor_cfg.port << " not reachable\n";
+        return false;
+    }
+    if (vnet::tls::enabled()) {
+        s.conductor_ssl = vnet::tls::handshake_client(s.conductor_fd);
+        if (!s.conductor_ssl) { std::cerr << "[Agent] TLS to conductor failed\n"; return false; }
+    }
+
+    mip::PacketAgentMIP mip_pkt;
+    mip_pkt.set_name(g_agent_name);
+    mip_pkt.set_auth_key(g_auth_key);
+    mip_pkt.set_network(env_or("VNET_NETWORK", "vnet.internal"));
+    if (!send_protobuf_packet(s.conductor_fd, PacketType::AGENT_MIP, mip_pkt, s.conductor_ssl)) {
+        std::cerr << "[Agent] Failed to send MIP\n";
+        return false;
+    }
+
+    mip::PacketConnectToSwitch assignment;
+    if (!read_protobuf_packet(s.conductor_fd, PacketType::CONNECT_TO_SWITCH, assignment, s.conductor_ssl)) {
+        std::cerr << "[Agent] No switch assignment from the conductor "
+                  << "(rejected, no switch available, or no answer)\n";
+        return false;
+    }
+
+    std::string sw_ip   = ipv4_to_string(assignment.switch_ipv4());
+    uint16_t    sw_port = static_cast<uint16_t>(assignment.switch_port());
+    s.switch_name = assignment.switch_name();
+    std::cout << "[Agent] Assigned to switch " << s.switch_name
+              << " @ " << sw_ip << ":" << sw_port << "\n";
+    pin_route(assignment.switch_ipv4());
+
+    for (int attempt = 1; attempt <= SWITCH_TRIES && g_running; attempt++) {
+        s.switch_fd = connect_bounded(sw_ip, sw_port);
+        if (s.switch_fd >= 0) break;
+        std::cerr << "[Agent] Switch " << s.switch_name << " not reachable ("
+                  << attempt << "/" << SWITCH_TRIES << ")\n";
+        wait_retry();
+    }
+    if (s.switch_fd < 0) return false;
+
+    if (vnet::tls::enabled()) {
+        s.switch_ssl = vnet::tls::handshake_client(s.switch_fd);
+        if (!s.switch_ssl) { std::cerr << "[Agent] TLS to switch failed\n"; return false; }
+    }
+
+    mip::PacketAuthConnectToSwitch auth_pkt;
+    auth_pkt.set_connection_token(assignment.connection_token());
+    if (!send_protobuf_packet(s.switch_fd, PacketType::AUTH_CONNECT_TO_SWITCH, auth_pkt, s.switch_ssl)) {
+        std::cerr << "[Agent] Failed to send auth to switch\n";
+        return false;
+    }
+
+    mip::PacketConnectionAccepted ack;
+    if (!read_protobuf_packet(s.switch_fd, PacketType::CONNECTION_ACCEPTED, ack, s.switch_ssl)) {
+        std::cerr << "[Agent] Switch did not accept the connection\n";
+        return false;
+    }
+    s.virtual_ipv4 = ack.virtual_ipv4();
+    std::cout << "[Agent] Authenticated with switch " << s.switch_name
+              << ", virtual IP: " << ipv4_to_string(s.virtual_ipv4) << "\n";
+
+    // Back to non-blocking for the event loop.
+    set_socket_timeout(s.conductor_fd, 0);
+    set_socket_timeout(s.switch_fd, 0);
+    set_nonblocking(s.conductor_fd);
+    set_nonblocking(s.switch_fd);
+    return true;
+}
+
+/* Keep trying until it works or we are told to stop. */
+static bool join(Session& s) {
+    while (g_running) {
+        if (try_join(s)) return true;
+        close_session(s);
+        wait_retry();
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+//  Main
 // ---------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
@@ -316,8 +477,6 @@ int main(int argc, char** argv) {
         std::cerr << "[Agent] No auth key: set VNET_AUTH_KEY or VNET_AUTH_KEY_FILE\n";
         return 1;
     }
-    std::string agent_name = g_agent_name;
-    std::string auth_key   = g_auth_key;
 
     const char* cdt_ip_env = std::getenv("CONDUCTOR_IP");
     if (!cdt_ip_env || !*cdt_ip_env || cdt_port == 0) {
@@ -337,164 +496,107 @@ int main(int argc, char** argv) {
     }
     g_default_via_tun = env_or("VNET_DEFAULT_VIA_TUN", "1") != "0";
 
-    g_conductor_cfg = MachineConfig{
-        cdt_ip_env,
-        static_cast<uint16_t>(cdt_port)
-    };
-    MachineConfig conductor_cfg = g_conductor_cfg;
-
-    // ===================================================================
-    //  STEP 1 — Connect to conductor and send Agent MIP
-    // ===================================================================
-    std::cout << "[Agent] Connecting to conductor "
-              << conductor_cfg.ip << ":" << conductor_cfg.port << " ...\n";
-
-    int cdt_sock = connect_with_retry(conductor_cfg, "conductor");
-    if (cdt_sock < 0) {
-        std::cerr << "[Agent] Could not reach conductor\n";
-        return 1;
-    }
-
-    ssl_st* cdt_ssl = nullptr;
-    if (vnet::tls::enabled()) {
-        cdt_ssl = vnet::tls::handshake_client(cdt_sock);
-        if (!cdt_ssl) {
-            close(cdt_sock);
-            return 1;
-        }
-    }
-
-    mip::PacketAgentMIP mip_pkt;
-    mip_pkt.set_name(agent_name);
-    mip_pkt.set_auth_key(auth_key);
-    mip_pkt.set_network("vnet.internal");
-
-    if (!send_protobuf_packet(cdt_sock, PacketType::AGENT_MIP, mip_pkt, cdt_ssl)) {
-        std::cerr << "[Agent] Failed to send MIP\n";
-        close(cdt_sock);
-        return 1;
-    }
-
-    // ===================================================================
-    //  STEP 2 — Receive switch assignment
-    // ===================================================================
-    mip::PacketConnectToSwitch assignment;
-    if (!read_protobuf_packet(cdt_sock, PacketType::CONNECT_TO_SWITCH, assignment, cdt_ssl)) {
-        std::cerr << "[Agent] Did not receive switch assignment\n";
-        close(cdt_sock);
-        return 1;
-    }
-
-    std::string sw_ip   = ipv4_to_string(assignment.switch_ipv4());
-    uint16_t    sw_port = static_cast<uint16_t>(assignment.switch_port());
-
-    std::cout << "[Agent] Assigned to switch " << assignment.switch_name()
-              << " @ " << sw_ip << ":" << sw_port << "\n";
-
-    // ===================================================================
-    //  STEP 3 — Connect to switch and authenticate
-    // ===================================================================
-    MachineConfig sw_cfg { sw_ip, sw_port };
-
-    int sw_sock = connect_with_retry(sw_cfg, "switch");
-    if (sw_sock < 0) {
-        std::cerr << "[Agent] Cannot reach assigned switch\n";
-        vnet::tls::free_session(cdt_ssl);
-        close(cdt_sock);
-        return 1;
-    }
-
-    ssl_st* sw_ssl = nullptr;
-    if (vnet::tls::enabled()) {
-        sw_ssl = vnet::tls::handshake_client(sw_sock);
-        if (!sw_ssl) {
-            vnet::tls::free_session(cdt_ssl);
-            close(sw_sock);
-            close(cdt_sock);
-            return 1;
-        }
-    }
-
-    mip::PacketAuthConnectToSwitch auth_pkt;
-    auth_pkt.set_connection_token(assignment.connection_token());
-
-    if (!send_protobuf_packet(sw_sock, PacketType::AUTH_CONNECT_TO_SWITCH, auth_pkt, sw_ssl)) {
-        std::cerr << "[Agent] Failed to send auth to switch\n";
-        close(sw_sock);
-        close(cdt_sock);
-        return 1;
-    }
-
-    mip::PacketConnectionAccepted ack;
-    if (!read_protobuf_packet(sw_sock, PacketType::CONNECTION_ACCEPTED, ack, sw_ssl)) {
-        std::cerr << "[Agent] Switch did not accept connection\n";
-        close(sw_sock);
-        close(cdt_sock);
-        return 1;
-    }
-
-    uint32_t virtual_ipv4 = ack.virtual_ipv4();
-    std::cout << "[Agent] Authenticated with switch " << assignment.switch_name()
-          << ", virtual IP: " << ipv4_to_string(virtual_ipv4) << "\n";
-
-    // ===================================================================
-    //  STEP 4 — Open TUN device with assigned virtual IP
-    // ===================================================================
-    
-    std::string tun_name = "vnet-" + agent_name;
-    int tun_fd = tun_open(tun_name, virtual_ipv4, 32);
-    if (tun_fd < 0) {
-        std::cerr << "[Agent] Failed to open TUN device\n";
-        close(sw_sock);
-        close(cdt_sock);
-        return 1;
-    }
-
-    install_host_routes(tun_name, peer_ipv4(cdt_sock), peer_ipv4(sw_sock));
-
-    // ===================================================================
-    //  STEP 5 — Switch both fds to non-blocking, enter event loop
-    // ===================================================================
-    set_nonblocking(cdt_sock);
-    set_nonblocking(sw_sock);
-
-    int flag = 1;
-    setsockopt(cdt_sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
-    setsockopt(sw_sock,  IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+    g_conductor_cfg = MachineConfig{ cdt_ip_env, static_cast<uint16_t>(cdt_port) };
 
     AgentDispatch dispatch;
-    dispatch.tun_fd = tun_fd;
     NetworkQueueHandler handler = makeNetworkQueueHandler(&dispatch);
     NetQueue queue(handler, /*epoll_timeout_ms=*/200);
     dispatch.queue = &queue;
 
-    auto* cdt_info = new ConnInfo();
-    cdt_info->role = ConnRole::CONDUCTOR;
-    cdt_info->fd   = cdt_sock;
-    g_state.conductor = cdt_info;
-    queue.put_sck(cdt_sock, cdt_info);
-    if (cdt_ssl) queue.adopt_tls(cdt_sock, cdt_ssl);
+    const std::string tun_name = "vnet-" + g_agent_name;
+    int      tun_fd  = -1;
+    uint32_t tun_ip  = 0;
+    int      status  = 0;
 
-    auto* sw_info = new ConnInfo();
-    sw_info->role = ConnRole::SWITCH;
-    sw_info->fd   = sw_sock;
-    g_state.sw = sw_info;
-    queue.put_sck(sw_sock, sw_info);
-    if (sw_ssl) queue.adopt_tls(sw_sock, sw_ssl);
-
-    queue.put_tun(tun_fd, nullptr);
-
-    std::cout << "[Agent] Entering event loop.\n";
-
+    // Each pass registers, runs until the switch link is lost, and
+    // registers again. The TUN stays up across passes, so applications
+    // keep their interface while the agent finds a new switch.
     while (g_running) {
-        queue.wait_and_process();
-        maybe_reconnect_conductor(queue);
-        send_heartbeats(queue);
-        reap_dead(queue);
+        Session s;
+        std::cout << "[Agent] Connecting to conductor "
+                  << g_conductor_cfg.ip << ":" << g_conductor_cfg.port << " ...\n";
+        if (!join(s)) break;
+
+        if (tun_fd >= 0 && tun_ip != s.virtual_ipv4) {
+            std::cout << "[Agent] Virtual IP changed; reopening the TUN\n";
+            queue.close(tun_fd);
+            tun_close(-1, tun_name);
+            tun_fd = -1;
+        }
+        if (tun_fd < 0) {
+            tun_fd = tun_open(tun_name, s.virtual_ipv4, 32);
+            if (tun_fd < 0) {
+                std::cerr << "[Agent] Failed to open TUN device\n";
+                close_session(s);
+                status = 1;
+                break;
+            }
+            tun_ip = s.virtual_ipv4;
+            dispatch.tun_fd = tun_fd;
+            if (queue.put_tun(tun_fd, nullptr) == nullptr) {
+                std::cerr << "[Agent] Failed to add the TUN to the queue\n";
+                status = 1;
+                break;
+            }
+        }
+
+        install_host_routes(tun_name, peer_ipv4(s.conductor_fd), peer_ipv4(s.switch_fd));
+
+        auto* cdt_info = new ConnInfo();
+        cdt_info->role = ConnRole::CONDUCTOR;
+        cdt_info->fd   = s.conductor_fd;
+        if (queue.put_sck(s.conductor_fd, cdt_info) == nullptr) {
+            std::cerr << "[Agent] Failed to add the conductor socket to the queue\n";
+            delete cdt_info;
+            close_session(s);
+            wait_retry();
+            continue;
+        }
+        g_state.conductor = cdt_info;
+        if (s.conductor_ssl) queue.adopt_tls(s.conductor_fd, s.conductor_ssl);
+
+        auto* sw_info = new ConnInfo();
+        sw_info->role = ConnRole::SWITCH;
+        sw_info->fd   = s.switch_fd;
+        if (queue.put_sck(s.switch_fd, sw_info) == nullptr) {
+            std::cerr << "[Agent] Failed to add the switch socket to the queue\n";
+            delete sw_info;
+            queue.close(s.conductor_fd);
+            vnet::tls::free_session(s.switch_ssl);
+            ::close(s.switch_fd);
+            wait_retry();
+            continue;
+        }
+        g_state.sw = sw_info;
+        if (s.switch_ssl) queue.adopt_tls(s.switch_fd, s.switch_ssl);
+
+        std::cout << "[Agent] Entering event loop.\n";
+
+        while (g_running && g_state.sw) {
+            queue.wait_and_process();
+            maybe_reconnect_conductor(queue);
+            send_heartbeats(queue);
+            reap_dead(queue);
+        }
+
+        if (!g_running) break;
+
+        // The switch is gone. The conductor must see this agent leave
+        // before it can assign it again, so the control socket goes too.
+        std::cerr << "[Agent] Switch link lost; joining again\n";
+        if (g_state.conductor) queue.close(g_state.conductor->fd);
+        g_state.conductor = nullptr;
+        wait_retry();
     }
 
     std::cout << "[Agent] Shutting down.\n";
-    tun_close(tun_fd, tun_name);
+    if (g_state.conductor) queue.close(g_state.conductor->fd);
+    if (g_state.sw)        queue.close(g_state.sw->fd);
+    if (tun_fd >= 0) {
+        queue.close(tun_fd);
+        tun_close(-1, tun_name);
+    }
+    restore_host_routes();
     google::protobuf::ShutdownProtobufLibrary();
-    return 0;
+    return status;
 }

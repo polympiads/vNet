@@ -54,6 +54,17 @@ int connect_to(const MachineConfig& mc) {
     return sock;
 }
 
+uint32_t resolve_ipv4(const std::string& host) {
+    struct addrinfo hints{}, *result = nullptr;
+    hints.ai_family   = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    if (getaddrinfo(host.c_str(), nullptr, &hints, &result) != 0 || !result)
+        return 0;
+    uint32_t addr = reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr.s_addr;
+    freeaddrinfo(result);
+    return addr;
+}
+
 int connect_start(const std::string& host, uint16_t port) {
     struct addrinfo hints{}, *result = nullptr;
     hints.ai_family   = AF_INET;

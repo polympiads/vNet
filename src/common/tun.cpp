@@ -113,5 +113,5 @@ void tun_close(int fd, const std::string& name) {
         }
         close(sock);
     }
-    close(fd);
+    if (fd >= 0) close(fd);
 }

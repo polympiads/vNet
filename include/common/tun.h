@@ -17,6 +17,7 @@
 int tun_open(const std::string& name, uint32_t ipv4, uint8_t prefix_len = 24);
 
 /**
- * @brief Close a TUN device and bring the interface down.
+ * @brief Bring the interface down and close the TUN device. Pass fd < 0
+ *        when something else owns and closes the descriptor.
  */
 void tun_close(int fd, const std::string& name);

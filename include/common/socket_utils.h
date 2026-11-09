@@ -23,6 +23,12 @@ int connect_to(const MachineConfig& mc);
 int connect_start(const std::string& host, uint16_t port);
 
 /**
+ * @brief Resolve an IPv4 address or host name to an address in network
+ *        order; 0 when it does not resolve.
+ */
+uint32_t resolve_ipv4(const std::string& host);
+
+/**
  * @brief Set a file descriptor to non-blocking mode.
  * @return true on success.
  */
