@@ -419,10 +419,18 @@ struct SwitchDispatch : public Dispatch {
         ack.set_virtual_ipv4(entry->virtual_ipv4);
         queue->send(data.fd, PacketType::CONNECTION_ACCEPTED, ack);
 
-        mip::PacketAgentRegistered reg;
-        reg.set_agent_name(agent_name);
-        reg.set_virtual_ipv4(entry->virtual_ipv4);
-        queue->send(g_state.conductor->fd, PacketType::AGENT_REGISTERED, reg);
+        // The token came from the conductor before it went away, so the
+        // agent is still accepted for local traffic; only the route
+        // announcement is skipped.
+        if (g_state.conductor) {
+            mip::PacketAgentRegistered reg;
+            reg.set_agent_name(agent_name);
+            reg.set_virtual_ipv4(entry->virtual_ipv4);
+            queue->send(g_state.conductor->fd, PacketType::AGENT_REGISTERED, reg);
+        } else {
+            std::cerr << "[Switch] No conductor link; route for " << agent_name
+                      << " was not announced\n";
+        }
 
         std::cout << "[Switch] Agent " << info->name
                 << " authenticated (fd=" << data.fd
