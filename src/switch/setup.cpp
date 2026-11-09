@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <algorithm>
 #include <chrono>
@@ -42,6 +43,7 @@ static const int                  ACCEPTS_PER_TURN    = 8;
 static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
 static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
 static std::chrono::seconds       g_dead{90};
+static const std::chrono::seconds IDENTIFY_TIMEOUT    {10};
 static const std::chrono::seconds TOKEN_EXPIRY        {60};
 static const int                  MAX_CONNECT_RETRIES = 20;
 static const int                  RETRY_DELAY_MS      = 2000;
@@ -61,6 +63,7 @@ struct ConnInfo {
     int         fd = -1;
     clk::time_point last_hb_sent = clk::now();
     clk::time_point last_rx = clk::now();
+    clk::time_point accepted_at = clk::now();
     /* Retiring a duplicate dial must not wipe routes that were moved. */
     bool        skip_route_cleanup = false;
 };
@@ -98,6 +101,9 @@ struct SwitchState {
 };
 
 static SwitchState g_state;
+
+/* Accepted sockets that may still be waiting to authenticate or say hello. */
+static std::unordered_set<ConnInfo*> g_unidentified;
 static BlackBox* g_blackbox = nullptr;
 static std::string g_switch_name;
 
@@ -480,6 +486,7 @@ struct SwitchDispatch : public Dispatch {
             g_state.conductor = nullptr;
         }
 
+        g_unidentified.erase(info);
         delete info;
     }
 
@@ -638,6 +645,25 @@ static void reap_dead(NetQueue& queue) {
     for (auto& peer : g_state.peer_switches) check(peer.second);
     for (int fd : dead) {
         std::cerr << "[Switch] Heartbeat timeout on fd " << fd << "\n";
+        queue.close(fd);
+    }
+
+    // A socket that never authenticates holds an fd and is never
+    // heartbeat-checked, since it is in none of the lists above.
+    std::vector<int> silent;
+    for (auto it = g_unidentified.begin(); it != g_unidentified.end(); ) {
+        ConnInfo* c = *it;
+        if (c->role != ConnRole::AGENT_PENDING) {
+            it = g_unidentified.erase(it);
+            continue;
+        }
+        if (now - c->accepted_at >= IDENTIFY_TIMEOUT)
+            silent.push_back(c->fd);
+        ++it;
+    }
+    for (int fd : silent) {
+        std::cerr << "[Switch] No authentication within "
+                  << IDENTIFY_TIMEOUT.count() << "s on fd " << fd << "\n";
         queue.close(fd);
     }
 }
@@ -885,6 +911,7 @@ int main(int argc, char** argv) {
                 delete info;
                 continue;
             }
+            g_unidentified.insert(info);
             if (ssl) {
                 queue.adopt_tls(agent_fd, ssl);
                 queue.drain_tls(agent_fd);
