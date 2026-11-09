@@ -9,8 +9,8 @@ EnvironmentFile=/etc/vnet/conductor.env
 ExecStart=/usr/local/bin/conductor
 Restart=always
 RestartSec=2
-# SIGUSR1 writes the state dump at once.
-ExecReload=/bin/kill -USR1 $MAINPID
+# SIGHUP reloads the auth file; SIGUSR1 writes the state dump at once.
+ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target

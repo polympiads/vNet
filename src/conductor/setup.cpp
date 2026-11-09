@@ -50,14 +50,18 @@ static const int64_t              TOKEN_EXPIRY_MS      = 60 * 1000;
 
 static const char* DEFAULT_DUMP_PATH = "/var/vnet-dump.bin";
 
-static volatile sig_atomic_t g_running      = 1;
-static volatile sig_atomic_t g_dump_request = 0;
+static volatile sig_atomic_t g_running        = 1;
+static volatile sig_atomic_t g_dump_request   = 0;
+static volatile sig_atomic_t g_reload_request = 0;
 
 static void on_signal(int) {
     g_running = 0;
 }
 static void on_sigusr1(int) {
     g_dump_request = 1;
+}
+static void on_sighup(int) {
+    g_reload_request = 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -330,27 +334,50 @@ struct AgentLocation {
 };
 static std::unordered_map<std::string, AgentLocation> g_agent_location;
 
+/*
+ * Read the auth file into a fresh table and swap it in only when the
+ * whole file parsed, so a reload that fails keeps the old table.
+ */
 static bool load_auth_file(const std::string& path) {
     std::ifstream in(path);
-    if (!in) return false;
+    if (!in) {
+        std::cerr << "[Conductor] Cannot open auth file " << path << "\n";
+        return false;
+    }
+    std::unordered_map<std::string, AuthRecord> fresh;
     std::string line;
+    int line_no = 0;
     while (std::getline(in, line)) {
+        line_no++;
         if (!line.empty() && line.back() == '\r') line.pop_back();
         size_t start = line.find_first_not_of(" \t");
         if (start == std::string::npos) continue;
         if (line[start] == '#') continue;
         std::istringstream iss(line.substr(start));
         std::string role, name, key;
-        if (!(iss >> role >> name >> key)) return false;
-        if (role != "switch" && role != "agent") return false;
-        if (!valid_name(name, role == "agent" ? AGENT_NAME_MAX : SWITCH_NAME_MAX)) {
-            std::cerr << "[Conductor] Invalid " << role << " name '" << name
-                      << "' in auth file\n";
+        if (!(iss >> role >> name >> key) || (role != "switch" && role != "agent")) {
+            std::cerr << "[Conductor] Auth file line " << line_no
+                      << ": expected 'switch <name> <key>' or 'agent <name> <key>'\n";
             return false;
         }
-        g_auth[name] = {role, key};
+        if (!valid_name(name, role == "agent" ? AGENT_NAME_MAX : SWITCH_NAME_MAX)) {
+            std::cerr << "[Conductor] Auth file line " << line_no << ": invalid "
+                      << role << " name '" << name << "'\n";
+            return false;
+        }
+        if (fresh.count(name)) {
+            std::cerr << "[Conductor] Auth file line " << line_no << ": " << name
+                      << " is listed twice\n";
+            return false;
+        }
+        fresh[name] = {role, key};
     }
-    return !g_auth.empty();
+    if (fresh.empty()) {
+        std::cerr << "[Conductor] Auth file " << path << " names no machine\n";
+        return false;
+    }
+    g_auth = std::move(fresh);
+    return true;
 }
 
 /* Equal length and equal bytes, in time that does not depend on where
@@ -824,6 +851,7 @@ int main() {
     signal(SIGTERM,  on_signal);
     signal(SIGPIPE,  SIG_IGN);
     signal(SIGUSR1,  on_sigusr1);
+    signal(SIGHUP,   on_sighup);
 
     // Dump path from env or default
     const char* dump_env = std::getenv("VNET_DUMP_PATH");
@@ -861,12 +889,11 @@ int main() {
 
     g_config_hash_check = env_or("VNET_CONFIG_HASH_CHECK", "1") != "0";
 
-    if (const char* auth_path = std::getenv("VNET_AUTH_FILE")) {
+    std::string auth_path;
+    if (const char* env_auth = std::getenv("VNET_AUTH_FILE")) {
+        auth_path = env_auth;
         g_auth_required = true;
-        if (!load_auth_file(auth_path)) {
-            std::cerr << "[Conductor] Failed to load auth file " << auth_path << "\n";
-            return 1;
-        }
+        if (!load_auth_file(auth_path)) return 1;
         std::cout << "[Conductor] Loaded " << g_auth.size() << " auth record(s)\n";
     }
 
@@ -964,6 +991,22 @@ int main() {
         if (g_dump_request) {
             g_dump_request = 0;
             write_dump();
+        }
+
+        // SIGHUP: machines added to the auth file can join without a
+        // restart. Machines removed are refused at their next MIP or MRP;
+        // the ones connected stay until then.
+        if (g_reload_request) {
+            g_reload_request = 0;
+            if (!g_auth_required) {
+                std::cerr << "[Conductor] No auth file to reload\n";
+            } else if (load_auth_file(auth_path)) {
+                std::cout << "[Conductor] Auth file reloaded: " << g_auth.size()
+                          << " record(s)\n";
+            } else {
+                std::cerr << "[Conductor] Auth file reload failed; the previous "
+                          << "records stay in force\n";
+            }
         }
     }
 

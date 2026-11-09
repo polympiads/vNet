@@ -271,6 +271,26 @@ scenario_config() {
   pass config
 }
 
+scenario_auth_reload() {
+  topo_up auth_reload
+  # agent3 is not in the auth file yet.
+  grep -v agent3 "$LOGS/auth.txt" > "$LOGS/auth2.txt" && mv "$LOGS/auth2.txt" "$LOGS/auth.txt"
+  standard_start || { fail auth_reload "agents did not register"; return; }
+  start_agent 3; sleep 3
+  grep -q "Rejected agent auth: agent3" "$LOGS/conductor.log" || { fail auth_reload "unknown agent not refused"; return; }
+  printf 'agent agent3 k3\n' >> "$LOGS/auth.txt"
+  kill -HUP "${PID[conductor]}"
+  wait_for "$LOGS/conductor.log" "Auth file reloaded" 1 5 || { fail auth_reload "no reload"; return; }
+  wait_for "$LOGS/conductor.log" "agent3 registered with IP" 1 15 || { fail auth_reload "agent3 did not join after reload"; return; }
+  [ "$(pings 1 10.0.1.3 3)" = 3 ] || { fail auth_reload "agent3 unreachable"; return; }
+  printf 'garbage\n' >> "$LOGS/auth.txt"
+  kill -HUP "${PID[conductor]}"; sleep 1
+  grep -q "reload failed" "$LOGS/conductor.log" || { fail auth_reload "bad file not reported"; return; }
+  alive conductor || { fail auth_reload "conductor died"; return; }
+  say "agent3 refused, then joined after SIGHUP; a broken file kept the old records"
+  pass auth_reload
+}
+
 scenario_flood() {
   command -v iperf3 >/dev/null || { echo "SKIP flood (no iperf3)"; return; }
   topo_up flood
@@ -314,7 +334,7 @@ scenario_throughput() {
 # ---------------------------------------------------------------- main
 
 make_certs
-ALL="basic attacks conductor_restart switch_restart switch_link agent_exit lockdown config flood throughput"
+ALL="basic attacks conductor_restart switch_restart switch_link agent_exit lockdown config auth_reload flood throughput"
 for s in ${@:-$ALL}; do
   echo "== $s"
   topo_down

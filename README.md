@@ -32,7 +32,7 @@ Each switch and agent reads its key from `VNET_AUTH_KEY`, or from the first line
 
 ## Auth and TLS
 
-Set `VNET_AUTH_FILE` on the conductor. Each line is `switch <name> <key>` or `agent <name> <key>`. The name and key must match what the process was given. Blank lines and `#` comments are ignored. Without the file the conductor refuses to start, since it would accept any name and key; `VNET_ALLOW_INSECURE=1` overrides that for a lab.
+Set `VNET_AUTH_FILE` on the conductor. Each line is `switch <name> <key>` or `agent <name> <key>`. The name and key must match what the process was given. Blank lines and `#` comments are ignored. Without the file the conductor refuses to start, since it would accept any name and key; `VNET_ALLOW_INSECURE=1` overrides that for a lab. `SIGHUP` reloads the file (`systemctl reload vnet-conductor`): added machines can join at once, removed ones are refused when they next connect, and a file that does not parse leaves the old records in force.
 
 Set `VNET_TLS=1` on the conductor, every switch, and every agent, or on none of them. Without it every process refuses to start, since keys and routes would cross the network in the clear; `VNET_ALLOW_INSECURE=1` overrides that too. The three variables `VNET_TLS_CERT`, `VNET_TLS_KEY`, and `VNET_TLS_CA` are required when TLS is on.
 
@@ -95,7 +95,7 @@ The conductor writes its state to `/var/vnet-dump.bin` (`VNET_DUMP_PATH`) every 
 
 Before: generate the files with `vnet-roster`, install `switch.txt`, `auth.txt`, the env file and the certificates under `/etc/vnet` on each machine (`ca.key` stays with you), start the units, and check `vnet-state dump auth.txt` until nothing is listed under "expected but not connected". Ping across two switches from a contestant machine, and from a locked-down machine confirm that its LAN gateway does not answer.
 
-During: `vnet-state` says who is missing; `SIGUSR1` on a switch says what it dropped and why. To add a machine, append it to the roster, rerun `vnet-roster`, copy `auth.txt` to the conductor and `switch.txt` to every switch, restart the conductor (switches and agents reconnect on their own) and send `SIGHUP` to every switch. To remove a machine, remove its lines the same way; it is cut off at its next connection, or at once if you also stop its agent.
+During: `vnet-state` says who is missing; `SIGUSR1` on a switch says what it dropped and why. To add a machine, append it to the roster, rerun `vnet-roster`, copy `auth.txt` to the conductor and `switch.txt` to every switch, and send `SIGHUP` to the conductor and to every switch; nothing restarts. To remove a machine, remove its lines the same way; it is cut off at its next connection, or at once if you also stop its agent.
 
 When a process dies, its unit restarts it; the others recover as described above. If a whole switch host is lost, its agents move to the remaining switches. If the conductor host is lost, the data plane keeps running; new joins and rejoins wait until a conductor with the same auth file is back at the same address.
 
