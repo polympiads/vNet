@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -61,6 +62,14 @@ bool set_blocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0) return false;
     return fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) >= 0;
+}
+
+bool set_socket_timeout(int fd, int ms) {
+    timeval tv{};
+    tv.tv_sec = ms / 1000;
+    tv.tv_usec = (ms % 1000) * 1000;
+    return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0 &&
+           setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) == 0;
 }
 
 static ssize_t io_write_fd(int sock, ssl_st* ssl, const void* buf, size_t n) {

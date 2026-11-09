@@ -229,14 +229,6 @@ static void install_waiting_routes(NetQueue* queue, const std::string& name, int
     g_routes_waiting.erase(it);
 }
 
-static void set_sock_timeout(int fd, int ms) {
-    timeval tv{};
-    tv.tv_sec = ms / 1000;
-    tv.tv_usec = (ms % 1000) * 1000;
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-}
-
 static int dial_peer(NetQueue* queue, const PeerTarget& target) {
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (fd < 0) return -1;
@@ -276,9 +268,9 @@ static int dial_peer(NetQueue* queue, const PeerTarget& target) {
     if (vnet::tls::enabled()) {
         // The peer may be busy accepting agents. Do not wait forever, or
         // this switch stops accepting its own agents.
-        set_sock_timeout(fd, 1000);
+        set_socket_timeout(fd, 1000);
         ssl = vnet::tls::handshake_client(fd);
-        set_sock_timeout(fd, 0);
+        set_socket_timeout(fd, 0);
         if (!ssl) {
             ::close(fd);
             return -1;
@@ -873,9 +865,9 @@ int main(int argc, char** argv) {
             set_blocking(agent_fd);
             ssl_st* ssl = nullptr;
             if (vnet::tls::enabled()) {
-                set_sock_timeout(agent_fd, 1000);
+                set_socket_timeout(agent_fd, 1000);
                 ssl = vnet::tls::handshake_server(agent_fd);
-                set_sock_timeout(agent_fd, 0);
+                set_socket_timeout(agent_fd, 0);
                 if (!ssl) {
                     close(agent_fd);
                     continue;

@@ -36,6 +36,7 @@ using sysclk = std::chrono::system_clock;
 static const uint16_t             LISTEN_PORT         = 5000;
 static const int                  LISTEN_BACKLOG      = 1024;
 static const int                  ACCEPTS_PER_TURN    = 8;
+static const int                  HANDSHAKE_TIMEOUT_MS = 1000;
 static const std::chrono::seconds HEARTBEAT_INTERVAL  {30};
 static const std::chrono::seconds DUMP_INTERVAL       {5};
 static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
@@ -718,7 +719,11 @@ int main() {
             set_blocking(client);
             ssl_st* ssl = nullptr;
             if (vnet::tls::enabled()) {
+                // A peer that never speaks TLS must not stall every
+                // other registration and heartbeat.
+                set_socket_timeout(client, HANDSHAKE_TIMEOUT_MS);
                 ssl = vnet::tls::handshake_server(client);
+                set_socket_timeout(client, 0);
                 if (!ssl) {
                     close(client);
                     continue;

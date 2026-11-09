@@ -23,6 +23,14 @@ bool set_nonblocking(int fd);
 bool set_blocking(int fd);
 
 /**
+ * Bound each blocking read and write on fd to ms milliseconds; 0 removes
+ * the bound. Used around blocking TLS handshakes so a silent peer cannot
+ * hold an event loop.
+ * @return true on success.
+ */
+bool set_socket_timeout(int fd, int ms);
+
+/**
  * @brief Read exactly n bytes from a socket (blocking).
  *        ssl, when set, reads through that finished TLS session.
  */
