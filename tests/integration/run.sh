@@ -105,7 +105,7 @@ start_switch() {  # i [cert name]
 start_agent() {  # i [extra env...]
   local i=$1; shift
   ip netns exec a$i env "${HB[@]}" $(tls_env agent$i) CONDUCTOR_IP=172.31.$i.1 CONDUCTOR_PORT=5000 \
-      VNET_AUTH_KEY=k$i "$@" "$BIN/agent" agent$i >> "$LOGS/agent$i.log" 2>&1 &
+      VNET_AUTH_KEY=k$i VNET_STATE_DIR="$LOGS/state" "$@" "$BIN/agent" agent$i >> "$LOGS/agent$i.log" 2>&1 &
   PID[agent$i]=$!
 }
 stop() { kill -"${2:-TERM}" "${PID[$1]}" 2>/dev/null; wait "${PID[$1]}" 2>/dev/null; unset PID[$1]; }
@@ -291,6 +291,23 @@ scenario_auth_reload() {
   pass auth_reload
 }
 
+scenario_agent_crash() {
+  topo_up agent_crash
+  standard_start || { fail agent_crash "agents did not register"; return; }
+  # A crash restores nothing: the machine is left with the TUN gone and
+  # no default route. The next agent must put the physical route back.
+  stop agent1 KILL; sleep 1
+  in_ns a1 ip route | grep -q "^default" && { fail agent_crash "a killed agent should leave no default route"; return; }
+  start_agent 1; sleep 3
+  wait_for "$LOGS/agent1.log" "Restored the default route" 1 10 || { fail agent_crash "saved route not used"; return; }
+  wait_for "$LOGS/conductor.log" "agent1 registered with IP" 2 15 || { fail agent_crash "agent1 did not rejoin"; return; }
+  [ "$(pings 1 10.0.1.2 3)" = 3 ] || { fail agent_crash "ping after restart"; return; }
+  stop agent1 TERM; sleep 1
+  in_ns a1 ip route | grep -q "^default via 172.31.1.1" || { fail agent_crash "default route not restored after the restart"; return; }
+  say "after SIGKILL the next agent restored the gateway from its saved state"
+  pass agent_crash
+}
+
 scenario_duplicate_identity() {
   topo_up duplicate_identity
   start_conductor; sleep 0.5
@@ -302,7 +319,7 @@ scenario_duplicate_identity() {
   # replace them on the switch and on the conductor.
   kill -STOP "${PID[agent1]}"
   ip netns exec a3 env "${HB[@]}" $(tls_env agent1) CONDUCTOR_IP=172.31.3.1 CONDUCTOR_PORT=5000 \
-      VNET_AUTH_KEY=k1 "$BIN/agent" agent1 >> "$LOGS/agent1-copy.log" 2>&1 &
+      VNET_AUTH_KEY=k1 VNET_STATE_DIR="$LOGS/state-a3" "$BIN/agent" agent1 >> "$LOGS/agent1-copy.log" 2>&1 &
   PID[agent1copy]=$!
   wait_for "$LOGS/switch1.log" "authenticated again; closing" 1 15 || { fail duplicate_identity "switch kept the frozen socket"; return; }
   wait_for "$LOGS/conductor.log" "registered again; closing" 1 15 || { fail duplicate_identity "conductor kept the frozen socket"; return; }
@@ -356,7 +373,7 @@ scenario_throughput() {
 # ---------------------------------------------------------------- main
 
 make_certs
-ALL="basic attacks conductor_restart switch_restart switch_link agent_exit duplicate_identity lockdown config auth_reload flood throughput"
+ALL="basic attacks conductor_restart switch_restart switch_link agent_exit agent_crash duplicate_identity lockdown config auth_reload flood throughput"
 for s in ${@:-$ALL}; do
   echo "== $s"
   topo_down

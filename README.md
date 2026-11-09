@@ -67,7 +67,7 @@ Allowed internet traffic is masqueraded out of the switch's physical default rou
 
 ## Routes that must stay off the TUN
 
-After the TUN comes up, the agent pins the conductor address and the assigned switch address as `/32` routes via the previous physical gateway. Overlay addresses go through the TUN. Do not give the conductor or a switch an address inside `VNET_OVERLAY_CIDR`. When the agent stops it puts the default route back and removes the pins.
+After the TUN comes up, the agent pins the conductor address and the assigned switch address as `/32` routes via the previous physical gateway. Overlay addresses go through the TUN. Do not give the conductor or a switch an address inside `VNET_OVERLAY_CIDR`. When the agent stops it puts the default route back and removes the pins. The physical route is also kept in `/run/vnet/agent-<name>.route` (`VNET_STATE_DIR`), so an agent started after a crash puts it back too.
 
 ## Lockdown of contestant machines
 

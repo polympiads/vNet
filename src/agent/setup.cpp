@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <thread>
 #include <vector>
 
@@ -256,6 +257,31 @@ struct HostRoutes {
 };
 static HostRoutes g_host;
 
+/*
+ * The saved route is also written to a file, so an agent that crashed
+ * (no chance to restore anything) finds the physical gateway again when
+ * it is started next, instead of a machine with no default route.
+ */
+static std::string route_state_path() {
+    return env_or("VNET_STATE_DIR", "/run/vnet") + "/agent-" + g_agent_name + ".route";
+}
+
+static void write_route_state() {
+    std::string dir = env_or("VNET_STATE_DIR", "/run/vnet");
+    run_program({"mkdir", "-p", dir}, "[Agent]", true);
+    std::ofstream out(route_state_path(), std::ios::trunc);
+    if (!out) return;
+    out << ipv4_to_string(g_host.gateway) << " " << g_host.iface << "\n";
+}
+
+static bool read_route_state(std::string& iface, uint32_t& gateway) {
+    std::ifstream in(route_state_path());
+    std::string gw;
+    if (!in || !(in >> gw >> iface)) return false;
+    gateway = resolve_ipv4(gw);
+    return gateway != 0 && valid_name(iface, 15);
+}
+
 static void save_physical_default() {
     if (g_host.saved) return;
     g_host.saved = true;
@@ -264,7 +290,30 @@ static void save_physical_default() {
         std::cerr << "[Agent] Unexpected interface name '" << g_host.iface << "'\n";
         g_host.had_default = false;
     }
-    if (!g_host.had_default)
+
+    // No default route, or one left in a TUN by an earlier agent that
+    // died: use what that agent saved.
+    bool left_by_agent = g_host.had_default && g_host.iface.rfind("vnet-", 0) == 0;
+    if (!g_host.had_default || left_by_agent) {
+        std::string iface;
+        uint32_t gateway = 0;
+        if (read_route_state(iface, gateway)) {
+            g_host.iface = iface;
+            g_host.gateway = gateway;
+            g_host.had_default = true;
+            run_program({"ip", "route", "replace", "default", "via",
+                         ipv4_to_string(gateway), "dev", iface}, "[Agent]");
+            std::cout << "[Agent] Restored the default route a previous agent "
+                      << "left behind: via " << ipv4_to_string(gateway)
+                      << " dev " << iface << "\n";
+        } else if (left_by_agent) {
+            g_host.had_default = false;
+        }
+    }
+
+    if (g_host.had_default)
+        write_route_state();
+    else
         std::cerr << "[Agent] No default route; control-plane pins are skipped\n";
 }
 
@@ -304,6 +353,7 @@ static void restore_host_routes() {
     for (uint32_t ip : g_host.pins)
         run_program({"ip", "route", "del", ipv4_to_string(ip) + "/32"}, "[Agent]", true);
     g_host.pins.clear();
+    unlink(route_state_path().c_str());
 }
 
 // ---------------------------------------------------------------------------
