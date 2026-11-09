@@ -35,6 +35,8 @@ static std::string g_agent_name;
 static std::string g_auth_key;
 static std::string g_overlay_cidr = "10.0.0.0/8";
 static bool        g_default_via_tun = true;
+static bool        g_lockdown = false;
+static std::vector<std::string> g_lockdown_allow;
 static MachineConfig g_conductor_cfg{"", 0};
 static clk::time_point g_last_reconn{};
 
@@ -305,6 +307,120 @@ static void restore_host_routes() {
 }
 
 // ---------------------------------------------------------------------------
+//  Lockdown: the host firewall of a contestant machine
+//
+//  The overlay only sees what enters the TUN. Without these rules a
+//  contestant still reaches the physical LAN and, over IPv6, the internet.
+//  With VNET_LOCKDOWN=1 the machine may talk only to the conductor, its
+//  switch, the TUN, DHCP, and the networks in VNET_LOCKDOWN_ALLOW
+//  (for the admins' SSH, say). IPv6 is blocked entirely.
+// ---------------------------------------------------------------------------
+
+static const char* CHAIN_IN  = "VNET_IN";
+static const char* CHAIN_OUT = "VNET_OUT";
+static bool g_lockdown_applied = false;
+
+static bool ipt(const std::vector<std::string>& args, bool quiet = false) {
+    std::vector<std::string> argv = {"iptables", "-w", "5"};
+    argv.insert(argv.end(), args.begin(), args.end());
+    return run_program(argv, "[Agent]", quiet);
+}
+static bool ip6t(const std::vector<std::string>& args, bool quiet = false) {
+    std::vector<std::string> argv = {"ip6tables", "-w", "5"};
+    argv.insert(argv.end(), args.begin(), args.end());
+    return run_program(argv, "[Agent]", quiet);
+}
+
+/* Make the chains and hook them first in INPUT and OUTPUT, once. */
+static void lockdown_hook() {
+    for (const char* chain : {CHAIN_IN, CHAIN_OUT}) {
+        ipt({"-N", chain}, true);
+        ip6t({"-N", chain}, true);
+    }
+    if (!ipt({"-C", "INPUT", "-j", CHAIN_IN}, true))   ipt({"-I", "INPUT", "1", "-j", CHAIN_IN});
+    if (!ipt({"-C", "OUTPUT", "-j", CHAIN_OUT}, true)) ipt({"-I", "OUTPUT", "1", "-j", CHAIN_OUT});
+    if (!ip6t({"-C", "INPUT", "-j", CHAIN_IN}, true))   ip6t({"-I", "INPUT", "1", "-j", CHAIN_IN});
+    if (!ip6t({"-C", "OUTPUT", "-j", CHAIN_OUT}, true)) ip6t({"-I", "OUTPUT", "1", "-j", CHAIN_OUT});
+}
+
+/*
+ * Fill the chains for the current conductor and switch. Called on every
+ * join, since the switch (and its address) can change.
+ */
+static void lockdown_apply(const std::string& tun_name,
+                           uint32_t conductor_ip, uint16_t conductor_port,
+                           uint32_t switch_ip, uint16_t switch_port) {
+    lockdown_hook();
+    ipt({"-F", CHAIN_IN});
+    ipt({"-F", CHAIN_OUT});
+    ip6t({"-F", CHAIN_IN});
+    ip6t({"-F", CHAIN_OUT});
+
+    // Outbound: loopback, the overlay, the two control links, replies to
+    // allowed inbound connections, DHCP, the allowed networks.
+    ipt({"-A", CHAIN_OUT, "-o", "lo", "-j", "ACCEPT"});
+    ipt({"-A", CHAIN_OUT, "-o", tun_name, "-j", "ACCEPT"});
+    if (conductor_ip)
+        ipt({"-A", CHAIN_OUT, "-p", "tcp", "-d", ipv4_to_string(conductor_ip),
+             "--dport", std::to_string(conductor_port), "-j", "ACCEPT"});
+    if (switch_ip)
+        ipt({"-A", CHAIN_OUT, "-p", "tcp", "-d", ipv4_to_string(switch_ip),
+             "--dport", std::to_string(switch_port), "-j", "ACCEPT"});
+    ipt({"-A", CHAIN_OUT, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"});
+    ipt({"-A", CHAIN_OUT, "-p", "udp", "--sport", "68", "--dport", "67", "-j", "ACCEPT"});
+    for (const auto& cidr : g_lockdown_allow)
+        ipt({"-A", CHAIN_OUT, "-d", cidr, "-j", "ACCEPT"});
+    ipt({"-A", CHAIN_OUT, "-j", "DROP"});
+
+    // Inbound: loopback, the overlay, replies, DHCP, the allowed networks.
+    ipt({"-A", CHAIN_IN, "-i", "lo", "-j", "ACCEPT"});
+    ipt({"-A", CHAIN_IN, "-i", tun_name, "-j", "ACCEPT"});
+    ipt({"-A", CHAIN_IN, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"});
+    ipt({"-A", CHAIN_IN, "-p", "udp", "--sport", "67", "--dport", "68", "-j", "ACCEPT"});
+    for (const auto& cidr : g_lockdown_allow)
+        ipt({"-A", CHAIN_IN, "-s", cidr, "-j", "ACCEPT"});
+    ipt({"-A", CHAIN_IN, "-j", "DROP"});
+
+    // IPv6: nothing but loopback. The overlay carries IPv4 only.
+    ip6t({"-A", CHAIN_OUT, "-o", "lo", "-j", "ACCEPT"});
+    ip6t({"-A", CHAIN_OUT, "-j", "DROP"});
+    ip6t({"-A", CHAIN_IN, "-i", "lo", "-j", "ACCEPT"});
+    ip6t({"-A", CHAIN_IN, "-j", "DROP"});
+
+    g_lockdown_applied = true;
+    std::cout << "[Agent] Lockdown on: only the conductor, the switch, the overlay"
+              << (g_lockdown_allow.empty() ? "" : " and the allowed networks")
+              << " are reachable; IPv6 is blocked\n";
+}
+
+/*
+ * Open the way to a control address before connecting to it while the
+ * chains from an earlier join are in force; the next lockdown_apply
+ * rewrites the chains from scratch.
+ */
+static void lockdown_allow_tcp(uint32_t ip, uint16_t port) {
+    if (!g_lockdown_applied || ip == 0) return;
+    ipt({"-I", CHAIN_OUT, "1", "-p", "tcp", "-d", ipv4_to_string(ip),
+         "--dport", std::to_string(port), "-j", "ACCEPT"});
+}
+
+static void lockdown_remove() {
+    if (!g_lockdown_applied) return;
+    ipt({"-D", "INPUT", "-j", CHAIN_IN}, true);
+    ipt({"-D", "OUTPUT", "-j", CHAIN_OUT}, true);
+    ip6t({"-D", "INPUT", "-j", CHAIN_IN}, true);
+    ip6t({"-D", "OUTPUT", "-j", CHAIN_OUT}, true);
+    for (const char* chain : {CHAIN_IN, CHAIN_OUT}) {
+        ipt({"-F", chain}, true);
+        ipt({"-X", chain}, true);
+        ip6t({"-F", chain}, true);
+        ip6t({"-X", chain}, true);
+    }
+    g_lockdown_applied = false;
+    std::cout << "[Agent] Lockdown removed\n";
+}
+
+// ---------------------------------------------------------------------------
 //  Join: register with the conductor, then authenticate to the switch
 // ---------------------------------------------------------------------------
 
@@ -334,6 +450,7 @@ struct Session {
     ssl_st*  conductor_ssl = nullptr;
     ssl_st*  switch_ssl    = nullptr;
     uint32_t virtual_ipv4  = 0;
+    uint16_t switch_port   = 0;
     std::string switch_name;
 };
 
@@ -359,7 +476,9 @@ static bool try_join(Session& s) {
     // Once the default route points into the TUN, a new control address
     // is reachable only through a pin, so pin before connecting.
     save_physical_default();
-    pin_route(resolve_ipv4(g_conductor_cfg.ip));
+    uint32_t conductor_ip = resolve_ipv4(g_conductor_cfg.ip);
+    pin_route(conductor_ip);
+    lockdown_allow_tcp(conductor_ip, g_conductor_cfg.port);
 
     s.conductor_fd = connect_bounded(g_conductor_cfg.ip, g_conductor_cfg.port);
     if (s.conductor_fd < 0) {
@@ -396,9 +515,11 @@ static bool try_join(Session& s) {
     std::string sw_ip   = ipv4_to_string(assignment.switch_ipv4());
     uint16_t    sw_port = static_cast<uint16_t>(assignment.switch_port());
     s.switch_name = assignment.switch_name();
+    s.switch_port = sw_port;
     std::cout << "[Agent] Assigned to switch " << s.switch_name
               << " @ " << sw_ip << ":" << sw_port << "\n";
     pin_route(assignment.switch_ipv4());
+    lockdown_allow_tcp(assignment.switch_ipv4(), sw_port);
 
     for (int attempt = 1; attempt <= SWITCH_TRIES && g_running; attempt++) {
         s.switch_fd = connect_bounded(sw_ip, sw_port);
@@ -511,6 +632,29 @@ int main(int argc, char** argv) {
         }
     }
     g_default_via_tun = env_or("VNET_DEFAULT_VIA_TUN", "1") != "0";
+    g_lockdown        = env_or("VNET_LOCKDOWN", "0") == "1";
+    {
+        // Comma-separated networks that stay reachable under lockdown.
+        std::string allow = env_or("VNET_LOCKDOWN_ALLOW", "");
+        size_t start = 0;
+        while (start <= allow.size() && !allow.empty()) {
+            size_t comma = allow.find(',', start);
+            std::string item = allow.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+            size_t a = item.find_first_not_of(" \t"), b = item.find_last_not_of(" \t");
+            if (a != std::string::npos) {
+                item = item.substr(a, b - a + 1);
+                uint32_t addr = 0;
+                int prefix = 0;
+                if (!parse_cidr(item, addr, prefix)) {
+                    std::cerr << "[Agent] VNET_LOCKDOWN_ALLOW entry is not a.b.c.d/n: " << item << "\n";
+                    return 1;
+                }
+                g_lockdown_allow.push_back(item);
+            }
+            if (comma == std::string::npos) break;
+            start = comma + 1;
+        }
+    }
 
     g_conductor_cfg = MachineConfig{ cdt_ip_env, static_cast<uint16_t>(cdt_port) };
 
@@ -557,6 +701,9 @@ int main(int argc, char** argv) {
         }
 
         install_host_routes(tun_name, peer_ipv4(s.conductor_fd), peer_ipv4(s.switch_fd));
+        if (g_lockdown)
+            lockdown_apply(tun_name, peer_ipv4(s.conductor_fd), g_conductor_cfg.port,
+                           peer_ipv4(s.switch_fd), s.switch_port);
 
         auto* cdt_info = new ConnInfo();
         cdt_info->role = ConnRole::CONDUCTOR;
@@ -612,6 +759,7 @@ int main(int argc, char** argv) {
         queue.close(tun_fd);
         tun_close(-1, tun_name);
     }
+    lockdown_remove();
     restore_host_routes();
     google::protobuf::ShutdownProtobufLibrary();
     return status;
