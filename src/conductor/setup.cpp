@@ -399,6 +399,23 @@ struct ConductorDispatch : public Dispatch {
 
         g_state.switches.push_back(info);
 
+        // One fresh token per pair: whichever side dials shows it in its
+        // hello, the other side checks it. Issued before the routes, so a
+        // switch usually holds the token before the peer learns its
+        // address; a hello that arrives first is refused and redialed.
+        for (auto* other : g_state.switches) {
+            if (other == info) continue;
+            uint64_t token = g_state.generate_token();
+            mip::PacketPeerToken to_other;
+            to_other.set_peer_name(info->name);
+            to_other.set_token(token);
+            queue->send(other->fd, PacketType::PEER_TOKEN, to_other);
+            mip::PacketPeerToken to_new;
+            to_new.set_peer_name(other->name);
+            to_new.set_token(token);
+            queue->send(info->fd, PacketType::PEER_TOKEN, to_new);
+        }
+
         for (const auto& route : g_state.published) {
             if (route.switch_name == info->name) continue;
             bool owner_up = false;

@@ -276,6 +276,50 @@ TEST_F(BlackBoxTest, SwitchDeliverLocal) {
     EXPECT_EQ(d.target_fd, 10);
 }
 
+TEST_F(BlackBoxTest, SwitchDeliverLocalFromKnownRoute) {
+    BlackBox box(cfg, TUN_FD);
+    box.on_agent_authenticated("contestant1", 10);
+    box.on_route_update(ip("10.0.0.1"), 20);
+
+    auto pkt = make_packet("10.0.0.1", "10.0.1.1");
+    auto d = box.process(SourceType::SWITCH, 20, pkt.data(), pkt.size());
+
+    EXPECT_EQ(d.action, PacketAction::DELIVER_LOCAL);
+    EXPECT_EQ(d.target_fd, 10);
+}
+TEST_F(BlackBoxTest, SwitchRejectsSourceFromWrongPeer) {
+    BlackBox box(cfg, TUN_FD);
+    box.on_agent_authenticated("contestant1", 10);
+    box.on_route_update(ip("10.0.0.1"), 20);
+
+    // gameserver lives behind fd 20, yet fd 21 claims to carry its packet.
+    auto pkt = make_packet("10.0.0.1", "10.0.1.1");
+    auto d = box.process(SourceType::SWITCH, 21, pkt.data(), pkt.size());
+
+    EXPECT_EQ(d.action, PacketAction::DROP);
+    EXPECT_EQ(d.drop_reason, DropReason::SOURCE_SPOOF);
+}
+TEST_F(BlackBoxTest, SwitchRejectsAclDeniedPair) {
+    BlackBox box(cfg, TUN_FD);
+    box.on_agent_authenticated("contestant1", 10);
+
+    // contestant2 may talk to the gameserver, not to contestant1.
+    auto pkt = make_packet("10.0.1.2", "10.0.1.1");
+    auto d = box.process(SourceType::SWITCH, 20, pkt.data(), pkt.size());
+
+    EXPECT_EQ(d.action, PacketAction::DROP);
+    EXPECT_EQ(d.drop_reason, DropReason::ACL_DENIED);
+}
+TEST_F(BlackBoxTest, SwitchRejectsUnknownSource) {
+    BlackBox box(cfg, TUN_FD);
+    box.on_agent_authenticated("contestant1", 10);
+
+    auto pkt = make_packet("10.9.9.9", "10.0.1.1");
+    auto d = box.process(SourceType::SWITCH, 20, pkt.data(), pkt.size());
+
+    EXPECT_EQ(d.action, PacketAction::DROP);
+    EXPECT_EQ(d.drop_reason, DropReason::SOURCE_UNKNOWN);
+}
 TEST_F(BlackBoxTest, SwitchDestNotLocal) {
     BlackBox box(cfg, TUN_FD);
 

@@ -148,6 +148,13 @@ void Dispatch::onSocketReady(socket_data data) {
             }
             break;
         }
+        case PEER_TOKEN: {
+            mip::PacketPeerToken packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onPeerToken(data, packet);
+            }
+            break;
+        }
         default:
             break;
     }
@@ -181,3 +188,4 @@ void Dispatch::onSwitchRouteUpdate     (socket_data, mip::PacketSwitchRouteUpdat
 void Dispatch::onSwitchDisconnected    (socket_data, mip::PacketSwitchDisconnected&)    {}
 void Dispatch::onSwitchHello           (socket_data, mip::PacketSwitchHello&)           {}
 void Dispatch::onAgentUnregistered     (socket_data, mip::PacketAgentUnregistered&)     {}
+void Dispatch::onPeerToken             (socket_data, mip::PacketPeerToken&)             {}

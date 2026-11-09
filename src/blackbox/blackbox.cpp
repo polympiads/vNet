@@ -79,7 +79,7 @@ namespace vnet::blackbox {
             case SourceType::AGENT:
                 return process_from_agent(source_fd, hdr, raw_ipv4, len);
             case SourceType::SWITCH:
-                return process_from_switch(hdr, raw_ipv4, len);
+                return process_from_switch(source_fd, hdr, raw_ipv4, len);
             case SourceType::TUN:
                 return process_from_tun(hdr, raw_ipv4, len);
         }
@@ -117,21 +117,37 @@ namespace vnet::blackbox {
     // =================================================================
     //  Packet from a peer switch
     //
-    //  The source switch already checked outgoing ACLs.
-    //  Since ACL rules are bidirectional, if the source switch
-    //  allowed it, the incoming side is also authorized.
-    //  We just deliver to the local agent.
+    //  The sending switch checked the ACL and the source address, and
+    //  every switch holds the same config, so the checks are repeated
+    //  here: a peer that is wrong or compromised still cannot reach an
+    //  agent the ACL does not allow, nor speak for an agent it does not
+    //  hold. A switch never forwards peer traffic on, so the destination
+    //  must be local.
     // =================================================================
 
-    PacketDecision BlackBox::process_from_switch(const IPv4Header& hdr,
+    PacketDecision BlackBox::process_from_switch(int source_fd,
+                                                  const IPv4Header& hdr,
                                                   const uint8_t* raw,
                                                   size_t len) {
         AgentEntry* dest = registry_.find_by_ipv4(hdr.dst_ip);
-        if (dest) {
-            return { PacketAction::DELIVER_LOCAL, dest->fd, 0, DropReason::NONE };
+        if (!dest) {
+            return { PacketAction::DROP, -1, 0, DropReason::DEST_UNREACHABLE };
         }
 
-        return { PacketAction::DROP, -1, 0, DropReason::DEST_UNREACHABLE };
+        if (config_.find_agent_for_ip(hdr.src_ip).empty()) {
+            return { PacketAction::DROP, -1, 0, DropReason::SOURCE_UNKNOWN };
+        }
+        // The route for the source, once learned, must point at the peer
+        // that sent this. Before it is learned the ACL alone decides.
+        int expected = routing_.lookup(hdr.src_ip);
+        if (expected >= 0 && expected != source_fd) {
+            return { PacketAction::DROP, -1, 0, DropReason::SOURCE_SPOOF };
+        }
+        if (!config_.can_agents_communicate(hdr.src_ip, hdr.dst_ip)) {
+            return { PacketAction::DROP, -1, 0, DropReason::ACL_DENIED };
+        }
+
+        return { PacketAction::DELIVER_LOCAL, dest->fd, 0, DropReason::NONE };
     }
 
     // =================================================================

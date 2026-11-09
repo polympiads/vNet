@@ -74,7 +74,16 @@ message PacketSwitchDisconnected {
 }
 
 message PacketSwitchHello {
-    string switch_name = 1;
+    string  switch_name = 1;
+    // The token the conductor issued for this pair of switches.
+    fixed64 peer_token  = 2;
+}
+
+// Conductor to switch: the token the switch named peer_name will present,
+// or must be shown, when the two connect.
+message PacketPeerToken {
+    string  peer_name = 1;
+    fixed64 token     = 2;
 }
 
 message PacketAgentUnregistered {

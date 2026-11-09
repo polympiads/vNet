@@ -21,7 +21,7 @@ namespace vnet::blackbox {
      */
     enum class SourceType {
         AGENT,      // From a local agent (needs source validation)
-        SWITCH,     // From a peer switch (source already validated by origin switch)
+        SWITCH,     // From a peer switch (ACL and source route checked again here)
         TUN         // From the internet TUN device (return traffic)
     };
 
@@ -155,7 +155,8 @@ namespace vnet::blackbox {
                                           const IPv4Header& hdr,
                                           const uint8_t* raw, size_t len);
 
-        PacketDecision process_from_switch(const IPv4Header& hdr,
+        PacketDecision process_from_switch(int source_fd,
+                                           const IPv4Header& hdr,
                                            const uint8_t* raw, size_t len);
 
         PacketDecision process_from_tun(const IPv4Header& hdr,

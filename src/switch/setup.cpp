@@ -133,6 +133,8 @@ struct PeerTarget {
 };
 
 static std::unordered_map<std::string, PeerTarget> g_peer_targets;
+/* Per peer switch, the token the conductor issued for that pair. */
+static std::unordered_map<std::string, uint64_t>   g_peer_tokens;
 static std::unordered_map<std::string, std::vector<uint32_t>> g_routes_waiting;
 
 // ---------------------------------------------------------------------------
@@ -309,6 +311,9 @@ static void retry_peers(NetQueue& queue) {
         // One side dials. The other accepts on the agent listener. If both
         // block in SSL_connect, neither ever accept()s.
         if (!(g_switch_name < target.name)) continue;
+        // Nothing to show the peer yet; the conductor's token comes
+        // right after its registration.
+        if (!g_peer_tokens.count(target.name)) continue;
         if (now - target.last_attempt < std::chrono::seconds(2)) continue;
         target.last_attempt = now;
         dial_peer(&queue, target);
@@ -357,6 +362,8 @@ struct SwitchDispatch : public Dispatch {
         if (info->role == ConnRole::PEER_SWITCH && info->dialed) {
             mip::PacketSwitchHello hello;
             hello.set_switch_name(g_switch_name);
+            auto token = g_peer_tokens.find(info->name);
+            hello.set_peer_token(token == g_peer_tokens.end() ? 0 : token->second);
             queue->send(data.fd, PacketType::SWITCH_HELLO, hello);
             std::cout << "[Switch] Peer " << info->name << " link up (dialed)\n";
             install_waiting_routes(queue, info->name, data.fd);
@@ -539,6 +546,20 @@ struct SwitchDispatch : public Dispatch {
             return;
         }
 
+        // Only a switch the conductor paired us with, showing that pair's
+        // token, becomes a peer. Anything else on the agent port that
+        // says hello is an agent trying to bypass the ACL.
+        auto token = g_peer_tokens.find(remote);
+        if (token == g_peer_tokens.end() || pkt.peer_token() == 0 ||
+            pkt.peer_token() != token->second) {
+            std::cerr << "[Switch] Rejected peer hello from '" << remote
+                      << "' (fd=" << data.fd << "): "
+                      << (token == g_peer_tokens.end() ? "no token for that switch yet"
+                                                       : "wrong token") << "\n";
+            data.net_element->state = SCK_ERROR;
+            return;
+        }
+
         auto existing = g_state.peer_switches.find(remote);
         bool have = existing != g_state.peer_switches.end() && existing->second != info;
 
@@ -570,6 +591,12 @@ struct SwitchDispatch : public Dispatch {
 
         std::cout << "[Switch] Collapsed duplicate link to " << remote << "\n";
         install_waiting_routes(queue, remote, data.fd);
+    }
+
+    void onPeerToken(socket_data data, mip::PacketPeerToken& pkt) override {
+        if (!from_conductor(data, "peer token")) return;
+        if (pkt.peer_name().empty() || pkt.token() == 0) return;
+        g_peer_tokens[pkt.peer_name()] = pkt.token();
     }
 
     void onAgentUnregistered(socket_data data,
@@ -619,6 +646,7 @@ struct SwitchDispatch : public Dispatch {
         std::string sw_name = pkt.switch_name();
         g_peer_targets.erase(sw_name);
         g_routes_waiting.erase(sw_name);
+        g_peer_tokens.erase(sw_name);
 
         auto it = g_state.peer_switches.find(sw_name);
         if (it == g_state.peer_switches.end()) return;
