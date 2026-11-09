@@ -43,6 +43,7 @@ include_directories(${ProtobufIncludePath})
 SET(VNET_SOURCE_FILES
         src/common/socket_utils.cpp
         src/common/tun.cpp
+        src/common/sysutil.cpp
         
         src/protocol/header.cpp
         src/protocol/types.cpp

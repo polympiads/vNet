@@ -19,6 +19,7 @@
 #include "mip.pb.h"
 #include "common/config.h"
 #include "common/socket_utils.h"
+#include "common/sysutil.h"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
 #include "vnet/tls/session.hpp"
@@ -32,6 +33,8 @@ static std::chrono::seconds       g_heartbeat = HEARTBEAT_INTERVAL;
 static std::chrono::seconds       g_dead{90};
 static std::string g_agent_name;
 static std::string g_auth_key;
+static std::string g_overlay_cidr = "10.0.0.0/8";
+static bool        g_default_via_tun = true;
 static MachineConfig g_conductor_cfg{"", 0};
 static clk::time_point g_last_reconn{};
 static const int MAX_CONNECT_RETRIES  = 20;
@@ -241,12 +244,6 @@ static uint32_t peer_ipv4(int fd) {
     return peer.sin_addr.s_addr;
 }
 
-static void run_cmd(const std::string& cmd) {
-    int rc = std::system(cmd.c_str());
-    if (rc != 0)
-        std::cerr << "[Agent] Command failed (" << rc << "): " << cmd << "\n";
-}
-
 /*
  * The TUN is a /32. Other virtual IPs are reached by an explicit overlay
  * route into the device. Conductor and switch addresses stay on the
@@ -260,8 +257,8 @@ static void install_host_routes(const std::string& tun_name,
     if (read_default_route(iface, gateway)) {
         auto pin = [&](uint32_t ip) {
             if (ip == 0) return;
-            run_cmd("ip route replace " + ipv4_to_string(ip) + "/32 via " +
-                    ipv4_to_string(gateway) + " dev " + iface);
+            run_program({"ip", "route", "replace", ipv4_to_string(ip) + "/32",
+                         "via", ipv4_to_string(gateway), "dev", iface}, "[Agent]");
         };
         pin(conductor_ip);
         pin(switch_ip);
@@ -269,13 +266,10 @@ static void install_host_routes(const std::string& tun_name,
         std::cerr << "[Agent] No default route; control-plane pins were skipped\n";
     }
 
-    const char* cidr = std::getenv("VNET_OVERLAY_CIDR");
-    if (!cidr || !*cidr) cidr = "10.0.0.0/8";
-    run_cmd("ip route replace " + std::string(cidr) + " dev " + tun_name);
+    run_program({"ip", "route", "replace", g_overlay_cidr, "dev", tun_name}, "[Agent]");
 
-    const char* via_tun = std::getenv("VNET_DEFAULT_VIA_TUN");
-    if (!via_tun || std::string(via_tun) != "0")
-        run_cmd("ip route replace default dev " + tun_name);
+    if (g_default_via_tun)
+        run_program({"ip", "route", "replace", "default", "dev", tun_name}, "[Agent]");
 }
 
 static int connect_with_retry(const MachineConfig& mc, const char* label) {
@@ -303,31 +297,57 @@ int main(int argc, char** argv) {
     signal(SIGTERM, on_signal);
     signal(SIGPIPE, SIG_IGN);
 
-    if (argc != 3) {
-        std::cerr << "Usage: ./agent <name> <auth_key>\n";
+    if (argc != 2 && argc != 3) {
+        std::cerr << "Usage: ./agent <name> [auth_key]\n"
+                  << "The key is read from VNET_AUTH_KEY or VNET_AUTH_KEY_FILE "
+                  << "when it is not given.\n";
         return 1;
     }
 
-    if (const char* hb = std::getenv("VNET_HEARTBEAT_SEC"))
-        g_heartbeat = std::chrono::seconds(std::stoi(hb));
-    if (const char* dead = std::getenv("VNET_DEAD_SEC"))
-        g_dead = std::chrono::seconds(std::stoi(dead));
+    long hb_sec = g_heartbeat.count(), dead_sec = g_dead.count();
+    long cdt_port = 0;
+    if (!env_int("VNET_HEARTBEAT_SEC", 1, 3600, hb_sec) ||
+        !env_int("VNET_DEAD_SEC", 1, 86400, dead_sec) ||
+        !env_int("CONDUCTOR_PORT", 1, 65535, cdt_port))
+        return 1;
+    g_heartbeat = std::chrono::seconds(hb_sec);
+    g_dead      = std::chrono::seconds(dead_sec);
 
     g_agent_name = argv[1];
-    g_auth_key   = argv[2];
+    if (!valid_name(g_agent_name, AGENT_NAME_MAX)) {
+        std::cerr << "[Agent] Name must be 1 to " << AGENT_NAME_MAX
+                  << " characters from [A-Za-z0-9_-]\n";
+        return 1;
+    }
+    g_auth_key = load_auth_key(argc == 3 ? argv[2] : nullptr, "[Agent]");
+    if (g_auth_key.empty()) {
+        std::cerr << "[Agent] No auth key: set VNET_AUTH_KEY or VNET_AUTH_KEY_FILE\n";
+        return 1;
+    }
     std::string agent_name = g_agent_name;
     std::string auth_key   = g_auth_key;
 
-    const char* cdt_ip_env   = std::getenv("CONDUCTOR_IP");
-    const char* cdt_port_env = std::getenv("CONDUCTOR_PORT");
-    if (!cdt_ip_env || !cdt_port_env) {
+    const char* cdt_ip_env = std::getenv("CONDUCTOR_IP");
+    if (!cdt_ip_env || !*cdt_ip_env || cdt_port == 0) {
         std::cerr << "[Agent] CONDUCTOR_IP and CONDUCTOR_PORT must be set\n";
         return 1;
     }
 
+    g_overlay_cidr = env_or("VNET_OVERLAY_CIDR", g_overlay_cidr);
+    {
+        uint32_t addr = 0;
+        int prefix = 0;
+        if (!parse_cidr(g_overlay_cidr, addr, prefix)) {
+            std::cerr << "[Agent] VNET_OVERLAY_CIDR is not a.b.c.d/n: "
+                      << g_overlay_cidr << "\n";
+            return 1;
+        }
+    }
+    g_default_via_tun = env_or("VNET_DEFAULT_VIA_TUN", "1") != "0";
+
     g_conductor_cfg = MachineConfig{
         cdt_ip_env,
-        static_cast<uint16_t>(std::stoi(cdt_port_env))
+        static_cast<uint16_t>(cdt_port)
     };
     MachineConfig conductor_cfg = g_conductor_cfg;
 

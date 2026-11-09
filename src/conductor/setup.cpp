@@ -21,6 +21,7 @@
 #include "mip.pb.h"
 #include "state.pb.h"
 #include "common/socket_utils.h"
+#include "common/sysutil.h"
 #include "vnet/netqueue/handler.hpp"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
@@ -299,6 +300,11 @@ static bool load_auth_file(const std::string& path) {
         std::string role, name, key;
         if (!(iss >> role >> name >> key)) return false;
         if (role != "switch" && role != "agent") return false;
+        if (!valid_name(name, role == "agent" ? AGENT_NAME_MAX : SWITCH_NAME_MAX)) {
+            std::cerr << "[Conductor] Invalid " << role << " name '" << name
+                      << "' in auth file\n";
+            return false;
+        }
         g_auth[name] = {role, key};
     }
     return !g_auth.empty();
@@ -724,10 +730,12 @@ int main() {
     g_dump_path = dump_env ? dump_env : DEFAULT_DUMP_PATH;
     std::cout << "[Conductor] State dump path: " << g_dump_path << "\n";
 
-    if (const char* hb = std::getenv("VNET_HEARTBEAT_SEC"))
-        g_heartbeat = std::chrono::seconds(std::stoi(hb));
-    if (const char* dead = std::getenv("VNET_DEAD_SEC"))
-        g_dead = std::chrono::seconds(std::stoi(dead));
+    long hb_sec = g_heartbeat.count(), dead_sec = g_dead.count();
+    if (!env_int("VNET_HEARTBEAT_SEC", 1, 3600, hb_sec) ||
+        !env_int("VNET_DEAD_SEC", 1, 86400, dead_sec))
+        return 1;
+    g_heartbeat = std::chrono::seconds(hb_sec);
+    g_dead      = std::chrono::seconds(dead_sec);
 
     if (const char* auth_path = std::getenv("VNET_AUTH_FILE")) {
         g_auth_required = true;

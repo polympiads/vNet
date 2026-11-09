@@ -22,6 +22,7 @@
 #include "mip.pb.h"
 #include "common/config.h"
 #include "common/socket_utils.h"
+#include "common/sysutil.h"
 #include "common/tun.h"
 #include <cstdlib>
 #include "vnet/netqueue/handler.hpp"
@@ -101,6 +102,7 @@ struct SwitchState {
 };
 
 static SwitchState g_state;
+static std::string g_overlay_cidr = "10.0.0.0/8";
 
 /* Accepted sockets that may still be waiting to authenticate or say hello. */
 static std::unordered_set<ConnInfo*> g_unidentified;
@@ -671,13 +673,6 @@ static void reap_dead(NetQueue& queue) {
 //  connect_to with retries (waits for the target to be up)
 // ---------------------------------------------------------------------------
 
-static bool run_cmd(const std::string& cmd) {
-    int rc = std::system(cmd.c_str());
-    if (rc != 0)
-        std::cerr << "[Switch] Command failed (" << rc << "): " << cmd << "\n";
-    return rc == 0;
-}
-
 /*
  * Packets written to the TUN are forwarded by the kernel and masqueraded
  * out the physical interface. Replies are routed back into the TUN, which
@@ -690,28 +685,37 @@ static bool setup_internet(const std::string& tun_name) {
         std::cerr << "[Switch] No default route for NAT\n";
         return false;
     }
+    if (!valid_name(egress, 15)) {
+        std::cerr << "[Switch] Unexpected egress interface name '" << egress << "'\n";
+        return false;
+    }
 
-    const char* cidr = std::getenv("VNET_OVERLAY_CIDR");
-    if (!cidr || !*cidr) cidr = "10.0.0.0/8";
+    const char* tag = "[Switch]";
+    run_program({"sysctl", "-w", "net.ipv4.ip_forward=1"}, tag);
+    run_program({"sysctl", "-w", "net.ipv4.conf.all.rp_filter=0"}, tag);
+    run_program({"sysctl", "-w", "net.ipv4.conf." + tun_name + ".rp_filter=0"}, tag);
+    run_program({"ip", "route", "replace", g_overlay_cidr, "dev", tun_name}, tag);
 
-    run_cmd("sysctl -w net.ipv4.ip_forward=1");
-    run_cmd("sysctl -w net.ipv4.conf.all.rp_filter=0");
-    run_cmd("sysctl -w net.ipv4.conf." + tun_name + ".rp_filter=0");
-    run_cmd("ip route replace " + std::string(cidr) + " dev " + tun_name);
-
-    std::string nat = "iptables -t nat -C POSTROUTING -o " + egress +
-                      " -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o " +
-                      egress + " -j MASQUERADE";
-    std::string out = "iptables -C FORWARD -i " + tun_name + " -o " + egress +
-                      " -j ACCEPT 2>/dev/null || iptables -A FORWARD -i " + tun_name +
-                      " -o " + egress + " -j ACCEPT";
-    std::string back = "iptables -C FORWARD -i " + egress + " -o " + tun_name +
-                       " -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || "
-                       "iptables -A FORWARD -i " + egress + " -o " + tun_name +
-                       " -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT";
-    bool ok = run_cmd(nat) && run_cmd(out) && run_cmd(back);
+    // Each rule is added once: check first, append when the check fails.
+    auto ensure = [&](const std::string& table, std::vector<std::string> rule) {
+        std::vector<std::string> check = {"iptables"};
+        std::vector<std::string> add   = {"iptables"};
+        if (!table.empty()) {
+            check.insert(check.end(), {"-t", table});
+            add.insert(add.end(), {"-t", table});
+        }
+        check.push_back("-C");
+        add.push_back("-A");
+        check.insert(check.end(), rule.begin(), rule.end());
+        add.insert(add.end(), rule.begin(), rule.end());
+        return run_program(check, tag, /*quiet=*/true) || run_program(add, tag);
+    };
+    bool ok = ensure("nat", {"POSTROUTING", "-o", egress, "-j", "MASQUERADE"})
+           && ensure("", {"FORWARD", "-i", tun_name, "-o", egress, "-j", "ACCEPT"})
+           && ensure("", {"FORWARD", "-i", egress, "-o", tun_name, "-m", "conntrack",
+                          "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"});
     if (ok)
-        std::cout << "[Switch] NAT " << cidr << " via " << tun_name
+        std::cout << "[Switch] NAT " << g_overlay_cidr << " via " << tun_name
                   << " -> " << egress << "\n";
     return ok;
 }
@@ -741,28 +745,60 @@ int main(int argc, char** argv) {
     signal(SIGTERM, on_signal);
     signal(SIGPIPE, SIG_IGN);
 
-    if (argc != 4) {
-        std::cerr << "Usage: ./switch <name> <auth_key> <port>\n";
+    if (argc != 3 && argc != 4) {
+        std::cerr << "Usage: ./switch <name> [auth_key] <port>\n"
+                  << "The key is read from VNET_AUTH_KEY or VNET_AUTH_KEY_FILE "
+                  << "when it is not given.\n";
         return 1;
     }
 
-    if (const char* hb = std::getenv("VNET_HEARTBEAT_SEC"))
-        g_heartbeat = std::chrono::seconds(std::stoi(hb));
-    if (const char* dead = std::getenv("VNET_DEAD_SEC"))
-        g_dead = std::chrono::seconds(std::stoi(dead));
+    long hb_sec = g_heartbeat.count(), dead_sec = g_dead.count();
+    long cdt_port = 0;
+    if (!env_int("VNET_HEARTBEAT_SEC", 1, 3600, hb_sec) ||
+        !env_int("VNET_DEAD_SEC", 1, 86400, dead_sec) ||
+        !env_int("CONDUCTOR_PORT", 1, 65535, cdt_port))
+        return 1;
+    g_heartbeat = std::chrono::seconds(hb_sec);
+    g_dead      = std::chrono::seconds(dead_sec);
 
     g_switch_name = argv[1];
+    if (!valid_name(g_switch_name, SWITCH_NAME_MAX)) {
+        std::cerr << "[Switch] Name must be 1 to " << SWITCH_NAME_MAX
+                  << " characters from [A-Za-z0-9_-]\n";
+        return 1;
+    }
     std::string switch_name = g_switch_name;
-    std::string auth_key    = argv[2];
-    uint16_t    port        = static_cast<uint16_t>(std::stoi(argv[3]));
+    std::string auth_key    = load_auth_key(argc == 4 ? argv[2] : nullptr, "[Switch]");
+    if (auth_key.empty()) {
+        std::cerr << "[Switch] No auth key: set VNET_AUTH_KEY or VNET_AUTH_KEY_FILE\n";
+        return 1;
+    }
+    const char* port_text = argv[argc - 1];
+    char* port_end = nullptr;
+    long port_long = std::strtol(port_text, &port_end, 10);
+    if (port_end == port_text || *port_end != '\0' || port_long < 1 || port_long > 65535) {
+        std::cerr << "[Switch] Port must be between 1 and 65535, got '"
+                  << port_text << "'\n";
+        return 1;
+    }
+    uint16_t port = static_cast<uint16_t>(port_long);
 
     // --- Read conductor address from environment ---
-    const char* cdt_ip_env   = std::getenv("CONDUCTOR_IP");
-    const char* cdt_port_env = std::getenv("CONDUCTOR_PORT");
+    const char* cdt_ip_env  = std::getenv("CONDUCTOR_IP");
     const char* config_path = std::getenv("VNET_CONFIG_PATH");
-    if (!cdt_ip_env || !cdt_port_env) {
+    if (!cdt_ip_env || !*cdt_ip_env || cdt_port == 0) {
         std::cerr << "[Switch] CONDUCTOR_IP and CONDUCTOR_PORT must be set\n";
         return 1;
+    }
+    g_overlay_cidr = env_or("VNET_OVERLAY_CIDR", g_overlay_cidr);
+    {
+        uint32_t addr = 0;
+        int prefix = 0;
+        if (!parse_cidr(g_overlay_cidr, addr, prefix)) {
+            std::cerr << "[Switch] VNET_OVERLAY_CIDR is not a.b.c.d/n: "
+                      << g_overlay_cidr << "\n";
+            return 1;
+        }
     }
     if (!config_path) {
         std::cerr << "[Switch] VNET_CONFIG_PATH must be set\n";
@@ -792,7 +828,7 @@ int main(int argc, char** argv) {
 
     MachineConfig conductor_cfg {
         cdt_ip_env,
-        static_cast<uint16_t>(std::stoi(cdt_port_env))
+        static_cast<uint16_t>(cdt_port)
     };
 
     // --- 1. Connect to conductor (blocking) and send Switch MIP ---
