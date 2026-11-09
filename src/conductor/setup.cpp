@@ -358,9 +358,20 @@ struct ConductorDispatch : public Dispatch {
         return true;
     }
 
+    /* With TLS on, the certificate must name the role the peer claims. */
+    bool cert_allows(socket_data data, const char* role, const std::string& name) {
+        if (vnet::tls::peer_has_role(data.net_element->ssl, role)) return true;
+        std::cerr << "[Conductor] Rejected " << role << " " << name
+                  << ": certificate role is '"
+                  << vnet::tls::peer_role(data.net_element->ssl) << "'\n";
+        queue->close(data.fd);
+        return false;
+    }
+
     void onSwitchMIP(socket_data data, mip::PacketSwitchMIP& pkt) override {
         auto* info     = static_cast<ConnInfo*>(data.ptr_data);
         if (already_identified(data, "switch MIP")) return;
+        if (!cert_allows(data, vnet::tls::ROLE_SWITCH, pkt.name())) return;
         if (!auth_ok("switch", pkt.name(), pkt.auth_key())) {
             std::cerr << "[Conductor] Rejected switch auth: " << pkt.name() << "\n";
             queue->close(data.fd);
@@ -441,6 +452,7 @@ struct ConductorDispatch : public Dispatch {
     void onAgentMIP(socket_data data, mip::PacketAgentMIP& pkt) override {
         auto* info     = static_cast<ConnInfo*>(data.ptr_data);
         if (already_identified(data, "agent MIP")) return;
+        if (!cert_allows(data, vnet::tls::ROLE_AGENT, pkt.name())) return;
         if (!auth_ok("agent", pkt.name(), pkt.auth_key())) {
             std::cerr << "[Conductor] Rejected agent auth: " << pkt.name() << "\n";
             queue->close(data.fd);
@@ -522,6 +534,7 @@ struct ConductorDispatch : public Dispatch {
     void onAgentMRP(socket_data data, mip::PacketAgentMRP& pkt) override {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
         if (already_identified(data, "agent MRP")) return;
+        if (!cert_allows(data, vnet::tls::ROLE_AGENT, pkt.name())) return;
         if (!auth_ok("agent", pkt.name(), pkt.auth_key())) {
             std::cerr << "[Conductor] Rejected agent reauth: " << pkt.name() << "\n";
             queue->close(data.fd);

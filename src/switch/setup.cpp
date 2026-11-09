@@ -353,11 +353,33 @@ struct SwitchDispatch : public Dispatch {
         if (info) info->last_rx = clk::now();
     }
 
+    /* With TLS on, the certificate must name the role the peer claims. */
+    bool cert_allows(socket_data data, const char* role, const std::string& who) {
+        if (vnet::tls::peer_has_role(data.net_element->ssl, role)) return true;
+        std::cerr << "[Switch] Rejected " << who << " (fd=" << data.fd
+                  << "): certificate role is '"
+                  << vnet::tls::peer_role(data.net_element->ssl) << "', expected "
+                  << role << "\n";
+        data.net_element->state = SCK_ERROR;
+        return false;
+    }
+
     void onConnected(socket_data data) override {
         auto* info = static_cast<ConnInfo*>(data.ptr_data);
         if (!info) return;
         info->connected = true;
         info->last_rx   = clk::now();
+
+        if (info->role == ConnRole::PEER_SWITCH &&
+            !cert_allows(data, vnet::tls::ROLE_SWITCH, "peer " + info->name)) {
+            queue->close(data.fd);
+            return;
+        }
+        if (info->role == ConnRole::CONDUCTOR &&
+            !cert_allows(data, vnet::tls::ROLE_CONDUCTOR, "conductor")) {
+            queue->close(data.fd);
+            return;
+        }
 
         if (info->role == ConnRole::PEER_SWITCH && info->dialed) {
             mip::PacketSwitchHello hello;
@@ -422,6 +444,8 @@ struct SwitchDispatch : public Dispatch {
                             mip::PacketAuthConnectToSwitch& pkt) override {
         auto*    info  = static_cast<ConnInfo*>(data.ptr_data);
         uint64_t token = pkt.connection_token();
+
+        if (!cert_allows(data, vnet::tls::ROLE_AGENT, "agent")) return;
 
         auto it = g_state.pending_tokens.find(token);
         if (it == g_state.pending_tokens.end()) {
@@ -545,6 +569,7 @@ struct SwitchDispatch : public Dispatch {
             data.net_element->state = SCK_ERROR;
             return;
         }
+        if (!cert_allows(data, vnet::tls::ROLE_SWITCH, "peer hello from " + remote)) return;
 
         // Only a switch the conductor paired us with, showing that pair's
         // token, becomes a peer. Anything else on the agent port that

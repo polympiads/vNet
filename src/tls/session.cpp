@@ -7,11 +7,13 @@
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/x509.h>
 
 namespace vnet::tls {
 
     static SSL_CTX* g_ctx = nullptr;
     static bool g_enabled = false;
+    static bool g_role_check = true;
 
     bool enabled() { return g_enabled; }
 
@@ -54,7 +56,11 @@ namespace vnet::tls {
         }
         SSL_CTX_set_verify(g_ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
         g_enabled = true;
-        std::cout << "[TLS] Enabled, peer certificates required\n";
+
+        const char* role_check = std::getenv("VNET_TLS_ROLE_CHECK");
+        g_role_check = !(role_check && std::string(role_check) == "0");
+        std::cout << "[TLS] Enabled, peer certificates required"
+                  << (g_role_check ? ", role in OU checked" : ", role check off") << "\n";
         return true;
     }
 
@@ -97,6 +103,29 @@ namespace vnet::tls {
 
     ssl_st* handshake_client(int fd) { return handshake(fd, false); }
     ssl_st* handshake_server(int fd) { return handshake(fd, true); }
+
+    std::string peer_role(ssl_st* ssl_in) {
+        if (!ssl_in) return "";
+        SSL* ssl = reinterpret_cast<SSL*>(ssl_in);
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+        X509* cert = SSL_get1_peer_certificate(ssl);
+#else
+        X509* cert = SSL_get_peer_certificate(ssl);
+#endif
+        if (!cert) return "";
+        char buf[64] = {0};
+        int n = X509_NAME_get_text_by_NID(X509_get_subject_name(cert),
+                                          NID_organizationalUnitName, buf, sizeof(buf));
+        X509_free(cert);
+        if (n <= 0) return "";
+        return std::string(buf, static_cast<size_t>(n));
+    }
+
+    bool peer_has_role(ssl_st* ssl, const char* role) {
+        if (!g_enabled || !g_role_check) return true;
+        if (!ssl) return false;
+        return peer_role(ssl) == role;
+    }
 
     void free_session(ssl_st* ssl) {
         if (!ssl) return;

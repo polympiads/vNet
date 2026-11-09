@@ -1,8 +1,15 @@
 #pragma once
 
+#include <string>
+
 struct ssl_st;
 
 namespace vnet::tls {
+
+    /** Certificate roles, carried in the subject's OU field. */
+    const char* const ROLE_CONDUCTOR = "conductor";
+    const char* const ROLE_SWITCH    = "switch";
+    const char* const ROLE_AGENT     = "agent";
 
     /** True after init() when VNET_TLS=1 and the certificate loaded. */
     bool enabled();
@@ -25,5 +32,19 @@ namespace vnet::tls {
     ssl_st* new_session(int fd);
 
     void free_session(ssl_st* ssl);
+
+    /**
+     * The role named in the peer certificate's OU, or "" when there is no
+     * certificate or no OU.
+     */
+    std::string peer_role(ssl_st* ssl);
+
+    /**
+     * True when the peer may act as role: TLS is off, VNET_TLS_ROLE_CHECK=0,
+     * or the peer certificate's OU is exactly role. With one certificate
+     * per role, a key found on a contestant machine cannot be used to pose
+     * as a switch or the conductor.
+     */
+    bool peer_has_role(ssl_st* ssl, const char* role);
 
 }

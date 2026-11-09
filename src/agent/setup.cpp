@@ -91,6 +91,12 @@ struct AgentDispatch : public Dispatch {
         if (!info || info->role != ConnRole::CONDUCTOR) return;
         info->connected = true;
         info->last_rx   = clk::now();
+        if (!vnet::tls::peer_has_role(data.net_element->ssl, vnet::tls::ROLE_CONDUCTOR)) {
+            std::cerr << "[Agent] The conductor's certificate role is '"
+                      << vnet::tls::peer_role(data.net_element->ssl) << "'\n";
+            queue->close(data.fd);
+            return;
+        }
 
         mip::PacketAgentMRP mrp;
         mrp.set_name(g_agent_name);
@@ -364,6 +370,11 @@ static bool try_join(Session& s) {
     if (vnet::tls::enabled()) {
         s.conductor_ssl = vnet::tls::handshake_client(s.conductor_fd);
         if (!s.conductor_ssl) { std::cerr << "[Agent] TLS to conductor failed\n"; return false; }
+        if (!vnet::tls::peer_has_role(s.conductor_ssl, vnet::tls::ROLE_CONDUCTOR)) {
+            std::cerr << "[Agent] The conductor's certificate role is '"
+                      << vnet::tls::peer_role(s.conductor_ssl) << "'\n";
+            return false;
+        }
     }
 
     mip::PacketAgentMIP mip_pkt;
@@ -401,6 +412,11 @@ static bool try_join(Session& s) {
     if (vnet::tls::enabled()) {
         s.switch_ssl = vnet::tls::handshake_client(s.switch_fd);
         if (!s.switch_ssl) { std::cerr << "[Agent] TLS to switch failed\n"; return false; }
+        if (!vnet::tls::peer_has_role(s.switch_ssl, vnet::tls::ROLE_SWITCH)) {
+            std::cerr << "[Agent] The switch's certificate role is '"
+                      << vnet::tls::peer_role(s.switch_ssl) << "'\n";
+            return false;
+        }
     }
 
     mip::PacketAuthConnectToSwitch auth_pkt;

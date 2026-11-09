@@ -10,12 +10,13 @@ AGENTS="${AGENTS:-100}"
 PROJECT="${PROJECT:-vnetscale}"
 
 mkdir -p "$OUT" "$ROOT/docker/certs"
-if [ ! -f "$ROOT/docker/certs/cert.pem" ] || [ ! -f "$ROOT/docker/certs/key.pem" ]; then
-    openssl req -x509 -newkey rsa:2048 \
-        -keyout "$ROOT/docker/certs/key.pem" \
-        -out "$ROOT/docker/certs/cert.pem" \
-        -days 365 -nodes -subj /CN=vnet >/dev/null 2>&1
-fi
+# One CA, one certificate per role: the programs check the role in the
+# certificate, so an agent's files cannot pose as a switch.
+CERTS="$ROOT/docker/certs"
+[ -f "$CERTS/ca.pem" ] || "$ROOT/tools/vnet-certs.sh" init "$CERTS"
+for pair in conductor:conductor switch:switch agent:agent; do
+    [ -f "$CERTS/${pair##*:}.pem" ] || "$ROOT/tools/vnet-certs.sh" issue "$CERTS" "${pair%%:*}" "${pair##*:}"
+done
 
 python3 - "$OUT" "$SWITCHES" "$AGENTS" << 'PY'
 import sys
@@ -33,10 +34,11 @@ cfg = [f"agent{i} 10.0.1.{i}" for i in range(1, n_ag + 1)]
 cfg += ["agent1 agent2", "agent1 ::internet:8.8.8.8", "agent2 ::internet:8.8.8.8"]
 (out / "switch.txt").write_text("\n".join(cfg) + "\n")
 
-tls = """      - VNET_TLS=1
-      - VNET_TLS_CERT=/etc/vnet/tls/cert.pem
-      - VNET_TLS_KEY=/etc/vnet/tls/key.pem
-      - VNET_TLS_CA=/etc/vnet/tls/cert.pem"""
+def tls(role):
+    return f"""      - VNET_TLS=1
+      - VNET_TLS_CERT=/etc/vnet/tls/{role}.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/{role}.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem"""
 certs = "      - ../../certs:/etc/vnet/tls:ro"
 
 lines = [
@@ -47,7 +49,7 @@ lines = [
     "    networks: [vnet]",
     "    environment:",
     "      - VNET_AUTH_FILE=/etc/vnet/auth.txt",
-    tls,
+    tls("conductor"),
     "    volumes:",
     "      - ./auth.txt:/etc/vnet/auth.txt:ro",
     certs,
@@ -65,7 +67,7 @@ for i in range(1, n_sw + 1):
         "      - CONDUCTOR_IP=conductor",
         "      - CONDUCTOR_PORT=5000",
         "      - VNET_CONFIG_PATH=/etc/vnet/config.txt",
-        tls,
+        tls("switch"),
         "    volumes:",
         "      - ./switch.txt:/etc/vnet/config.txt:ro",
         certs,
@@ -87,7 +89,7 @@ for i in range(1, n_ag + 1):
         "    environment:",
         "      - CONDUCTOR_IP=conductor",
         "      - CONDUCTOR_PORT=5000",
-        tls,
+        tls("agent"),
         "    volumes:",
         certs,
         "    cap_add: [NET_ADMIN]",

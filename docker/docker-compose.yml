@@ -8,9 +8,9 @@ services:
     environment:
       - VNET_AUTH_FILE=/etc/vnet/auth.txt
       - VNET_TLS=1
-      - VNET_TLS_CERT=/etc/vnet/tls/cert.pem
-      - VNET_TLS_KEY=/etc/vnet/tls/key.pem
-      - VNET_TLS_CA=/etc/vnet/tls/cert.pem
+      - VNET_TLS_CERT=/etc/vnet/tls/conductor.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/conductor.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     volumes:
       - ./auth.txt:/etc/vnet/auth.txt:ro
       - ./certs:/etc/vnet/tls:ro
@@ -41,9 +41,9 @@ services:
       - CONDUCTOR_PORT=5000
       - VNET_CONFIG_PATH=/etc/vnet/config.txt
       - VNET_TLS=1
-      - VNET_TLS_CERT=/etc/vnet/tls/cert.pem
-      - VNET_TLS_KEY=/etc/vnet/tls/key.pem
-      - VNET_TLS_CA=/etc/vnet/tls/cert.pem
+      - VNET_TLS_CERT=/etc/vnet/tls/switch1.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/switch1.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     volumes:
       - ./switch1.txt:/etc/vnet/config.txt:ro
       - ./certs:/etc/vnet/tls:ro
@@ -81,9 +81,9 @@ services:
       - CONDUCTOR_PORT=5000
       - VNET_CONFIG_PATH=/etc/vnet/config.txt
       - VNET_TLS=1
-      - VNET_TLS_CERT=/etc/vnet/tls/cert.pem
-      - VNET_TLS_KEY=/etc/vnet/tls/key.pem
-      - VNET_TLS_CA=/etc/vnet/tls/cert.pem
+      - VNET_TLS_CERT=/etc/vnet/tls/switch2.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/switch2.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     volumes:
       - ./switch2.txt:/etc/vnet/config.txt:ro
       - ./certs:/etc/vnet/tls:ro
@@ -121,9 +121,9 @@ services:
       - CONDUCTOR_PORT=5000
       - VNET_CONFIG_PATH=/etc/vnet/config.txt
       - VNET_TLS=1
-      - VNET_TLS_CERT=/etc/vnet/tls/cert.pem
-      - VNET_TLS_KEY=/etc/vnet/tls/key.pem
-      - VNET_TLS_CA=/etc/vnet/tls/cert.pem
+      - VNET_TLS_CERT=/etc/vnet/tls/switch3.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/switch3.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     volumes:
       - ./switch3.txt:/etc/vnet/config.txt:ro
       - ./certs:/etc/vnet/tls:ro
@@ -164,9 +164,9 @@ services:
       - CONDUCTOR_IP=vnet-conductor
       - CONDUCTOR_PORT=5000
       - VNET_TLS=1
-      - VNET_TLS_CERT=/etc/vnet/tls/cert.pem
-      - VNET_TLS_KEY=/etc/vnet/tls/key.pem
-      - VNET_TLS_CA=/etc/vnet/tls/cert.pem
+      - VNET_TLS_CERT=/etc/vnet/tls/agent1.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/agent1.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     cap_add:
       - NET_ADMIN
     devices:
@@ -198,9 +198,9 @@ services:
       - CONDUCTOR_IP=vnet-conductor
       - CONDUCTOR_PORT=5000
       - VNET_TLS=1
-      - VNET_TLS_CERT=/etc/vnet/tls/cert.pem
-      - VNET_TLS_KEY=/etc/vnet/tls/key.pem
-      - VNET_TLS_CA=/etc/vnet/tls/cert.pem
+      - VNET_TLS_CERT=/etc/vnet/tls/agent2.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/agent2.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     cap_add:
       - NET_ADMIN
     devices:
