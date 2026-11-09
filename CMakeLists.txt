@@ -74,6 +74,18 @@ target_include_directories(vnet PUBLIC include)
 add_subdirectory(src/conductor)
 add_subdirectory(src/switch)
 add_subdirectory(src/agent)
+add_subdirectory(src/tools)
+
+#############################################################
+########################## INSTALL ##########################
+#############################################################
+
+install(TARGETS conductor switch agent vnet-state
+        RUNTIME DESTINATION bin)
+install(PROGRAMS tools/vnet-certs.sh  RENAME vnet-certs  DESTINATION bin)
+install(PROGRAMS tools/vnet-roster.py RENAME vnet-roster DESTINATION bin)
+install(FILES deploy/vnet-conductor.service deploy/vnet-switch.service deploy/vnet-agent.service
+        DESTINATION lib/systemd/system)
 
 #############################################################
 ######################## GOOGLE TEST ########################
@@ -86,6 +98,8 @@ if (NOT GTest_FOUND)
         googletest
         URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
     )
+    # The test framework is a build dependency, not something to install.
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
 endif()
 enable_testing()

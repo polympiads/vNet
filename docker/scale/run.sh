@@ -67,6 +67,7 @@ for i in range(1, n_sw + 1):
         "      - CONDUCTOR_IP=conductor",
         "      - CONDUCTOR_PORT=5000",
         "      - VNET_CONFIG_PATH=/etc/vnet/config.txt",
+        f"      - VNET_AUTH_KEY=switchkey{i}",
         tls("switch"),
         "    volumes:",
         "      - ./switch.txt:/etc/vnet/config.txt:ro",
@@ -77,7 +78,7 @@ for i in range(1, n_sw + 1):
         '      net.ipv4.conf.all.rp_filter: "0"',
         "    devices:",
         "      - /dev/net/tun:/dev/net/tun",
-        f"    command: ['/usr/local/bin/switch', 'switch{i}', 'switchkey{i}', '{port}']",
+        f"    command: ['/usr/local/bin/switch', 'switch{i}', '{port}']",
     ]
 for i in range(1, n_ag + 1):
     lines += [
@@ -89,13 +90,14 @@ for i in range(1, n_ag + 1):
         "    environment:",
         "      - CONDUCTOR_IP=conductor",
         "      - CONDUCTOR_PORT=5000",
+        f"      - VNET_AUTH_KEY=agentkey{i}",
         tls("agent"),
         "    volumes:",
         certs,
         "    cap_add: [NET_ADMIN]",
         "    devices:",
         "      - /dev/net/tun:/dev/net/tun",
-        f"    command: ['/usr/local/bin/agent', 'agent{i}', 'agentkey{i}']",
+        f"    command: ['/usr/local/bin/agent', 'agent{i}']",
         "    restart: 'no'",
     ]
 lines += ["networks:", "  vnet:", "    driver: bridge"]

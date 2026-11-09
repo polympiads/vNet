@@ -1,0 +1,20 @@
+[Unit]
+Description=vNet agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Written by tools/vnet-roster.py: VNET_AGENT_NAME, VNET_AUTH_KEY,
+# CONDUCTOR_IP, CONDUCTOR_PORT, TLS files, VNET_LOCKDOWN.
+EnvironmentFile=/etc/vnet/agent.env
+ExecStart=/usr/local/bin/agent ${VNET_AGENT_NAME}
+Restart=always
+RestartSec=2
+# Needs the TUN device, routes and iptables: runs as root.
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+DeviceAllow=/dev/net/tun rw
+# Stopping restores the host routes and firewall; give it time.
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
