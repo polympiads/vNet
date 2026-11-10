@@ -247,6 +247,84 @@ scenario_lockdown() {
   pass lockdown
 }
 
+# A TCP listener in a namespace, kept in PID under a name.
+listen_tcp() {  # ns name port
+  ip netns exec $1 python3 -c '
+import socket, sys, time
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("", int(sys.argv[1]))); s.listen(5); time.sleep(120)' $3 &
+  PID[$2]=$!
+}
+# connects <ns> <source ip> <dest ip> <port>: 0 when a TCP connection completes within 2 s
+connects() {
+  ip netns exec $1 python3 -c '
+import socket, sys
+try:
+    socket.create_connection((sys.argv[2], int(sys.argv[3])), timeout=2, source_address=(sys.argv[1], 0)).close()
+except OSError:
+    sys.exit(1)' $2 $3 $4 2>/dev/null
+}
+
+# The bypass file: a broker in another subnet stays reachable through
+# the physical gateway, with and without lockdown; in/out rules open
+# single ports; a reload follows the file; everything goes on exit.
+scenario_bypass() {
+  topo_up bypass
+  in_ns core ip addr add 172.29.0.9/24 dev lo
+  start_conductor; sleep 0.5
+  start_switch 1; start_switch 2; sleep 1.5
+  cat > "$LOGS/bypass.conf" <<EOF
+# the broker's subnet stays on the physical network
+route 172.29.0.0/24
+# the gateway may reach the service on 2244, nothing else
+in -p tcp -s 172.31.1.1/32 --dport 2244 -j ACCEPT
+# this machine may reach the gateway's service on 2255
+out -p tcp -d 172.31.1.1/32 --dport 2255 -j ACCEPT
+in6 -p tcp --dport 2266 -j ACCEPT
+EOF
+  start_agent 1 VNET_LOCKDOWN=1 VNET_BYPASS_FILE="$LOGS/bypass.conf"
+  start_agent 2 VNET_BYPASS_FILE="$LOGS/bypass.conf"
+  sleep 2
+  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail bypass "agents did not register"; return; }
+  [ "$(pings 1 10.0.1.2 2)" = 2 ] || { fail bypass "overlay blocked"; return; }
+  # The broker is off the local subnet: without the route line it would
+  # go into the TUN. Reachable both ways, with lockdown (a1) and without (a2).
+  in_ns a1 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 || { fail bypass "broker unreachable under lockdown"; return; }
+  in_ns a2 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 || { fail bypass "broker unreachable without lockdown"; return; }
+  in_ns core ping -c 1 -W 1 -I 172.29.0.9 172.31.1.2 >/dev/null 2>&1 || { fail bypass "broker cannot reach the agent"; return; }
+  in_ns a1 ip route | grep -q "^172.29.0.0/24 via 172.31.1.1 dev xa1" || { fail bypass "route not pinned"; return; }
+  in_ns a1 ping -c 1 -W 1 172.31.1.1 >/dev/null 2>&1 && { fail bypass "LAN gateway reachable"; return; }
+  # Port rules: the gateway reaches a1 only on 2244; a1 reaches the gateway only on 2255.
+  listen_tcp a1 l2244 2244; listen_tcp a1 l2245 2245; listen_tcp core l2255 2255; listen_tcp core l2256 2256; sleep 0.5
+  connects core 172.31.1.1 172.31.1.2 2244 || { fail bypass "allowed inbound port blocked"; return; }
+  connects core 172.31.1.1 172.31.1.2 2245 && { fail bypass "other inbound port open"; return; }
+  connects a1 172.31.1.2 172.31.1.1 2255 || { fail bypass "allowed outbound port blocked"; return; }
+  connects a1 172.31.1.2 172.31.1.1 2256 && { fail bypass "other outbound port open"; return; }
+  in_ns a1 ip6tables -S VNET_IN | grep -q -- "--dport 2266" || { fail bypass "in6 rule missing"; return; }
+  # Reload: the route line leaves the file and comes back.
+  cp "$LOGS/bypass.conf" "$LOGS/full.conf"
+  grep -v '^route' "$LOGS/full.conf" > "$LOGS/bypass.conf"
+  kill -HUP "${PID[agent1]}"; sleep 1
+  grep -q "Bypass file reloaded" "$LOGS/agent1.log" || { fail bypass "no reload"; return; }
+  in_ns a1 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 && { fail bypass "broker still reachable after the route left the file"; return; }
+  in_ns a1 ip route | grep -q "^172.29.0.0/24" && { fail bypass "pin kept after reload"; return; }
+  cp "$LOGS/full.conf" "$LOGS/bypass.conf"
+  kill -HUP "${PID[agent1]}"; sleep 1
+  in_ns a1 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 || { fail bypass "broker unreachable after the route came back"; return; }
+  # A broken file changes nothing.
+  printf 'route 0.0.0.0/0\n' >> "$LOGS/bypass.conf"
+  kill -HUP "${PID[agent1]}"; sleep 1
+  grep -q "reload failed" "$LOGS/agent1.log" || { fail bypass "bad file not reported"; return; }
+  in_ns a1 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 || { fail bypass "broker lost after a bad reload"; return; }
+  # Exit: pins and chains gone, on both machines.
+  stop agent1 TERM; stop agent2 TERM; sleep 1
+  in_ns a1 ip route | grep -q "^172.29.0.0/24" && { fail bypass "pin left behind"; return; }
+  in_ns a2 ip route | grep -q "^172.29.0.0/24" && { fail bypass "pin left behind without lockdown"; return; }
+  [ "$(in_ns a1 iptables -S | grep -c VNET)" = 0 ] || { fail bypass "rules left behind"; return; }
+  say "broker in another subnet reachable through the pin; port rules hold; reload and exit clean"
+  pass bypass
+}
+
 # Switches with config files of their own: compared, reloaded on SIGHUP.
 scenario_config_files() {
   topo_up config_files
@@ -425,7 +503,7 @@ scenario_throughput() {
 # ---------------------------------------------------------------- main
 
 make_certs
-ALL="basic attacks conductor_restart switch_restart switch_link agent_exit agent_crash duplicate_identity lockdown config config_files auth_reload flood throughput"
+ALL="basic attacks conductor_restart switch_restart switch_link agent_exit agent_crash duplicate_identity lockdown bypass config config_files auth_reload flood throughput"
 for s in ${@:-$ALL}; do
   echo "== $s"
   topo_down

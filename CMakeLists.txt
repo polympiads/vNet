@@ -47,6 +47,7 @@ SET(VNET_SOURCE_FILES
         src/common/socket_utils.cpp
         src/common/tun.cpp
         src/common/sysutil.cpp
+        src/common/bypass.cpp
         
         src/protocol/header.cpp
         src/protocol/types.cpp

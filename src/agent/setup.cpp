@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <sstream>
 #include <thread>
 #include <vector>
 
@@ -18,6 +19,7 @@
 
 #include "common/tun.h"
 #include "mip.pb.h"
+#include "common/bypass.h"
 #include "common/config.h"
 #include "common/socket_utils.h"
 #include "common/sysutil.h"
@@ -37,7 +39,13 @@ static std::string g_auth_key;
 static std::string g_overlay_cidr = "10.0.0.0/8";
 static bool        g_default_via_tun = true;
 static bool        g_lockdown = false;
-static std::vector<std::string> g_lockdown_allow;
+/*
+ * What stays on the physical network: the bypass file (VNET_BYPASS_FILE)
+ * plus VNET_LOCKDOWN_ALLOW, which is the same as route lines. Read at
+ * start and again on SIGHUP.
+ */
+static std::string g_bypass_path;
+static std::vector<BypassRule> g_bypass;
 static MachineConfig g_conductor_cfg{"", 0};
 static clk::time_point g_last_reconn{};
 
@@ -49,7 +57,9 @@ static const int STEP_TIMEOUT_MS      = 10000;
 static const int SWITCH_TRIES         = 3;
 
 static volatile sig_atomic_t g_running = 1;
+static volatile sig_atomic_t g_reload_request = 0;
 static void on_signal(int) { g_running = 0; }
+static void on_sighup(int) { g_reload_request = 1; }
 
 // ---------------------------------------------------------------------------
 //  Connection metadata
@@ -244,18 +254,57 @@ static uint32_t peer_ipv4(int fd) {
 
 /*
  * The physical default route as it was before the first join, and the
- * /32 pins installed through it. Once the default route points into the
- * TUN, /proc/net/route no longer says where the physical gateway was, so
- * it is read once and kept.
+ * pins installed through it: /32s for the conductor and the switch,
+ * the prefixes of the route lines of the bypass file. Once the default
+ * route points into the TUN, /proc/net/route no longer says where the
+ * physical gateway was, so it is read once and kept.
  */
 struct HostRoutes {
     bool        saved = false;
     bool        had_default = false;
     std::string iface;
     uint32_t    gateway = 0;
-    std::vector<uint32_t> pins;
+    /* Prefixes this agent installed, a.b.c.d/n, removed when it stops. */
+    std::vector<std::string> pins;
 };
 static HostRoutes g_host;
+
+static uint32_t mask_of(int prefix) {
+    if (prefix == 0) return 0;
+    return htonl(0xFFFFFFFFu << (32 - prefix));
+}
+
+static std::string cidr_text(uint32_t addr, int prefix) {
+    return ipv4_to_string(addr) + "/" + std::to_string(prefix);
+}
+
+/* One line of /proc/net/route, addresses in network order. */
+struct KernelRoute {
+    std::string iface;
+    uint32_t    dest = 0;
+    uint32_t    mask = 0;
+    uint32_t    gateway = 0;
+};
+
+static std::vector<KernelRoute> read_kernel_routes() {
+    std::vector<KernelRoute> routes;
+    std::ifstream in("/proc/net/route");
+    std::string line;
+    std::getline(in, line);
+    while (std::getline(in, line)) {
+        std::istringstream iss(line);
+        std::string name, dest, gateway, flags, refcnt, use, metric, mask;
+        if (!(iss >> name >> dest >> gateway >> flags >> refcnt >> use >> metric >> mask))
+            continue;
+        KernelRoute r;
+        r.iface   = name;
+        r.dest    = static_cast<uint32_t>(std::strtoul(dest.c_str(), nullptr, 16));
+        r.gateway = static_cast<uint32_t>(std::strtoul(gateway.c_str(), nullptr, 16));
+        r.mask    = static_cast<uint32_t>(std::strtoul(mask.c_str(), nullptr, 16));
+        routes.push_back(r);
+    }
+    return routes;
+}
 
 /*
  * The saved route is also written to a file, so an agent that crashed
@@ -317,12 +366,65 @@ static void save_physical_default() {
         std::cerr << "[Agent] No default route; control-plane pins are skipped\n";
 }
 
+/*
+ * Keep a prefix on the physical network once the default route points
+ * into the TUN. A prefix inside a subnet the machine is directly on
+ * needs nothing: the subnet route beats the default. A prefix the
+ * machine already routes through another gateway is left to that
+ * route. Anything else goes through the saved physical gateway.
+ */
+static void pin_prefix(uint32_t addr, int prefix) {
+    if (addr == 0 || !g_host.had_default) return;
+    std::string cidr = cidr_text(addr & mask_of(prefix), prefix);
+    for (const auto& p : g_host.pins) if (p == cidr) return;
+
+    uint32_t mask = mask_of(prefix);
+    for (const KernelRoute& r : read_kernel_routes()) {
+        if (r.mask == 0 || r.iface == "lo" || r.iface.rfind("vnet-", 0) == 0) continue;
+        bool exact = r.dest == (addr & mask) && r.mask == mask;
+        if (exact && r.gateway != 0 && (r.gateway != g_host.gateway || r.iface != g_host.iface)) {
+            std::cout << "[Agent] " << cidr << " already has a route via "
+                      << ipv4_to_string(r.gateway) << " dev " << r.iface << "; left alone\n";
+            return;
+        }
+        // A directly connected subnet that contains the whole prefix.
+        bool connected = r.gateway == 0 && ntohl(r.mask) <= ntohl(mask) &&
+                         (addr & r.mask) == r.dest;
+        if (connected) return;
+    }
+    if (run_program({"ip", "route", "replace", cidr,
+                     "via", ipv4_to_string(g_host.gateway), "dev", g_host.iface}, "[Agent]")) {
+        g_host.pins.push_back(cidr);
+        std::cout << "[Agent] " << cidr << " stays on the physical network via "
+                  << ipv4_to_string(g_host.gateway) << " dev " << g_host.iface << "\n";
+    }
+}
+
 static void pin_route(uint32_t ip) {
-    if (ip == 0 || !g_host.had_default) return;
-    for (uint32_t p : g_host.pins) if (p == ip) return;
-    if (run_program({"ip", "route", "replace", ipv4_to_string(ip) + "/32",
-                     "via", ipv4_to_string(g_host.gateway), "dev", g_host.iface}, "[Agent]"))
-        g_host.pins.push_back(ip);
+    pin_prefix(ip, 32);
+}
+
+/* The route lines of the bypass file, pinned whether or not lockdown is on. */
+static void pin_bypass_routes() {
+    for (const BypassRule& rule : g_bypass)
+        if (rule.kind == BypassRule::ROUTE) pin_prefix(rule.addr, rule.prefix);
+}
+
+/* Drop the pins of route lines that left the bypass file on a reload. */
+static void unpin_removed_routes() {
+    std::vector<std::string> keep;
+    for (const auto& cidr : g_host.pins) {
+        bool still = cidr.size() > 3 && cidr.compare(cidr.size() - 3, 3, "/32") == 0;
+        for (const BypassRule& rule : g_bypass)
+            if (rule.kind == BypassRule::ROUTE && rule.cidr == cidr) still = true;
+        if (still) {
+            keep.push_back(cidr);
+        } else {
+            run_program({"ip", "route", "del", cidr}, "[Agent]", true);
+            std::cout << "[Agent] Route " << cidr << " no longer bypasses the TUN\n";
+        }
+    }
+    g_host.pins = keep;
 }
 
 /*
@@ -336,6 +438,7 @@ static void install_host_routes(const std::string& tun_name,
     save_physical_default();
     pin_route(conductor_ip);
     pin_route(switch_ip);
+    pin_bypass_routes();
 
     run_program({"ip", "route", "replace", g_overlay_cidr, "dev", tun_name}, "[Agent]");
 
@@ -350,8 +453,8 @@ static void restore_host_routes() {
         run_program({"ip", "route", "replace", "default", "via",
                      ipv4_to_string(g_host.gateway), "dev", g_host.iface}, "[Agent]");
     }
-    for (uint32_t ip : g_host.pins)
-        run_program({"ip", "route", "del", ipv4_to_string(ip) + "/32"}, "[Agent]", true);
+    for (const auto& cidr : g_host.pins)
+        run_program({"ip", "route", "del", cidr}, "[Agent]", true);
     g_host.pins.clear();
     unlink(route_state_path().c_str());
 }
@@ -362,13 +465,24 @@ static void restore_host_routes() {
 //  The overlay only sees what enters the TUN. Without these rules a
 //  contestant still reaches the physical LAN and, over IPv6, the internet.
 //  With VNET_LOCKDOWN=1 the machine may talk only to the conductor, its
-//  switch, the TUN, DHCP, and the networks in VNET_LOCKDOWN_ALLOW
-//  (for the admins' SSH, say). IPv6 is blocked entirely.
+//  switch, the TUN, DHCP, and what the bypass file allows: the route
+//  prefixes in both directions, plus its in and out rules (a VDI broker,
+//  the admins' SSH). IPv6 is blocked except for the in6 and out6 rules.
 // ---------------------------------------------------------------------------
 
 static const char* CHAIN_IN  = "VNET_IN";
 static const char* CHAIN_OUT = "VNET_OUT";
 static bool g_lockdown_applied = false;
+
+/* What the chains were last built for, so a reload can rebuild them. */
+struct LockdownParams {
+    std::string tun_name;
+    uint32_t    conductor_ip = 0;
+    uint16_t    conductor_port = 0;
+    uint32_t    switch_ip = 0;
+    uint16_t    switch_port = 0;
+};
+static LockdownParams g_lockdown_params;
 
 static bool ipt(const std::vector<std::string>& args, bool quiet = false) {
     std::vector<std::string> argv = {"iptables", "-w", "5"};
@@ -397,17 +511,42 @@ static void lockdown_hook() {
  * Fill the chains for the current conductor and switch. Called on every
  * join, since the switch (and its address) can change.
  */
+/* The in, out, in6 and out6 rules of the bypass file, as written. */
+static void bypass_rules_into(const char* chain, BypassRule::Kind kind) {
+    for (const BypassRule& rule : g_bypass) {
+        if (rule.kind != kind) continue;
+        std::vector<std::string> args = {"-A", chain};
+        args.insert(args.end(), rule.args.begin(), rule.args.end());
+        bool v6 = kind == BypassRule::IN6 || kind == BypassRule::OUT6;
+        if (v6 ? ip6t(args) : ipt(args)) continue;
+        std::string text;
+        for (const auto& a : rule.args) text += " " + a;
+        std::cerr << "[Agent] Bypass rule not installed:"
+                  << (kind == BypassRule::IN ? " in" : kind == BypassRule::OUT ? " out" :
+                      kind == BypassRule::IN6 ? " in6" : " out6") << text << "\n";
+    }
+}
+
+/* End a chain with its DROP. */
+static void finish_chain(const char* chain, bool v6) {
+    if (v6) ip6t({"-A", chain, "-j", "DROP"}); else ipt({"-A", chain, "-j", "DROP"});
+}
+
 static void lockdown_apply(const std::string& tun_name,
                            uint32_t conductor_ip, uint16_t conductor_port,
                            uint32_t switch_ip, uint16_t switch_port) {
+    g_lockdown_params = {tun_name, conductor_ip, conductor_port, switch_ip, switch_port};
     lockdown_hook();
     ipt({"-F", CHAIN_IN});
     ipt({"-F", CHAIN_OUT});
     ip6t({"-F", CHAIN_IN});
     ip6t({"-F", CHAIN_OUT});
 
+    size_t routes = 0, rules = 0;
+    for (const BypassRule& rule : g_bypass) (rule.kind == BypassRule::ROUTE ? routes : rules)++;
+
     // Outbound: loopback, the overlay, the two control links, replies to
-    // allowed inbound connections, DHCP, the allowed networks.
+    // allowed inbound connections, DHCP, the bypass routes and rules.
     ipt({"-A", CHAIN_OUT, "-o", "lo", "-j", "ACCEPT"});
     ipt({"-A", CHAIN_OUT, "-o", tun_name, "-j", "ACCEPT"});
     if (conductor_ip)
@@ -418,29 +557,62 @@ static void lockdown_apply(const std::string& tun_name,
              "--dport", std::to_string(switch_port), "-j", "ACCEPT"});
     ipt({"-A", CHAIN_OUT, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"});
     ipt({"-A", CHAIN_OUT, "-p", "udp", "--sport", "68", "--dport", "67", "-j", "ACCEPT"});
-    for (const auto& cidr : g_lockdown_allow)
-        ipt({"-A", CHAIN_OUT, "-d", cidr, "-j", "ACCEPT"});
-    ipt({"-A", CHAIN_OUT, "-j", "DROP"});
+    for (const BypassRule& rule : g_bypass)
+        if (rule.kind == BypassRule::ROUTE)
+            ipt({"-A", CHAIN_OUT, "-d", rule.cidr, "-j", "ACCEPT"});
+    bypass_rules_into(CHAIN_OUT, BypassRule::OUT);
+    finish_chain(CHAIN_OUT, false);
 
-    // Inbound: loopback, the overlay, replies, DHCP, the allowed networks.
+    // Inbound: loopback, the overlay, replies, DHCP, the bypass routes and rules.
     ipt({"-A", CHAIN_IN, "-i", "lo", "-j", "ACCEPT"});
     ipt({"-A", CHAIN_IN, "-i", tun_name, "-j", "ACCEPT"});
     ipt({"-A", CHAIN_IN, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"});
     ipt({"-A", CHAIN_IN, "-p", "udp", "--sport", "67", "--dport", "68", "-j", "ACCEPT"});
-    for (const auto& cidr : g_lockdown_allow)
-        ipt({"-A", CHAIN_IN, "-s", cidr, "-j", "ACCEPT"});
-    ipt({"-A", CHAIN_IN, "-j", "DROP"});
+    for (const BypassRule& rule : g_bypass)
+        if (rule.kind == BypassRule::ROUTE)
+            ipt({"-A", CHAIN_IN, "-s", rule.cidr, "-j", "ACCEPT"});
+    bypass_rules_into(CHAIN_IN, BypassRule::IN);
+    finish_chain(CHAIN_IN, false);
 
-    // IPv6: nothing but loopback. The overlay carries IPv4 only.
+    // IPv6: loopback and the in6/out6 rules. The overlay carries IPv4 only.
     ip6t({"-A", CHAIN_OUT, "-o", "lo", "-j", "ACCEPT"});
-    ip6t({"-A", CHAIN_OUT, "-j", "DROP"});
+    bypass_rules_into(CHAIN_OUT, BypassRule::OUT6);
+    finish_chain(CHAIN_OUT, true);
     ip6t({"-A", CHAIN_IN, "-i", "lo", "-j", "ACCEPT"});
-    ip6t({"-A", CHAIN_IN, "-j", "DROP"});
+    bypass_rules_into(CHAIN_IN, BypassRule::IN6);
+    finish_chain(CHAIN_IN, true);
 
     g_lockdown_applied = true;
     std::cout << "[Agent] Lockdown on: only the conductor, the switch, the overlay"
-              << (g_lockdown_allow.empty() ? "" : " and the allowed networks")
+              << (routes + rules == 0 ? std::string() :
+                  " and the bypass file (routes: " + std::to_string(routes) +
+                  ", rules: " + std::to_string(rules) + ")")
               << " are reachable; IPv6 is blocked\n";
+}
+
+/*
+ * SIGHUP: read the bypass file again. Routes that left the file are
+ * unpinned, new ones pinned, and the lockdown chains are rebuilt. A file
+ * that does not parse changes nothing.
+ */
+static void reload_bypass() {
+    if (g_bypass_path.empty()) {
+        std::cout << "[Agent] No bypass file to reload\n";
+        return;
+    }
+    std::vector<BypassRule> fresh;
+    if (!load_bypass_file(g_bypass_path, g_overlay_cidr, fresh, "[Agent]")) {
+        std::cerr << "[Agent] Bypass file reload failed; the previous rules stay in force\n";
+        return;
+    }
+    g_bypass = std::move(fresh);
+    unpin_removed_routes();
+    pin_bypass_routes();
+    if (g_lockdown_applied)
+        lockdown_apply(g_lockdown_params.tun_name,
+                       g_lockdown_params.conductor_ip, g_lockdown_params.conductor_port,
+                       g_lockdown_params.switch_ip, g_lockdown_params.switch_port);
+    std::cout << "[Agent] Bypass file reloaded: " << g_bypass.size() << " line(s)\n";
 }
 
 /*
@@ -636,6 +808,7 @@ int main(int argc, char** argv) {
     signal(SIGINT,  on_signal);
     signal(SIGTERM, on_signal);
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGHUP,  on_sighup);
 
     if (argc != 2 && argc != 3) {
         std::cerr << "Usage: ./agent <name> [auth_key]\n"
@@ -693,26 +866,37 @@ int main(int argc, char** argv) {
     g_default_via_tun = env_or("VNET_DEFAULT_VIA_TUN", "1") != "0";
     g_lockdown        = env_or("VNET_LOCKDOWN", "0") == "1";
     {
-        // Comma-separated networks that stay reachable under lockdown.
+        // VNET_LOCKDOWN_ALLOW: comma-separated prefixes, the same as
+        // route lines of the bypass file, kept for existing setups.
         std::string allow = env_or("VNET_LOCKDOWN_ALLOW", "");
-        size_t start = 0;
-        while (start <= allow.size() && !allow.empty()) {
+        std::string as_lines;
+        for (size_t start = 0; start < allow.size(); ) {
             size_t comma = allow.find(',', start);
-            std::string item = allow.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+            if (comma == std::string::npos) comma = allow.size();
+            std::string item = allow.substr(start, comma - start);
             size_t a = item.find_first_not_of(" \t"), b = item.find_last_not_of(" \t");
-            if (a != std::string::npos) {
-                item = item.substr(a, b - a + 1);
-                uint32_t addr = 0;
-                int prefix = 0;
-                if (!parse_cidr(item, addr, prefix)) {
-                    std::cerr << "[Agent] VNET_LOCKDOWN_ALLOW entry is not a.b.c.d/n: " << item << "\n";
-                    return 1;
-                }
-                g_lockdown_allow.push_back(item);
-            }
-            if (comma == std::string::npos) break;
+            if (a != std::string::npos) as_lines += "route " + item.substr(a, b - a + 1) + "\n";
             start = comma + 1;
         }
+        if (!parse_bypass(as_lines, g_overlay_cidr, g_bypass, "[Agent]")) {
+            std::cerr << "[Agent] VNET_LOCKDOWN_ALLOW must be a comma-separated list of a.b.c.d/n\n";
+            return 1;
+        }
+        g_bypass_path = env_or("VNET_BYPASS_FILE", "");
+        if (!g_bypass_path.empty()) {
+            std::vector<BypassRule> from_file;
+            if (!load_bypass_file(g_bypass_path, g_overlay_cidr, from_file, "[Agent]"))
+                return 1;
+            g_bypass.insert(g_bypass.end(), from_file.begin(), from_file.end());
+            std::cout << "[Agent] Bypass file " << g_bypass_path << ": "
+                      << from_file.size() << " line(s)\n";
+        }
+        bool has_rules = false;
+        for (const BypassRule& rule : g_bypass)
+            if (rule.kind != BypassRule::ROUTE) has_rules = true;
+        if (has_rules && !g_lockdown)
+            std::cout << "[Agent] The in/out lines of the bypass file do nothing without "
+                      << "VNET_LOCKDOWN=1; only its route lines apply\n";
     }
 
     g_conductor_cfg = MachineConfig{ cdt_ip_env, static_cast<uint16_t>(cdt_port) };
@@ -799,6 +983,10 @@ int main(int argc, char** argv) {
             maybe_reconnect_conductor(queue);
             send_heartbeats(queue);
             reap_dead(queue);
+            if (g_reload_request) {
+                g_reload_request = 0;
+                reload_bypass();
+            }
         }
 
         if (!g_running) break;
