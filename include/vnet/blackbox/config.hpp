@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iosfwd>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -63,10 +64,20 @@ namespace vnet::blackbox {
         bool load(const std::string& path);
 
         /**
+         * Parse a config held in memory, in the file format: what a
+         * switch received from the conductor. Same guarantees as load().
+         *
+         * @param text  The whole config file.
+         * @return true on success, false on parse error.
+         */
+        bool load_text(const std::string& text);
+
+        /**
          * SHA-256, as hex, of the parsed content in a canonical order:
          * two files that mean the same have the same fingerprint however
-         * they are written. The conductor refuses a switch whose
-         * fingerprint differs from the others'.
+         * they are written. The conductor compares the fingerprints the
+         * switches report with each other, or with its own config when
+         * it is the one handing the config out.
          */
         std::string fingerprint() const;
 
@@ -120,7 +131,7 @@ namespace vnet::blackbox {
         std::unordered_map<uint32_t, std::vector<Prefix>> internet_acl_;
 
         static bool is_ipv4(const std::string& s);
-        bool parse_into(const std::string& path);
+        bool parse_into(std::istream& in, const std::string& origin);
     };
 
 };

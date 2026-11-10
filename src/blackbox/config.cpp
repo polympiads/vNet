@@ -26,19 +26,26 @@ namespace vnet::blackbox {
     static const std::string INTERNET_PREFIX = "::internet:";
 
     bool Config::load(const std::string& path) {
-        Config fresh;
-        if (!fresh.parse_into(path)) return false;
-        *this = fresh;
-        return true;
-    }
-
-    bool Config::parse_into(const std::string& path) {
         std::ifstream file(path);
         if (!file.is_open()) {
             std::cerr << "[Config] Cannot open " << path << "\n";
             return false;
         }
+        Config fresh;
+        if (!fresh.parse_into(file, path)) return false;
+        *this = fresh;
+        return true;
+    }
 
+    bool Config::load_text(const std::string& text) {
+        std::istringstream in(text);
+        Config fresh;
+        if (!fresh.parse_into(in, "received config")) return false;
+        *this = fresh;
+        return true;
+    }
+
+    bool Config::parse_into(std::istream& file, const std::string& origin) {
         name_to_ip_.clear();
         ip_to_name_.clear();
         agent_acl_.clear();
@@ -73,7 +80,7 @@ namespace vnet::blackbox {
             iss >> first >> second;
 
             if (first.empty() || second.empty()) {
-                std::cerr << "[Config] Line " << line_num
+                std::cerr << "[Config] " << origin << " line " << line_num
                           << ": expected two tokens, got '" << raw << "'\n";
                 return false;
             }
@@ -88,24 +95,24 @@ namespace vnet::blackbox {
 
             uint32_t ipv4 = parse_ipv4(l.second);
             if (ipv4 == 0) {
-                std::cerr << "[Config] Line " << l.num
+                std::cerr << "[Config] " << origin << " line " << l.num
                           << ": invalid IPv4 '" << l.second << "'\n";
                 return false;
             }
 
             if (!valid_name(l.first, AGENT_NAME_MAX)) {
-                std::cerr << "[Config] Line " << l.num << ": agent name '" << l.first
+                std::cerr << "[Config] " << origin << " line " << l.num << ": agent name '" << l.first
                           << "' must be 1 to " << AGENT_NAME_MAX
                           << " characters from [A-Za-z0-9_-]\n";
                 return false;
             }
             if (ip_to_name_.count(ipv4)) {
-                std::cerr << "[Config] Line " << l.num
+                std::cerr << "[Config] " << origin << " line " << l.num
                           << ": duplicate IP " << l.second << "\n";
                 return false;
             }
             if (name_to_ip_.count(l.first)) {
-                std::cerr << "[Config] Line " << l.num
+                std::cerr << "[Config] " << origin << " line " << l.num
                           << ": duplicate agent name '" << l.first << "'\n";
                 return false;
             }
@@ -122,7 +129,7 @@ namespace vnet::blackbox {
             // Validate the source agent exists
             auto src_it = name_to_ip_.find(l.first);
             if (src_it == name_to_ip_.end()) {
-                std::cerr << "[Config] Line " << l.num
+                std::cerr << "[Config] " << origin << " line " << l.num
                           << ": unknown agent '" << l.first << "'\n";
                 return false;
             }
@@ -135,7 +142,7 @@ namespace vnet::blackbox {
                 int prefix_len = 32;
                 if (!parse_cidr(ip_str, inet_ip, prefix_len) ||
                     (inet_ip == 0 && prefix_len == 32)) {
-                    std::cerr << "[Config] Line " << l.num
+                    std::cerr << "[Config] " << origin << " line " << l.num
                               << ": invalid internet address in '" << l.second << "'\n";
                     return false;
                 }
@@ -145,7 +152,7 @@ namespace vnet::blackbox {
                 // agent-to-agent rule
                 auto dst_it = name_to_ip_.find(l.second);
                 if (dst_it == name_to_ip_.end()) {
-                    std::cerr << "[Config] Line " << l.num
+                    std::cerr << "[Config] " << origin << " line " << l.num
                               << ": unknown agent '" << l.second << "'\n";
                     return false;
                 }

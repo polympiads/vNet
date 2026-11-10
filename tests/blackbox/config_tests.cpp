@@ -263,3 +263,30 @@ TEST_F(ConfigTest, FingerprintIgnoresOrderAndSpacing) {
     ASSERT_TRUE(c.load(tmp_path));
     EXPECT_NE(a.fingerprint(), c.fingerprint());
 }
+
+TEST_F(ConfigTest, TextParsesLikeFile) {
+    const std::string text =
+        "agent1  10.0.0.1\r\n"
+        "agent2  10.0.0.2\n"
+        "agent1  agent2\n"
+        "agent2  ::internet:198.51.100.0/24\n";
+    write_config(text);
+    Config from_file;
+    ASSERT_TRUE(from_file.load(tmp_path));
+
+    Config from_text;
+    ASSERT_TRUE(from_text.load_text(text));
+    EXPECT_EQ(from_text.fingerprint(), from_file.fingerprint());
+    EXPECT_EQ(from_text.find_ip_for_agent("agent2"), ip("10.0.0.2"));
+    EXPECT_TRUE(from_text.can_agents_communicate(ip("10.0.0.1"), ip("10.0.0.2")));
+    EXPECT_TRUE(from_text.can_reach_internet_ip(ip("10.0.0.2"), ip("198.51.100.7")));
+
+    // A received config that does not parse leaves the current one in force.
+    EXPECT_FALSE(from_text.load_text("agent1 10.0.0.1\nagent1 nobody\n"));
+    EXPECT_EQ(from_text.fingerprint(), from_file.fingerprint());
+
+    // Empty text is a config with no machine, which is what an empty file is.
+    Config empty;
+    EXPECT_TRUE(empty.load_text(""));
+    EXPECT_EQ(empty.agents().size(), 0u);
+}
