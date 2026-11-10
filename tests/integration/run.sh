@@ -282,7 +282,7 @@ in -p tcp -s 172.31.1.1/32 --dport 2244 -j ACCEPT
 out -p tcp -d 172.31.1.1/32 --dport 2255 -j ACCEPT
 in6 -p tcp --dport 2266 -j ACCEPT
 EOF
-  start_agent 1 VNET_LOCKDOWN=1 VNET_BYPASS_FILE="$LOGS/bypass.conf"
+  start_agent 1 VNET_LOCKDOWN=1 VNET_LOCKDOWN_LOG=1 VNET_BYPASS_FILE="$LOGS/bypass.conf"
   start_agent 2 VNET_BYPASS_FILE="$LOGS/bypass.conf"
   sleep 2
   wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail bypass "agents did not register"; return; }
@@ -301,6 +301,7 @@ EOF
   connects a1 172.31.1.2 172.31.1.1 2255 || { fail bypass "allowed outbound port blocked"; return; }
   connects a1 172.31.1.2 172.31.1.1 2256 && { fail bypass "other outbound port open"; return; }
   in_ns a1 ip6tables -S VNET_IN | grep -q -- "--dport 2266" || { fail bypass "in6 rule missing"; return; }
+  in_ns a1 iptables -S VNET_OUT | grep -q -- "-j LOG" || { fail bypass "drop log rule missing"; return; }
   # Reload: the route line leaves the file and comes back.
   cp "$LOGS/bypass.conf" "$LOGS/full.conf"
   grep -v '^route' "$LOGS/full.conf" > "$LOGS/bypass.conf"

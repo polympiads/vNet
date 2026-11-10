@@ -39,6 +39,8 @@ static std::string g_auth_key;
 static std::string g_overlay_cidr = "10.0.0.0/8";
 static bool        g_default_via_tun = true;
 static bool        g_lockdown = false;
+/* VNET_LOCKDOWN_LOG=1: dropped packets go to the kernel log, rate limited. */
+static bool        g_lockdown_log = false;
 /*
  * What stays on the physical network: the bypass file (VNET_BYPASS_FILE)
  * plus VNET_LOCKDOWN_ALLOW, which is the same as route lines. Read at
@@ -527,8 +529,14 @@ static void bypass_rules_into(const char* chain, BypassRule::Kind kind) {
     }
 }
 
-/* End a chain with its DROP. */
-static void finish_chain(const char* chain, bool v6) {
+/* End a chain: log what is about to be dropped when asked, then drop. */
+static void finish_chain(const char* chain, bool v6, const char* prefix) {
+    if (g_lockdown_log) {
+        std::vector<std::string> log = {"-A", chain, "-m", "limit", "--limit", "1/second",
+                                        "--limit-burst", "50", "-j", "LOG",
+                                        "--log-prefix", prefix, "--log-level", "info"};
+        if (v6) ip6t(log); else ipt(log);
+    }
     if (v6) ip6t({"-A", chain, "-j", "DROP"}); else ipt({"-A", chain, "-j", "DROP"});
 }
 
@@ -561,7 +569,7 @@ static void lockdown_apply(const std::string& tun_name,
         if (rule.kind == BypassRule::ROUTE)
             ipt({"-A", CHAIN_OUT, "-d", rule.cidr, "-j", "ACCEPT"});
     bypass_rules_into(CHAIN_OUT, BypassRule::OUT);
-    finish_chain(CHAIN_OUT, false);
+    finish_chain(CHAIN_OUT, false, "vnet-drop-out: ");
 
     // Inbound: loopback, the overlay, replies, DHCP, the bypass routes and rules.
     ipt({"-A", CHAIN_IN, "-i", "lo", "-j", "ACCEPT"});
@@ -572,22 +580,23 @@ static void lockdown_apply(const std::string& tun_name,
         if (rule.kind == BypassRule::ROUTE)
             ipt({"-A", CHAIN_IN, "-s", rule.cidr, "-j", "ACCEPT"});
     bypass_rules_into(CHAIN_IN, BypassRule::IN);
-    finish_chain(CHAIN_IN, false);
+    finish_chain(CHAIN_IN, false, "vnet-drop-in: ");
 
     // IPv6: loopback and the in6/out6 rules. The overlay carries IPv4 only.
     ip6t({"-A", CHAIN_OUT, "-o", "lo", "-j", "ACCEPT"});
     bypass_rules_into(CHAIN_OUT, BypassRule::OUT6);
-    finish_chain(CHAIN_OUT, true);
+    finish_chain(CHAIN_OUT, true, "vnet-drop-out6: ");
     ip6t({"-A", CHAIN_IN, "-i", "lo", "-j", "ACCEPT"});
     bypass_rules_into(CHAIN_IN, BypassRule::IN6);
-    finish_chain(CHAIN_IN, true);
+    finish_chain(CHAIN_IN, true, "vnet-drop-in6: ");
 
     g_lockdown_applied = true;
     std::cout << "[Agent] Lockdown on: only the conductor, the switch, the overlay"
               << (routes + rules == 0 ? std::string() :
                   " and the bypass file (routes: " + std::to_string(routes) +
                   ", rules: " + std::to_string(rules) + ")")
-              << " are reachable; IPv6 is blocked\n";
+              << " are reachable; IPv6 is blocked"
+              << (g_lockdown_log ? "; drops are logged" : "") << "\n";
 }
 
 /*
@@ -865,6 +874,7 @@ int main(int argc, char** argv) {
     }
     g_default_via_tun = env_or("VNET_DEFAULT_VIA_TUN", "1") != "0";
     g_lockdown        = env_or("VNET_LOCKDOWN", "0") == "1";
+    g_lockdown_log    = env_or("VNET_LOCKDOWN_LOG", "0") == "1";
     {
         // VNET_LOCKDOWN_ALLOW: comma-separated prefixes, the same as
         // route lines of the bypass file, kept for existing setups.
