@@ -22,6 +22,7 @@
 #include "state.pb.h"
 #include "common/socket_utils.h"
 #include "common/sysutil.h"
+#include "vnet/blackbox/config.hpp"
 #include "vnet/netqueue/handler.hpp"
 #include "vnet/protocol/dispatch.hpp"
 #include "vnet/netqueue/netqueue.hpp"
@@ -314,6 +315,67 @@ static bool g_auth_required = false;
 static bool g_config_hash_check = true;
 
 /*
+ * The switch config, when VNET_CONFIG_PATH is set here: the conductor
+ * hands it to every switch as it registers and again after a reload, so
+ * one edit on this machine reaches the whole network. Without it the
+ * switches read their own files and are only compared.
+ */
+struct PushedConfig {
+    std::string path;
+    std::string text;
+    std::string hash;
+    bool        enabled() const { return !path.empty(); }
+};
+static PushedConfig g_config;
+
+/* One frame holds at most MAX_PAYLOAD_SIZE bytes; keep the protobuf
+ * overhead and the hash well clear of it. */
+static const size_t CONFIG_PIECE_BYTES = 60000;
+
+/*
+ * Read and parse the config file into a fresh copy, swapped in only
+ * when the whole file parsed, so a reload that fails keeps the old one.
+ */
+static bool load_config_file() {
+    std::ifstream in(g_config.path, std::ios::binary);
+    if (!in) {
+        std::cerr << "[Conductor] Cannot open config file " << g_config.path << "\n";
+        return false;
+    }
+    std::ostringstream buf;
+    buf << in.rdbuf();
+    vnet::blackbox::Config parsed;
+    if (!parsed.load_text(buf.str())) {
+        std::cerr << "[Conductor] Config file " << g_config.path << " did not parse\n";
+        return false;
+    }
+    if (parsed.agents().empty())
+        std::cerr << "[Conductor] Config file " << g_config.path
+                  << " names no agent; no machine can join\n";
+    g_config.text = buf.str();
+    g_config.hash = parsed.fingerprint();
+    return true;
+}
+
+/* Send the config to one switch, in pieces that each fit a frame. */
+static bool send_config(NetQueue& queue, int fd) {
+    const std::string& text = g_config.text;
+    uint32_t index = 0;
+    size_t offset = 0;
+    do {
+        size_t n = std::min(CONFIG_PIECE_BYTES, text.size() - offset);
+        mip::PacketConfigPush piece;
+        piece.set_config_hash(g_config.hash);
+        piece.set_index(index++);
+        piece.set_text(text.data() + offset, n);
+        offset += n;
+        piece.set_last(offset >= text.size());
+        if (!queue.send(fd, PacketType::CONFIG_PUSH, piece)) return false;
+    } while (offset < text.size());
+    return true;
+}
+
+/*
  * What the conductor itself handed out: the key the agent used and the
  * network it named. Lost on restart.
  */
@@ -446,8 +508,11 @@ struct ConductorDispatch : public Dispatch {
         }
 
         // A switch with a different config would apply a different ACL
-        // to the same machines. Refuse it and say which switch disagrees.
-        if (g_config_hash_check && !pkt.config_hash().empty()) {
+        // to the same machines. When the switches bring their own files,
+        // refuse it and say which switch disagrees. When the config comes
+        // from here, it is sent right after this and checked when the
+        // switch confirms it.
+        if (g_config_hash_check && !g_config.enabled() && !pkt.config_hash().empty()) {
             for (const auto* other : g_state.switches) {
                 if (other->config_hash.empty() || other->config_hash == pkt.config_hash())
                     continue;
@@ -481,6 +546,17 @@ struct ConductorDispatch : public Dispatch {
         }
 
         g_state.add_switch(info);
+
+        // The config goes first on the link, so the switch holds it
+        // before the first token or route reaches it.
+        if (g_config.enabled()) {
+            if (send_config(*queue, info->fd))
+                std::cout << "[Conductor] Config " << g_config.hash.substr(0, 12)
+                          << " sent to " << info->name << "\n";
+            else
+                std::cerr << "[Conductor] Failed to send the config to "
+                          << info->name << "\n";
+        }
 
         // One fresh token per pair: whichever side dials shows it in its
         // hello, the other side checks it. Issued before the routes, so a
@@ -743,12 +819,28 @@ struct ConductorDispatch : public Dispatch {
         }
     }
 
-    /* A switch reloaded its config. Rolling reloads disagree for a
-     * while; that is logged, not refused. */
+    /*
+     * A switch says which config it applies: after a reload of its own
+     * file, or after a config sent from here was applied or refused.
+     * With a pushed config the reference is this conductor's; otherwise
+     * the switches are compared with each other. Rolling reloads
+     * disagree for a while; that is logged, not refused.
+     */
     void onSwitchConfig(socket_data data, mip::PacketSwitchConfig& pkt) override {
         auto* sw_info = static_cast<ConnInfo*>(data.ptr_data);
         if (!sw_info || sw_info->role != Role::SWITCH_CONN) return;
         sw_info->config_hash = pkt.config_hash();
+        if (g_config.enabled()) {
+            if (pkt.config_hash() == g_config.hash) {
+                std::cout << "[Conductor] Switch " << sw_info->name
+                          << " applied config " << g_config.hash.substr(0, 12) << "\n";
+            } else {
+                std::cerr << "[Conductor] Switch " << sw_info->name << " runs config "
+                          << pkt.config_hash().substr(0, 12) << ", not the one sent ("
+                          << g_config.hash.substr(0, 12) << "); see its log\n";
+            }
+            return;
+        }
         std::cout << "[Conductor] Switch " << sw_info->name << " reloaded its config ("
                   << pkt.config_hash().substr(0, 12) << ")\n";
         for (const auto* other : g_state.switches) {
@@ -889,6 +981,16 @@ int main() {
 
     g_config_hash_check = env_or("VNET_CONFIG_HASH_CHECK", "1") != "0";
 
+    g_config.path = env_or("VNET_CONFIG_PATH", "");
+    if (g_config.enabled()) {
+        if (!load_config_file()) return 1;
+        std::cout << "[Conductor] Switch config " << g_config.path << " ("
+                  << g_config.text.size() << " bytes, fingerprint "
+                  << g_config.hash.substr(0, 12) << ") will be sent to every switch\n";
+    } else {
+        std::cout << "[Conductor] No VNET_CONFIG_PATH: switches read their own config files\n";
+    }
+
     std::string auth_path;
     if (const char* env_auth = std::getenv("VNET_AUTH_FILE")) {
         auth_path = env_auth;
@@ -995,7 +1097,8 @@ int main() {
 
         // SIGHUP: machines added to the auth file can join without a
         // restart. Machines removed are refused at their next MIP or MRP;
-        // the ones connected stay until then.
+        // the ones connected stay until then. The switch config, when it
+        // is held here, is read again and sent to every switch.
         if (g_reload_request) {
             g_reload_request = 0;
             if (!g_auth_required) {
@@ -1006,6 +1109,23 @@ int main() {
             } else {
                 std::cerr << "[Conductor] Auth file reload failed; the previous "
                           << "records stay in force\n";
+            }
+            if (g_config.enabled()) {
+                std::string previous = g_config.hash;
+                if (!load_config_file()) {
+                    std::cerr << "[Conductor] Config reload failed; the previous "
+                              << "config stays in force\n";
+                } else if (g_config.hash == previous) {
+                    std::cout << "[Conductor] Config reloaded, unchanged ("
+                              << g_config.hash.substr(0, 12) << ")\n";
+                } else {
+                    size_t sent = 0;
+                    for (auto* sw : g_state.switches)
+                        if (send_config(queue, sw->fd)) sent++;
+                    std::cout << "[Conductor] Config reloaded, fingerprint "
+                              << g_config.hash.substr(0, 12) << "; sent to " << sent
+                              << " switch(es)\n";
+                }
             }
         }
     }

@@ -91,15 +91,16 @@ topo_down() {
 trap topo_down EXIT
 
 # Processes, all with TLS and their own certificate.
+CONDUCTOR_ENV=()   # extra settings for the conductor of one scenario
 start_conductor() {
   ip netns exec core env "${HB[@]}" $(tls_env conductor) VNET_AUTH_FILE="$LOGS/auth.txt" \
-      VNET_DUMP_PATH="$LOGS/dump.bin" "$BIN/conductor" >> "$LOGS/conductor.log" 2>&1 &
+      VNET_DUMP_PATH="$LOGS/dump.bin" "${CONDUCTOR_ENV[@]}" "$BIN/conductor" >> "$LOGS/conductor.log" 2>&1 &
   PID[conductor]=$!
 }
 SWITCH_ENV=()   # extra settings for the switches of one scenario
-start_switch() {  # i [cert name]
+start_switch() {  # i [cert name]; SWITCH_CONFIG set but empty = no file of its own
   ip netns exec s$1 env "${HB[@]}" $(tls_env ${2:-switch$1}) CONDUCTOR_IP=172.30.$1.1 CONDUCTOR_PORT=5000 \
-      VNET_CONFIG_PATH="${SWITCH_CONFIG:-$LOGS/switch.txt}" VNET_AUTH_KEY=key$1 VNET_STATS_SEC=0 \
+      VNET_CONFIG_PATH="${SWITCH_CONFIG-$LOGS/switch.txt}" VNET_AUTH_KEY=key$1 VNET_STATS_SEC=0 \
       "${SWITCH_ENV[@]}" "$BIN/switch" switch$1 600$1 >> "$LOGS/switch$1.log" 2>&1 &
   PID[switch$1]=$!
 }
@@ -168,7 +169,7 @@ scenario_attacks() {
   sleep 1.5
   wait_for "$LOGS/conductor.log" "Switch registered" 1 10 || { fail attacks "switch did not register"; return; }
   local ok=1 line
-  for check in oversized forged_token forged_hello forged_withdrawal reidentify bad_key unknown_name; do
+  for check in oversized forged_token forged_hello forged_withdrawal forged_config reidentify bad_key unknown_name; do
     line=$(ip netns exec core python3 "$HERE/client.py" $check 2>&1); say "$line"
     echo "$line" | grep -q "RESULT $check ok" || ok=0
   done
@@ -246,29 +247,71 @@ scenario_lockdown() {
   pass lockdown
 }
 
-scenario_config() {
-  topo_up config
+# Switches with config files of their own: compared, reloaded on SIGHUP.
+scenario_config_files() {
+  topo_up config_files
   start_conductor; sleep 0.5
   start_switch 1
   printf 'agent1 10.0.1.1\nagent2 10.0.1.2\nagent3 10.0.1.3\n' > "$LOGS/other.txt"
   SWITCH_CONFIG="$LOGS/other.txt" start_switch 2; unset SWITCH_CONFIG
   sleep 3
-  [ "$(grep -c 'Switch registered' "$LOGS/conductor.log")" = 1 ] || { fail config "mismatched config not refused"; return; }
-  grep -q "differs from" "$LOGS/conductor.log" || { fail config "no mismatch message"; return; }
+  [ "$(grep -c 'Switch registered' "$LOGS/conductor.log")" = 1 ] || { fail config_files "mismatched config not refused"; return; }
+  grep -q "differs from" "$LOGS/conductor.log" || { fail config_files "no mismatch message"; return; }
   stop switch2 TERM
   # Reload: agent2<->agent3 not allowed, then allowed after SIGHUP.
   start_switch 2; sleep 1.5
   start_agent 2; start_agent 3; sleep 2
-  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail config "agents did not register"; return; }
-  [ "${r:=$(pings 2 10.0.1.3 1)}" = 0 ] || { fail config "denied pair pinged before reload"; return; }
+  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail config_files "agents did not register"; return; }
+  [ "${r:=$(pings 2 10.0.1.3 1)}" = 0 ] || { fail config_files "denied pair pinged before reload"; return; }
   printf 'agent2 agent3\n' >> "$LOGS/switch.txt"
   kill -HUP "${PID[switch1]}" "${PID[switch2]}"; sleep 1
-  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "pair still denied after reload"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config_files "pair still denied after reload"; return; }
   printf 'garbage\n' >> "$LOGS/switch.txt"
   kill -HUP "${PID[switch1]}"; sleep 1
-  grep -q "reload failed" "$LOGS/switch1.log" || { fail config "bad reload not reported"; return; }
-  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "old config not kept"; return; }
+  grep -q "reload failed" "$LOGS/switch1.log" || { fail config_files "bad reload not reported"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config_files "old config not kept"; return; }
   say "mismatch refused; SIGHUP applied; broken file kept the old config"
+  pass config_files
+}
+
+# The conductor holds the config: switches get it as they register and
+# after a SIGHUP on the conductor; a file larger than one frame arrives
+# in pieces.
+scenario_config() {
+  topo_up config
+  CONDUCTOR_ENV=(VNET_CONFIG_PATH="$LOGS/switch.txt"); start_conductor; CONDUCTOR_ENV=(); sleep 0.5
+  # switch1 has no file of its own; switch2 starts from a stale one.
+  SWITCH_CONFIG= start_switch 1
+  printf 'agent1 10.0.1.1\nagent2 10.0.1.2\nagent3 10.0.1.3\n' > "$LOGS/other.txt"
+  SWITCH_CONFIG="$LOGS/other.txt" start_switch 2; unset SWITCH_CONFIG
+  wait_for "$LOGS/conductor.log" "applied config" 2 10 || { fail config "switches did not confirm the config"; return; }
+  grep -q "waiting for the config from the conductor" "$LOGS/switch1.log" || { fail config "switch1 did not wait for the config"; return; }
+  start_agent 2; start_agent 3; sleep 2
+  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail config "agents did not register"; return; }
+  [ "$(pings 2 10.0.1.3 1)" = 0 ] || { fail config "denied pair pinged before reload"; return; }
+  # One edit on the conductor reaches both switches.
+  printf 'agent2 agent3\n' >> "$LOGS/switch.txt"
+  kill -HUP "${PID[conductor]}"
+  wait_for "$LOGS/conductor.log" "applied config" 4 10 || { fail config "reload did not reach both switches"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "pair still denied after reload"; return; }
+  # A broken file keeps the old config everywhere.
+  cp "$LOGS/switch.txt" "$LOGS/good.txt"
+  printf 'garbage\n' >> "$LOGS/switch.txt"
+  kill -HUP "${PID[conductor]}"; sleep 1
+  grep -q "Config reload failed" "$LOGS/conductor.log" || { fail config "bad reload not reported"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "old config not kept"; return; }
+  # A config larger than one frame (5000 more machines) arrives whole.
+  { cat "$LOGS/good.txt"; for i in $(seq 1 5000); do printf 'f%04d 10.9.%d.%d\n' $i $((i / 250)) $((i % 250 + 1)); done; } > "$LOGS/switch.txt"
+  kill -HUP "${PID[conductor]}"
+  wait_for "$LOGS/conductor.log" "applied config" 6 15 || { fail config "large config did not reach both switches"; return; }
+  grep -q "5003 agents" "$LOGS/switch1.log" || { fail config "large config not applied whole"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "pair denied after the large config"; return; }
+  # A switch that restarts gets the config again, without a file.
+  stop switch1 TERM; SWITCH_CONFIG= start_switch 1; unset SWITCH_CONFIG
+  wait_for "$LOGS/conductor.log" "applied config" 7 15 || { fail config "restarted switch did not get the config"; return; }
+  local bytes
+  bytes=$(grep -o "applied, fingerprint [0-9a-f]* ([0-9]* bytes" "$LOGS/switch1.log" | tail -1 | grep -o "[0-9]* bytes")
+  say "config sent on registration and on SIGHUP; broken file kept; large config ($bytes) in pieces"
   pass config
 }
 
@@ -382,7 +425,7 @@ scenario_throughput() {
 # ---------------------------------------------------------------- main
 
 make_certs
-ALL="basic attacks conductor_restart switch_restart switch_link agent_exit agent_crash duplicate_identity lockdown config auth_reload flood throughput"
+ALL="basic attacks conductor_restart switch_restart switch_link agent_exit agent_crash duplicate_identity lockdown config config_files auth_reload flood throughput"
 for s in ${@:-$ALL}; do
   echo "== $s"
   topo_down

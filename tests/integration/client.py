@@ -19,7 +19,7 @@ TYPES = dict(HEARTBEAT=0, SWITCH_MIP=1, AGENT_MIP=2, CONNECT_TO_SWITCH=3,
              AGENT_CONNECTION_TOKEN=4, AUTH_CONNECT_TO_SWITCH=5,
              CONNECTION_ACCEPTED=6, AGENT_MRP=7, IPV4_RAW=10,
              SWITCH_ROUTE_UPDATE=12, SWITCH_DISCONNECTED=13, SWITCH_HELLO=14,
-             AGENT_UNREGISTERED=15, PEER_TOKEN=16)
+             AGENT_UNREGISTERED=15, PEER_TOKEN=16, CONFIG_PUSH=18)
 
 CONDUCTOR = ("127.0.0.1", 5000)
 SWITCH = ("127.0.0.1", 6000)
@@ -141,6 +141,16 @@ def check_forged_withdrawal():
     result("forged_withdrawal", closed_by_peer(s, 2), "")
 
 
+def check_forged_config():
+    """A client on the agent port hands the switch a config of its own."""
+    s = socket.create_connection(SWITCH, timeout=3)
+    text = b"agent1 10.0.1.1\nagent9 10.0.1.9\nagent1 agent9\n"
+    body = f_str(1, "0" * 64) + f_varint(2, 0) + f_varint(3, 1)
+    body += bytes([(4 << 3) | 2]) + varint(len(text)) + text
+    s.sendall(packet("CONFIG_PUSH", body))
+    result("forged_config", closed_by_peer(s, 2), "")
+
+
 def check_reidentify():
     """A registered switch connection sends a second MIP."""
     c = socket.create_connection(CONDUCTOR, timeout=3)
@@ -189,6 +199,8 @@ if __name__ == "__main__":
         check_forged_hello()
     elif check == "forged_withdrawal":
         check_forged_withdrawal()
+    elif check == "forged_config":
+        check_forged_config()
     elif check == "reidentify":
         check_reidentify()
     elif check == "idle":

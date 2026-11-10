@@ -123,6 +123,20 @@ struct SwitchIdentity {
     uint32_t      advertise_ipv4 = 0;
 };
 static SwitchIdentity   g_identity;
+
+/*
+ * The config as the conductor sends it, in pieces collected until the
+ * last one. A switch started without VNET_CONFIG_PATH has no config and
+ * accepts no agent until the first push has been applied.
+ */
+struct ConfigInbox {
+    std::string text;
+    uint32_t    next_index = 0;
+};
+static ConfigInbox g_config_inbox;
+static bool        g_have_config = false;
+/* The conductor is trusted, but a runaway sender must not fill memory. */
+static const size_t CONFIG_TEXT_MAX = 16 * 1024 * 1024;
 static clk::time_point  g_last_conductor_dial{};
 
 /* Accepted sockets that may still be waiting to authenticate or say hello. */
@@ -473,6 +487,13 @@ struct SwitchDispatch : public Dispatch {
         std::string agent_name = it->second.agent_name;
         g_state.pending_tokens.erase(it);
 
+        if (!g_have_config) {
+            std::cerr << "[Switch] Rejected agent " << agent_name
+                      << ": no config received from the conductor yet\n";
+            data.net_element->state = SCK_ERROR;
+            return;
+        }
+
         // Register agent in BlackBox — looks up virtual IP from config
         if (!g_blackbox->on_agent_authenticated(agent_name, data.fd)) {
             std::cerr << "[Switch] Agent " << agent_name
@@ -649,6 +670,74 @@ struct SwitchDispatch : public Dispatch {
         if (!from_conductor(data, "peer token")) return;
         if (pkt.peer_name().empty() || pkt.token() == 0) return;
         g_peer_tokens[pkt.peer_name()] = pkt.token();
+    }
+
+    /* Tell the conductor which config is in force. */
+    void report_config(int fd) {
+        mip::PacketSwitchConfig cfg_pkt;
+        cfg_pkt.set_config_hash(g_identity.config_hash);
+        queue->send(fd, PacketType::SWITCH_CONFIG, cfg_pkt);
+    }
+
+    /*
+     * One piece of the config the conductor holds. The pieces of one
+     * config arrive in order; a piece out of sequence starts over, since
+     * only the latest config matters. The whole is parsed at the last
+     * piece and applied without disturbing the agents already connected,
+     * as a SIGHUP reload does. A config that does not parse is reported
+     * and the previous one stays in force.
+     */
+    void onConfigPush(socket_data data, mip::PacketConfigPush& pkt) override {
+        if (!from_conductor(data, "config")) return;
+        if (pkt.index() == 0) {
+            g_config_inbox = ConfigInbox{};
+        } else if (pkt.index() != g_config_inbox.next_index) {
+            std::cerr << "[Switch] Config piece " << pkt.index() << " arrived, expected "
+                      << g_config_inbox.next_index << "; waiting for the next config\n";
+            g_config_inbox = ConfigInbox{};
+            return;
+        }
+        if (g_config_inbox.text.size() + pkt.text().size() > CONFIG_TEXT_MAX) {
+            std::cerr << "[Switch] Config from the conductor exceeds "
+                      << CONFIG_TEXT_MAX << " bytes; ignored\n";
+            g_config_inbox = ConfigInbox{};
+            return;
+        }
+        g_config_inbox.text += pkt.text();
+        g_config_inbox.next_index = pkt.index() + 1;
+        if (!pkt.last()) return;
+
+        std::string text = std::move(g_config_inbox.text);
+        g_config_inbox = ConfigInbox{};
+
+        vnet::blackbox::Config fresh;
+        if (!fresh.load_text(text)) {
+            std::cerr << "[Switch] Config from the conductor ("
+                      << pkt.config_hash().substr(0, 12) << ") did not parse; "
+                      << (g_have_config ? "the previous config stays in force"
+                                        : "still waiting for a usable one") << "\n";
+            report_config(data.fd);
+            return;
+        }
+        std::string hash = fresh.fingerprint();
+        if (g_have_config && hash == g_identity.config_hash) {
+            // A conductor that restarted sends the same config again.
+            std::cout << "[Switch] Config from the conductor unchanged ("
+                      << hash.substr(0, 12) << ")\n";
+            report_config(data.fd);
+            return;
+        }
+        g_blackbox->replace_config(fresh);
+        g_identity.config_hash = hash;
+        g_have_config = true;
+        std::cout << "[Switch] Config from the conductor applied, fingerprint "
+                  << g_identity.config_hash.substr(0, 12) << " (" << text.size()
+                  << " bytes, " << fresh.agents().size() << " agents)\n";
+        if (g_identity.config_hash != pkt.config_hash())
+            std::cerr << "[Switch] The conductor announced fingerprint "
+                      << pkt.config_hash().substr(0, 12) << " for this config: the two "
+                      << "binaries parse it differently; update one of them\n";
+        report_config(data.fd);
     }
 
     void onAgentUnregistered(socket_data data,
@@ -998,16 +1087,19 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
-    if (!config_path) {
-        std::cerr << "[Switch] VNET_CONFIG_PATH must be set\n";
-        return 1;
-    }
-
     // --- Load config and initialize BlackBox ---
+    // With VNET_CONFIG_PATH the switch starts from its own file; without
+    // it the switch waits for the config the conductor sends. A config
+    // from the conductor replaces the file's in either case.
     vnet::blackbox::Config config;
-    if (!config.load(config_path)) {
-        std::cerr << "[Switch] Failed to load config: " << config_path << "\n";
-        return 1;
+    if (config_path && *config_path) {
+        if (!config.load(config_path)) {
+            std::cerr << "[Switch] Failed to load config: " << config_path << "\n";
+            return 1;
+        }
+        g_have_config = true;
+    } else {
+        config_path = "";
     }
 
     const std::string tun_name = "vnet-out";
@@ -1026,14 +1118,17 @@ int main(int argc, char** argv) {
     std::cout << "[Switch] Per-agent limit: " << agent_pps << " pps, "
               << agent_mbps << " Mbit/s (0 = none)\n";
 
-    std::cout << "[Switch] Loaded config from " << config_path << "\n";
+    if (g_have_config)
+        std::cout << "[Switch] Loaded config from " << config_path << "\n";
+    else
+        std::cout << "[Switch] No VNET_CONFIG_PATH: waiting for the config from the conductor\n";
 
     g_identity.name        = switch_name;
     g_identity.auth_key    = auth_key;
     g_identity.port        = port;
     g_identity.conductor   = MachineConfig{cdt_ip_env, static_cast<uint16_t>(cdt_port)};
     g_identity.config_path = config_path;
-    g_identity.config_hash = config.fingerprint();
+    g_identity.config_hash = g_have_config ? config.fingerprint() : "";
     g_identity.network     = env_or("VNET_NETWORK", "::internet");
     {
         // Behind NAT or on a host with several addresses, the address the
@@ -1047,7 +1142,8 @@ int main(int argc, char** argv) {
             }
         }
     }
-    std::cout << "[Switch] Config fingerprint " << g_identity.config_hash.substr(0, 12) << "\n";
+    if (g_have_config)
+        std::cout << "[Switch] Config fingerprint " << g_identity.config_hash.substr(0, 12) << "\n";
 
     int flag = 1;
 
@@ -1133,16 +1229,17 @@ int main(int argc, char** argv) {
         if (g_reload_request) {
             g_reload_request = 0;
             vnet::blackbox::Config fresh;
-            if (fresh.load(g_identity.config_path)) {
+            if (g_identity.config_path.empty()) {
+                std::cerr << "[Switch] No config file to reload: the config comes from "
+                          << "the conductor, reload it there\n";
+            } else if (fresh.load(g_identity.config_path)) {
                 blackbox.replace_config(fresh);
                 g_identity.config_hash = fresh.fingerprint();
+                g_have_config = true;
                 std::cout << "[Switch] Config reloaded, fingerprint "
                           << g_identity.config_hash.substr(0, 12) << "\n";
-                if (g_state.conductor && g_state.conductor->connected) {
-                    mip::PacketSwitchConfig cfg_pkt;
-                    cfg_pkt.set_config_hash(g_identity.config_hash);
-                    queue.send(g_state.conductor->fd, PacketType::SWITCH_CONFIG, cfg_pkt);
-                }
+                if (g_state.conductor && g_state.conductor->connected)
+                    dispatch.report_config(g_state.conductor->fd);
             } else {
                 std::cerr << "[Switch] Config reload failed; the previous config stays in force\n";
             }
