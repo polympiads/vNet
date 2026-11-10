@@ -4,14 +4,16 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-# Written by tools/vnet-roster.py: CONDUCTOR_PORT, VNET_AUTH_FILE, TLS files.
+# Written by tools/vnet-roster.py: CONDUCTOR_PORT, VNET_AUTH_FILE,
+# VNET_CONFIG_PATH, TLS files.
 EnvironmentFile=/etc/vnet/conductor.env
 ExecStart=/usr/local/bin/conductor
 Restart=always
 RestartSec=2
 # One socket per machine, plus the peers; the default 1024 is too few.
 LimitNOFILE=65536
-# SIGHUP reloads the auth file; SIGUSR1 writes the state dump at once.
+# SIGHUP reloads the auth file and the switch config, which is then sent
+# to every switch; SIGUSR1 writes the state dump at once.
 ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]

@@ -41,6 +41,8 @@ namespace vnet::protocol {
         virtual void onAgentUnregistered  (netqueue::socket_data data, mip::PacketAgentUnregistered  &packet);
         virtual void onPeerToken          (netqueue::socket_data data, mip::PacketPeerToken          &packet);
         virtual void onSwitchConfig       (netqueue::socket_data data, mip::PacketSwitchConfig       &packet);
+        /** One piece of the switch config, conductor to switch. */
+        virtual void onConfigPush         (netqueue::socket_data data, mip::PacketConfigPush         &packet);
 
         virtual ~Dispatch() = default;
     };

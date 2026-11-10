@@ -91,15 +91,16 @@ topo_down() {
 trap topo_down EXIT
 
 # Processes, all with TLS and their own certificate.
+CONDUCTOR_ENV=()   # extra settings for the conductor of one scenario
 start_conductor() {
   ip netns exec core env "${HB[@]}" $(tls_env conductor) VNET_AUTH_FILE="$LOGS/auth.txt" \
-      VNET_DUMP_PATH="$LOGS/dump.bin" "$BIN/conductor" >> "$LOGS/conductor.log" 2>&1 &
+      VNET_DUMP_PATH="$LOGS/dump.bin" "${CONDUCTOR_ENV[@]}" "$BIN/conductor" >> "$LOGS/conductor.log" 2>&1 &
   PID[conductor]=$!
 }
 SWITCH_ENV=()   # extra settings for the switches of one scenario
-start_switch() {  # i [cert name]
+start_switch() {  # i [cert name]; SWITCH_CONFIG set but empty = no file of its own
   ip netns exec s$1 env "${HB[@]}" $(tls_env ${2:-switch$1}) CONDUCTOR_IP=172.30.$1.1 CONDUCTOR_PORT=5000 \
-      VNET_CONFIG_PATH="${SWITCH_CONFIG:-$LOGS/switch.txt}" VNET_AUTH_KEY=key$1 VNET_STATS_SEC=0 \
+      VNET_CONFIG_PATH="${SWITCH_CONFIG-$LOGS/switch.txt}" VNET_AUTH_KEY=key$1 VNET_STATS_SEC=0 \
       "${SWITCH_ENV[@]}" "$BIN/switch" switch$1 600$1 >> "$LOGS/switch$1.log" 2>&1 &
   PID[switch$1]=$!
 }
@@ -168,7 +169,7 @@ scenario_attacks() {
   sleep 1.5
   wait_for "$LOGS/conductor.log" "Switch registered" 1 10 || { fail attacks "switch did not register"; return; }
   local ok=1 line
-  for check in oversized forged_token forged_hello forged_withdrawal reidentify bad_key unknown_name; do
+  for check in oversized forged_token forged_hello forged_withdrawal forged_config reidentify bad_key unknown_name; do
     line=$(ip netns exec core python3 "$HERE/client.py" $check 2>&1); say "$line"
     echo "$line" | grep -q "RESULT $check ok" || ok=0
   done
@@ -246,29 +247,150 @@ scenario_lockdown() {
   pass lockdown
 }
 
-scenario_config() {
-  topo_up config
+# A TCP listener in a namespace, kept in PID under a name.
+listen_tcp() {  # ns name port
+  ip netns exec $1 python3 -c '
+import socket, sys, time
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("", int(sys.argv[1]))); s.listen(5); time.sleep(120)' $3 &
+  PID[$2]=$!
+}
+# connects <ns> <source ip> <dest ip> <port>: 0 when a TCP connection completes within 2 s
+connects() {
+  ip netns exec $1 python3 -c '
+import socket, sys
+try:
+    socket.create_connection((sys.argv[2], int(sys.argv[3])), timeout=2, source_address=(sys.argv[1], 0)).close()
+except OSError:
+    sys.exit(1)' $2 $3 $4 2>/dev/null
+}
+
+# The bypass file: a broker in another subnet stays reachable through
+# the physical gateway, with and without lockdown; in/out rules open
+# single ports; a reload follows the file; everything goes on exit.
+scenario_bypass() {
+  topo_up bypass
+  in_ns core ip addr add 172.29.0.9/24 dev lo
+  start_conductor; sleep 0.5
+  start_switch 1; start_switch 2; sleep 1.5
+  cat > "$LOGS/bypass.conf" <<EOF
+# the broker's subnet stays on the physical network
+route 172.29.0.0/24
+# the gateway may reach the service on 2244, nothing else
+in -p tcp -s 172.31.1.1/32 --dport 2244 -j ACCEPT
+# this machine may reach the gateway's service on 2255
+out -p tcp -d 172.31.1.1/32 --dport 2255 -j ACCEPT
+in6 -p tcp --dport 2266 -j ACCEPT
+EOF
+  start_agent 1 VNET_LOCKDOWN=1 VNET_LOCKDOWN_LOG=1 VNET_BYPASS_FILE="$LOGS/bypass.conf"
+  start_agent 2 VNET_BYPASS_FILE="$LOGS/bypass.conf"
+  sleep 2
+  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail bypass "agents did not register"; return; }
+  [ "$(pings 1 10.0.1.2 2)" = 2 ] || { fail bypass "overlay blocked"; return; }
+  # The broker is off the local subnet: without the route line it would
+  # go into the TUN. Reachable both ways, with lockdown (a1) and without (a2).
+  in_ns a1 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 || { fail bypass "broker unreachable under lockdown"; return; }
+  in_ns a2 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 || { fail bypass "broker unreachable without lockdown"; return; }
+  in_ns core ping -c 1 -W 1 -I 172.29.0.9 172.31.1.2 >/dev/null 2>&1 || { fail bypass "broker cannot reach the agent"; return; }
+  in_ns a1 ip route | grep -q "^172.29.0.0/24 via 172.31.1.1 dev xa1" || { fail bypass "route not pinned"; return; }
+  in_ns a1 ping -c 1 -W 1 172.31.1.1 >/dev/null 2>&1 && { fail bypass "LAN gateway reachable"; return; }
+  # Port rules: the gateway reaches a1 only on 2244; a1 reaches the gateway only on 2255.
+  listen_tcp a1 l2244 2244; listen_tcp a1 l2245 2245; listen_tcp core l2255 2255; listen_tcp core l2256 2256; sleep 0.5
+  connects core 172.31.1.1 172.31.1.2 2244 || { fail bypass "allowed inbound port blocked"; return; }
+  connects core 172.31.1.1 172.31.1.2 2245 && { fail bypass "other inbound port open"; return; }
+  connects a1 172.31.1.2 172.31.1.1 2255 || { fail bypass "allowed outbound port blocked"; return; }
+  connects a1 172.31.1.2 172.31.1.1 2256 && { fail bypass "other outbound port open"; return; }
+  in_ns a1 ip6tables -S VNET_IN | grep -q -- "--dport 2266" || { fail bypass "in6 rule missing"; return; }
+  in_ns a1 iptables -S VNET_OUT | grep -q -- "-j LOG" || { fail bypass "drop log rule missing"; return; }
+  # Reload: the route line leaves the file and comes back.
+  cp "$LOGS/bypass.conf" "$LOGS/full.conf"
+  grep -v '^route' "$LOGS/full.conf" > "$LOGS/bypass.conf"
+  kill -HUP "${PID[agent1]}"; sleep 1
+  grep -q "Bypass file reloaded" "$LOGS/agent1.log" || { fail bypass "no reload"; return; }
+  in_ns a1 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 && { fail bypass "broker still reachable after the route left the file"; return; }
+  in_ns a1 ip route | grep -q "^172.29.0.0/24" && { fail bypass "pin kept after reload"; return; }
+  cp "$LOGS/full.conf" "$LOGS/bypass.conf"
+  kill -HUP "${PID[agent1]}"; sleep 1
+  in_ns a1 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 || { fail bypass "broker unreachable after the route came back"; return; }
+  # A broken file changes nothing.
+  printf 'route 0.0.0.0/0\n' >> "$LOGS/bypass.conf"
+  kill -HUP "${PID[agent1]}"; sleep 1
+  grep -q "reload failed" "$LOGS/agent1.log" || { fail bypass "bad file not reported"; return; }
+  in_ns a1 ping -c 1 -W 1 172.29.0.9 >/dev/null 2>&1 || { fail bypass "broker lost after a bad reload"; return; }
+  # Exit: pins and chains gone, on both machines.
+  stop agent1 TERM; stop agent2 TERM; sleep 1
+  in_ns a1 ip route | grep -q "^172.29.0.0/24" && { fail bypass "pin left behind"; return; }
+  in_ns a2 ip route | grep -q "^172.29.0.0/24" && { fail bypass "pin left behind without lockdown"; return; }
+  [ "$(in_ns a1 iptables -S | grep -c VNET)" = 0 ] || { fail bypass "rules left behind"; return; }
+  say "broker in another subnet reachable through the pin; port rules hold; reload and exit clean"
+  pass bypass
+}
+
+# Switches with config files of their own: compared, reloaded on SIGHUP.
+scenario_config_files() {
+  topo_up config_files
   start_conductor; sleep 0.5
   start_switch 1
   printf 'agent1 10.0.1.1\nagent2 10.0.1.2\nagent3 10.0.1.3\n' > "$LOGS/other.txt"
   SWITCH_CONFIG="$LOGS/other.txt" start_switch 2; unset SWITCH_CONFIG
   sleep 3
-  [ "$(grep -c 'Switch registered' "$LOGS/conductor.log")" = 1 ] || { fail config "mismatched config not refused"; return; }
-  grep -q "differs from" "$LOGS/conductor.log" || { fail config "no mismatch message"; return; }
+  [ "$(grep -c 'Switch registered' "$LOGS/conductor.log")" = 1 ] || { fail config_files "mismatched config not refused"; return; }
+  grep -q "differs from" "$LOGS/conductor.log" || { fail config_files "no mismatch message"; return; }
   stop switch2 TERM
   # Reload: agent2<->agent3 not allowed, then allowed after SIGHUP.
   start_switch 2; sleep 1.5
   start_agent 2; start_agent 3; sleep 2
-  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail config "agents did not register"; return; }
-  [ "${r:=$(pings 2 10.0.1.3 1)}" = 0 ] || { fail config "denied pair pinged before reload"; return; }
+  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail config_files "agents did not register"; return; }
+  [ "${r:=$(pings 2 10.0.1.3 1)}" = 0 ] || { fail config_files "denied pair pinged before reload"; return; }
   printf 'agent2 agent3\n' >> "$LOGS/switch.txt"
   kill -HUP "${PID[switch1]}" "${PID[switch2]}"; sleep 1
-  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "pair still denied after reload"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config_files "pair still denied after reload"; return; }
   printf 'garbage\n' >> "$LOGS/switch.txt"
   kill -HUP "${PID[switch1]}"; sleep 1
-  grep -q "reload failed" "$LOGS/switch1.log" || { fail config "bad reload not reported"; return; }
-  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "old config not kept"; return; }
+  grep -q "reload failed" "$LOGS/switch1.log" || { fail config_files "bad reload not reported"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config_files "old config not kept"; return; }
   say "mismatch refused; SIGHUP applied; broken file kept the old config"
+  pass config_files
+}
+
+# The conductor holds the config: switches get it as they register and
+# after a SIGHUP on the conductor; a file larger than one frame arrives
+# in pieces.
+scenario_config() {
+  topo_up config
+  CONDUCTOR_ENV=(VNET_CONFIG_PATH="$LOGS/switch.txt"); start_conductor; CONDUCTOR_ENV=(); sleep 0.5
+  # switch1 has no file of its own; switch2 starts from a stale one.
+  SWITCH_CONFIG= start_switch 1
+  printf 'agent1 10.0.1.1\nagent2 10.0.1.2\nagent3 10.0.1.3\n' > "$LOGS/other.txt"
+  SWITCH_CONFIG="$LOGS/other.txt" start_switch 2; unset SWITCH_CONFIG
+  wait_for "$LOGS/conductor.log" "applied config" 2 10 || { fail config "switches did not confirm the config"; return; }
+  grep -q "waiting for the config from the conductor" "$LOGS/switch1.log" || { fail config "switch1 did not wait for the config"; return; }
+  start_agent 2; start_agent 3; sleep 2
+  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail config "agents did not register"; return; }
+  [ "$(pings 2 10.0.1.3 1)" = 0 ] || { fail config "denied pair pinged before reload"; return; }
+  # One edit on the conductor reaches both switches.
+  printf 'agent2 agent3\n' >> "$LOGS/switch.txt"
+  kill -HUP "${PID[conductor]}"
+  wait_for "$LOGS/conductor.log" "applied config" 4 10 || { fail config "reload did not reach both switches"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "pair still denied after reload"; return; }
+  # A broken file keeps the old config everywhere.
+  cp "$LOGS/switch.txt" "$LOGS/good.txt"
+  printf 'garbage\n' >> "$LOGS/switch.txt"
+  kill -HUP "${PID[conductor]}"; sleep 1
+  grep -q "Config reload failed" "$LOGS/conductor.log" || { fail config "bad reload not reported"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "old config not kept"; return; }
+  # A config larger than one frame (5000 more machines) arrives whole.
+  { cat "$LOGS/good.txt"; for i in $(seq 1 5000); do printf 'f%04d 10.9.%d.%d\n' $i $((i / 250)) $((i % 250 + 1)); done; } > "$LOGS/switch.txt"
+  kill -HUP "${PID[conductor]}"
+  wait_for "$LOGS/conductor.log" "applied config" 6 15 || { fail config "large config did not reach both switches"; return; }
+  grep -q "5003 agents" "$LOGS/switch1.log" || { fail config "large config not applied whole"; return; }
+  [ "$(pings 2 10.0.1.3 3)" = 3 ] || { fail config "pair denied after the large config"; return; }
+  # A switch that restarts gets the config again, without a file.
+  stop switch1 TERM; SWITCH_CONFIG= start_switch 1; unset SWITCH_CONFIG
+  wait_for "$LOGS/conductor.log" "applied config" 7 15 || { fail config "restarted switch did not get the config"; return; }
+  local bytes
+  bytes=$(grep -o "applied, fingerprint [0-9a-f]* ([0-9]* bytes" "$LOGS/switch1.log" | tail -1 | grep -o "[0-9]* bytes")
+  say "config sent on registration and on SIGHUP; broken file kept; large config ($bytes) in pieces"
   pass config
 }
 
@@ -382,7 +504,7 @@ scenario_throughput() {
 # ---------------------------------------------------------------- main
 
 make_certs
-ALL="basic attacks conductor_restart switch_restart switch_link agent_exit agent_crash duplicate_identity lockdown config auth_reload flood throughput"
+ALL="basic attacks conductor_restart switch_restart switch_link agent_exit agent_crash duplicate_identity lockdown bypass config config_files auth_reload flood throughput"
 for s in ${@:-$ALL}; do
   echo "== $s"
   topo_down

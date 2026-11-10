@@ -37,6 +37,9 @@ namespace vnet::protocol {
         AGENT_UNREGISTERED     = 15,
         PEER_TOKEN             = 16,
         SWITCH_CONFIG          = 17,
+
+        // The switch config itself, conductor to switch.
+        CONFIG_PUSH            = 18,
     };
 
     PacketType    ntoh_packet_type (uint_packet_t type);

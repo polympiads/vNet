@@ -17,9 +17,27 @@ message PacketSwitchMIP {
     fixed32 advertise_ipv4 = 6;
 }
 
-// Switch to conductor after a config reload: the new fingerprint.
+// Switch to conductor: the fingerprint of the config it applies, sent
+// after a reload of its own file and after a config pushed by the
+// conductor was applied (or refused, in which case the old fingerprint
+// is repeated).
 message PacketSwitchConfig {
     string config_hash = 1;
+}
+
+// Conductor to switch: the switch config as text, in one or more pieces,
+// so a file larger than one frame still fits. Pieces arrive in order on
+// the conductor link; the switch collects them and parses the whole
+// when the last one arrives.
+message PacketConfigPush {
+    // Fingerprint of the parsed config the pieces add up to.
+    string config_hash = 1;
+    // Position of this piece, 0 for the first.
+    uint32 index = 2;
+    // True on the last piece.
+    bool   last = 3;
+    // A slice of the config file.
+    bytes  text = 4;
 }
 
 message PacketAgentMIP {

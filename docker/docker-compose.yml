@@ -7,12 +7,14 @@ services:
     networks: [vnet]
     environment:
       - VNET_AUTH_FILE=/etc/vnet/auth.txt
+      - VNET_CONFIG_PATH=/etc/vnet/switch.txt
       - VNET_TLS=1
       - VNET_TLS_CERT=/etc/vnet/tls/conductor.pem
       - VNET_TLS_KEY=/etc/vnet/tls/conductor.key
       - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     volumes:
       - ./auth.txt:/etc/vnet/auth.txt:ro
+      - ./switch.txt:/etc/vnet/switch.txt:ro
       - ./certs:/etc/vnet/tls:ro
     healthcheck:
       test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/5000' || exit 1"]
@@ -39,14 +41,12 @@ services:
     environment:
       - CONDUCTOR_IP=vnet-conductor
       - CONDUCTOR_PORT=5000
-      - VNET_CONFIG_PATH=/etc/vnet/config.txt
       - VNET_TLS=1
       - VNET_AUTH_KEY=authkey1
       - VNET_TLS_CERT=/etc/vnet/tls/switch1.pem
       - VNET_TLS_KEY=/etc/vnet/tls/switch1.key
       - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     volumes:
-      - ./switch1.txt:/etc/vnet/config.txt:ro
       - ./certs:/etc/vnet/tls:ro
     cap_add:
       - NET_ADMIN
@@ -80,14 +80,12 @@ services:
     environment:
       - CONDUCTOR_IP=vnet-conductor
       - CONDUCTOR_PORT=5000
-      - VNET_CONFIG_PATH=/etc/vnet/config.txt
       - VNET_TLS=1
       - VNET_AUTH_KEY=authkey2
       - VNET_TLS_CERT=/etc/vnet/tls/switch2.pem
       - VNET_TLS_KEY=/etc/vnet/tls/switch2.key
       - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     volumes:
-      - ./switch2.txt:/etc/vnet/config.txt:ro
       - ./certs:/etc/vnet/tls:ro
     cap_add:
       - NET_ADMIN
@@ -121,14 +119,12 @@ services:
     environment:
       - CONDUCTOR_IP=vnet-conductor
       - CONDUCTOR_PORT=5000
-      - VNET_CONFIG_PATH=/etc/vnet/config.txt
       - VNET_TLS=1
       - VNET_AUTH_KEY=authkey3
       - VNET_TLS_CERT=/etc/vnet/tls/switch3.pem
       - VNET_TLS_KEY=/etc/vnet/tls/switch3.key
       - VNET_TLS_CA=/etc/vnet/tls/ca.pem
     volumes:
-      - ./switch3.txt:/etc/vnet/config.txt:ro
       - ./certs:/etc/vnet/tls:ro
     cap_add:
       - NET_ADMIN

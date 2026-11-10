@@ -37,7 +37,7 @@ Once routes are known, packets flow switch-to-switch without the conductor invol
 
 Three processes. One conductor, one or more switches, and one agent per machine. Start them in any order: a switch or an agent that cannot reach the conductor keeps trying every 2 seconds, and an agent that loses its switch asks the conductor for another.
 
-The conductor listens on `CONDUCTOR_PORT` (5000 when unset). It has no arguments.
+The conductor listens on `CONDUCTOR_PORT` (5000 when unset) and holds the switch config (`VNET_CONFIG_PATH`), which it sends to every switch. It has no arguments.
 
 ```
 conductor
@@ -73,7 +73,9 @@ Beyond keys and certificates, the switch accepts a token, a route or a peer noti
 
 ## Switch config
 
-`VNET_CONFIG_PATH` is required. Copy the same file to every switch: each switch applies the ACL itself and must know every virtual address. The conductor refuses a switch whose config differs from the registered switches' (compared by a fingerprint of the parsed content, so comments and ordering do not matter), and names both switches in its log. `VNET_CONFIG_HASH_CHECK=0` turns that off.
+Set `VNET_CONFIG_PATH` on the conductor. Each switch applies the ACL itself and must know every virtual address, so the conductor sends the file to a switch when it registers, and to every switch after `SIGHUP` (`systemctl reload vnet-conductor`). A switch confirms with a fingerprint of the parsed content (comments and ordering do not matter), and the conductor names a switch whose fingerprint is not the one it sent. A file larger than one frame travels in pieces; the switch applies the whole or nothing. A switch started without a config of its own accepts no agent until the first one arrives, and keeps the last one it applied while the conductor is down.
+
+A switch may still read a file of its own (`VNET_CONFIG_PATH` on the switch, `SIGHUP` reloads it), which a config from the conductor replaces. When the conductor has no `VNET_CONFIG_PATH`, that is the only source, and the conductor refuses a switch whose fingerprint differs from the registered switches', naming both; `VNET_CONFIG_HASH_CHECK=0` turns that off.
 
 Three kinds of lines:
 
@@ -90,7 +92,7 @@ The first assigns a virtual address inside the overlay (`10.0.0.0/8` unless `VNE
 
 `agent1 ::internet:8.8.8.8` allows that machine to exchange packets with that one internet address, through the switch; `a.b.c.d/n` allows a whole prefix, and `0.0.0.0/0` allows everything. There is no rule for every internet host. Return traffic is accepted only for an address that was allowed outbound. If contestants should use their machine's normal route for general internet, set `VNET_DEFAULT_VIA_TUN=0` on the agent. Otherwise the agent replaces the default route with the TUN, and only listed internet addresses pass. Remember the resolver: a machine with no `::internet` rule for its DNS server resolves nothing.
 
-Send `SIGHUP` to a switch to reload the file without a restart (`systemctl reload vnet-switch`). Rules apply to the next packet; a changed or removed address takes effect when that agent next connects. A file that does not parse leaves the previous config in force. Reload every switch, or the conductor logs that they disagree.
+To change the rules, edit the file on the conductor and reload it; nothing restarts. Rules apply to the next packet; a changed or removed address takes effect when that agent next connects. A file that does not parse leaves the previous config in force, on the conductor and on every switch.
 
 A switch announces itself as network `::internet` (`VNET_NETWORK`), so the conductor may assign any agent to it; an agent announces `vnet.internal` (`VNET_NETWORK`). The conductor assigns an agent to a switch of the same network or of `::internet`, round-robin across the switches that are up.
 
@@ -100,9 +102,37 @@ Allowed internet traffic is masqueraded out of the switch's physical default rou
 
 After the TUN comes up, the agent pins the conductor address and the assigned switch address as `/32` routes via the previous physical gateway. Overlay addresses go through the TUN. Do not give the conductor or a switch an address inside `VNET_OVERLAY_CIDR`. When the agent stops it puts the default route back and removes the pins. The physical route is also kept in `/run/vnet/agent-<name>.route` (`VNET_STATE_DIR`), so an agent started after a crash puts it back too.
 
+Anything else the machine must keep reaching on the physical network while the default route is the TUN goes in the bypass file, `VNET_BYPASS_FILE`:
+
+```
+# a VDI broker in another subnet, a DNS server
+route 192.0.2.0/24
+route 198.51.100.53
+```
+
+Each `route` prefix is pinned the same way, whether or not lockdown is on. A prefix inside a subnet the machine is directly on needs no pin and gets none; a prefix the machine already routes through another gateway is left to that route. A prefix that overlaps the overlay, or `0.0.0.0/0`, is refused. A machine on a directly connected subnet, such as the LAN gateway, is reachable without any of this. `VNET_LOCKDOWN_ALLOW` (comma-separated prefixes) means the same as `route` lines and still works.
+
 ## Lockdown of contestant machines
 
-The overlay only governs what enters the TUN. Two contestants on the same LAN can still reach each other directly, and a dual-stack network leaves the internet open over IPv6. With `VNET_LOCKDOWN=1` the agent adds host firewall rules (chains `VNET_IN` and `VNET_OUT`, hooked first in `INPUT` and `OUTPUT`) that allow only loopback, the TUN, the links to the conductor and the switch, replies to allowed connections, DHCP, and the networks in `VNET_LOCKDOWN_ALLOW` (comma-separated CIDRs, for the admins' SSH). Everything else is dropped in both directions and IPv6 is blocked. The rules follow the agent to a new switch and are removed when it stops. Contestants must not have root on the machine, or none of this holds.
+The overlay only governs what enters the TUN. Two contestants on the same LAN can still reach each other directly, and a dual-stack network leaves the internet open over IPv6. With `VNET_LOCKDOWN=1` the agent adds host firewall rules (chains `VNET_IN` and `VNET_OUT`, hooked first in `INPUT` and `OUTPUT`) that allow only loopback, the TUN, the links to the conductor and the switch, replies to allowed connections, DHCP, and what the bypass file allows. Everything else is dropped in both directions and IPv6 is blocked. The rules follow the agent to a new switch and are removed when it stops. Contestants must not have root on the machine, or none of this holds.
+
+The bypass file carries the exceptions, so nothing about a particular site is in vNet. Its `route` prefixes are allowed in both directions on every port. Its `in` and `out` lines are iptables rules appended to `VNET_IN` and `VNET_OUT` before the final drop, exactly as written; `in6` and `out6` do the same for IPv6:
+
+```
+# the connection servers, both ways
+route 192.0.2.10/32
+route 192.0.2.11/32
+# display protocol from the client subnet, inbound only
+in  -p tcp -s 198.51.100.0/24 --dport 22443 -j ACCEPT
+# one outbound service on the gateway
+out -p tcp -d 203.0.113.1 --dport 4001:4002 -j ACCEPT
+```
+
+The arguments go to `iptables` without a shell, so a line cannot run anything; a line iptables refuses is logged and the drop stays. A file that cannot be opened stops the agent at start, so a wrong path cannot leave a machine open or a broker unreachable. `SIGHUP` (`systemctl reload vnet-agent`) reads the file again: routes that left it are unpinned, new ones pinned, the chains rebuilt.
+
+`VNET_LOCKDOWN_LOG=1` logs each dropped packet to the kernel log (`journalctl -k`, prefixes `vnet-drop-in` and `vnet-drop-out`), one line per second at most. Turn it on for the first machine locked down on a new network: it lists every flow the image or its agents need that the bypass file does not allow yet. Without lockdown, only the `route` lines of the bypass file have an effect.
+
+On a VDI, the in-guest agent of the broker (Horizon Agent, say) talks to its connection servers and receives the display sessions over the physical network, and the hypervisor heartbeat of VMware Tools does not use the network at all. Put the connection servers, the gateway appliance if sessions are tunneled, the DNS and NTP servers, and the domain controllers if the desktops are domain-joined, in `route` lines; with direct client connections add an `in` line for the display port from the client subnet. When the infrastructure already isolates the desktops from each other, `VNET_LOCKDOWN=0` and `VNET_DEFAULT_VIA_TUN=0` need no bypass file at all.
 
 ## Limits and counters
 
@@ -120,13 +150,13 @@ The conductor writes its state to `/var/vnet-dump.bin` (`VNET_DUMP_PATH`) every 
 
 ## Generating the files
 
-`tools/vnet-roster.py roster.txt out --conductor <ip>[:port] [--tls]` turns one roster into every file an event needs: `out/auth.txt` for the conductor, `out/switch.txt` for every switch, `out/machines/<name>.env` for each machine's systemd unit, and with `--tls` a CA and a certificate per machine in `out/certs/`. Keys are random and kept across reruns. The roster lists switches, agents with their virtual IP, groups, `internet=` prefixes and `lockdown`, and `allow` rules between groups; `tools/vnet-roster.py -h` shows the format.
+`tools/vnet-roster.py roster.txt out --conductor <ip>[:port] [--tls]` turns one roster into every file an event needs: `out/auth.txt` and `out/switch.txt` for the conductor, `out/machines/<name>.env` for each machine's systemd unit, `out/machines/<name>.bypass` for each agent that has bypass lines, and with `--tls` a CA and a certificate per machine in `out/certs/`. Keys are random and kept across reruns. The roster lists switches, agents with their virtual IP, groups, `internet=` prefixes, `lockdown` and `droplog`, `allow` rules between groups, and `bypass` lines per group; `tools/vnet-roster.py -h` shows the format.
 
 ## Running an event
 
-Before: generate the files with `vnet-roster`, install `switch.txt`, `auth.txt`, the env file and the certificates under `/etc/vnet` on each machine (`ca.key` stays with you), start the units, and check `vnet-state dump auth.txt` until nothing is listed under "expected but not connected". Ping across two switches from a contestant machine, and from a locked-down machine confirm that its LAN gateway does not answer.
+Before: generate the files with `vnet-roster`, install `auth.txt` and `switch.txt` on the conductor, and the env file, the bypass file if there is one, and the certificates under `/etc/vnet` on each machine (`ca.key` stays with you), start the units, and check `vnet-state dump auth.txt` until nothing is listed under "expected but not connected". Ping across two switches from a contestant machine, and from a locked-down machine confirm that its LAN gateway does not answer and that whatever its bypass file names still does.
 
-During: `vnet-state` says who is missing; `SIGUSR1` on a switch says what it dropped and why. To add a machine, append it to the roster, rerun `vnet-roster`, copy `auth.txt` to the conductor and `switch.txt` to every switch, and send `SIGHUP` to the conductor and to every switch; nothing restarts. To remove a machine, remove its lines the same way; it is cut off at its next connection, or at once if you also stop its agent.
+During: `vnet-state` says who is missing; `SIGUSR1` on a switch says what it dropped and why. To add a machine or change a rule, edit the roster, rerun `vnet-roster`, copy `auth.txt` and `switch.txt` to the conductor, and `systemctl reload vnet-conductor`; every switch gets the new config and nothing restarts. To remove a machine, remove its lines the same way; it is cut off at its next connection, or at once if you also stop its agent.
 
 When a process dies, its unit restarts it; the others recover as described above. If a whole switch host is lost, its agents move to the remaining switches. If the conductor host is lost, the data plane keeps running; new joins and rejoins wait until a conductor with the same auth file is back at the same address.
 
@@ -140,4 +170,4 @@ The overlay rides TCP (with TLS) between agent and switch and between switches, 
 
 ## Tests
 
-`cmake --build build --target coverage` and `--target memcheck` run the unit tests, as the CI does. `sudo tests/integration/run.sh build` runs the conductor, two switches and three agents in network namespaces with TLS, and checks registration and ACL, forged messages from a raw client, conductor and switch restarts, a cut link, route restore, lockdown, config reload, the per-agent limit under a flood, and throughput.
+`cmake --build build --target coverage` and `--target memcheck` run the unit tests, as the CI does. `sudo tests/integration/run.sh build` runs the conductor, two switches and three agents in network namespaces with TLS, and checks registration and ACL, forged messages from a raw client, conductor and switch restarts, a cut link, route restore, lockdown, the bypass file, the config sent by the conductor and reloaded, the per-agent limit under a flood, and throughput.
