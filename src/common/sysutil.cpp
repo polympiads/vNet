@@ -35,6 +35,12 @@ bool run_program(const std::vector<std::string>& argv, const char* tag,
             }
         }
         execvp(args[0], args.data());
+        // Only reached when the program is missing. The redirected
+        // descriptors are this child's own; leave nothing of ours open.
+        if (quiet) {
+            close(STDOUT_FILENO);
+            close(STDERR_FILENO);
+        }
         _exit(127);
     }
 
