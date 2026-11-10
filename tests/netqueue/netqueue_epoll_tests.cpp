@@ -105,10 +105,19 @@ TEST(NetQueueEpoll, NetQueuePutError) {
 
 TEST(NetQueueEpoll, NetQueueWaitError) {
     NetQueue* queue = new NetQueue(NetworkQueueHandler(), 500);
-    uint32_t* buffer = (uint32_t*) queue;
-    close(buffer[0]);
+
+    // Swap the epoll descriptor (the first member) for a pipe end, so
+    // epoll_wait fails with EINVAL and the queue must come back. The queue
+    // closes the pipe end as its own; no descriptor is closed twice.
+    int pipe_fds[2];
+    ASSERT_EQ(pipe(pipe_fds), 0);
+    int* epoll_slot = (int*) queue;
+    close(*epoll_slot);
+    *epoll_slot = pipe_fds[0];
 
     queue->wait_and_process();
+
+    close(pipe_fds[1]);
     delete queue;
 }
 

@@ -77,8 +77,7 @@ TEST(NetQueue, CloseNetworkElement) {
 
     queue->close(element);
 
-    EXPECT_EQ( read(fd_client, bf, 1), -1 );
-    EXPECT_EQ( errno, EBADF );
+    EXPECT_FALSE( fd_is_open(fd_client) );
     EXPECT_EQ( queue->get_network_element_from_fd(fd_client), nullptr );
     
     close(fd_server);
@@ -104,8 +103,7 @@ TEST(NetQueue, CloseFD) {
 
     queue->close( fd_client );
 
-    EXPECT_EQ( read(fd_client, bf, 1), -1 );
-    EXPECT_EQ( errno, EBADF );
+    EXPECT_FALSE( fd_is_open(fd_client) );
     EXPECT_EQ( queue->get_network_element_from_fd(fd_client), nullptr );
     
     close(fd_server);
