@@ -1,6 +1,37 @@
-# polympiads/vNet - Virtualized Network
+# polympiads/vNet — Virtualized Network
 
-The purpose of the vNet software is to provide us with a way to link the virtual machines (both the ones used by our contestants and the ones used by host and runners), as part of a unified virtual network with security groups and network forwarding to the global internet.
+vNet is a virtual networking system built for competitive programming events. It creates an isolated overlay network where participants (agents) talk to each other using virtual IPs, no matter where they physically are. Each agent can only reach what the config explicitly allows.
+
+vNet powers the networking infrastructure of olympiads in informatics at EPFL.
+
+---
+
+## Architecture
+
+```
+┌─────────────┐        ┌─────────────┐        ┌─────────────┐
+│   Conductor │◄──────►│   Switch    │◄──────►│    Agent    │
+│             │        │  (BlackBox) │        │  (TUN iface)│
+└─────────────┘        └─────────────┘        └─────────────┘
+  Control plane          Data plane             End node
+```
+
+- **Conductor** — manages connections, assigns agents to switches, broadcasts routes. Never forwards packets.
+- **Switch** — agents connect here. Forwards packets locally, to peer switches, or to the internet, via the **BlackBox**.
+- **Agent** — end node. Creates a TUN interface with its virtual IP. Applications see normal IPv4 traffic.
+- **BlackBox** — packet engine: anti-spoofing, ACL checks, routing decisions.
+
+---
+
+## How it works
+
+The agent registers with the conductor, gets assigned to a switch with a one-time token, authenticates, and receives its virtual IP. It creates a TUN interface and enters its event loop.
+
+When an agent authenticates, its switch tells the conductor, which broadcasts the route to every other switch. Switches connect to each other on demand and cache routes locally — no per-packet conductor lookups. When a switch disconnects, the conductor tells everyone to drop routes pointing to it.
+
+Once routes are known, packets flow switch-to-switch without the conductor involved. The BlackBox on each switch decides: deliver locally, forward to a peer switch, forward to the internet, or drop.
+
+---
 
 ## Setup
 
