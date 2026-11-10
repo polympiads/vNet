@@ -23,6 +23,8 @@ create_test(netqueue_socket_tests netqueue/netqueue_socket_tests.cpp)
 create_test(netqueue_epoll_tests  netqueue/netqueue_epoll_tests.cpp)
 create_test(netqueue_tun_tests    netqueue/netqueue_tun_tests.cpp)
 create_test(netqueue_tests        netqueue/netqueue_tests.cpp)
+create_test(netqueue_send_tests   netqueue/netqueue_send_tests.cpp)
+create_test(netqueue_connect_tests netqueue/netqueue_connect_tests.cpp)
 
 # testing utils
 create_test(tun_wrapper_tests utils/tun_wrapper_tests.cpp)
@@ -35,6 +37,8 @@ function(create_blackbox_test test_name test_file)
 endfunction()
 
 create_blackbox_test(ipv4_tests             blackbox/ipv4_tests.cpp)
+create_blackbox_test(ratelimit_tests        blackbox/ratelimit_tests.cpp)
+create_blackbox_test(sysutil_tests          common/sysutil_tests.cpp)
 create_blackbox_test(agent_registry_tests   blackbox/agent_registry_tests.cpp)
 create_blackbox_test(routing_table_tests    blackbox/routing_table_tests.cpp)
 create_blackbox_test(config_tests           blackbox/config_tests.cpp)

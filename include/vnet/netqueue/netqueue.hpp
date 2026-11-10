@@ -9,18 +9,33 @@
 #include <google/protobuf/message.h>
 #include <unordered_map>
 #include <mutex>
+#include <vector>
+
+/* OpenSSL session type, declared here so no copy of it lands in this namespace. */
+struct ssl_st;
 
 namespace vnet::netqueue {
     /**
-     * Maximum number for events returned
-     * by a single call to epoll_wait
+     * Maximum number of events returned by a single call to epoll_wait.
+     * A switch with hundreds of agents gets most of them in one turn.
      */
-    const int EPOLL_MAX_EVENTS = 32;
+    const int EPOLL_MAX_EVENTS = 256;
+
+    /**
+     * Packets one element may deliver in one turn of wait_and_process.
+     * A socket that is fed without pause is put down after this many and
+     * taken up again next turn, so it cannot starve the other elements.
+     */
+    const int PACKETS_PER_TURN = 64;
 
     /**
      * Instances of this class represents a general
      * purpose pool of file descriptors intended to
-     * represent a queue for incoming network packets. 
+     * represent a queue for incoming network packets.
+     *
+     * The process must ignore SIGPIPE: a write to a peer that hung up,
+     * including the TLS alert OpenSSL sends on a failed handshake, is
+     * reported as an error on that socket instead of ending the process.
      */
     struct NetQueue {
     private:
@@ -41,6 +56,20 @@ namespace vnet::netqueue {
         /* Mutex for all operations related to the fd_to_network_element unordered_map */
         std::mutex fd_to_network_element_mutex;
 
+        /* Elements removed from the map but not yet deleted, so an epoll
+         * batch that still holds their pointer can skip them safely. */
+        std::vector<NetworkElement*> deferred_delete;
+
+        /* Elements that hit PACKETS_PER_TURN with input left: handled
+         * first next turn, which then does not sleep in epoll_wait. */
+        std::vector<NetworkElement*> backlog;
+        uint64_t turn = 0;
+
+        void reap_closed();
+
+        /* One element that epoll (or the backlog) reported ready. */
+        void handle_ready(NetworkElement* element, uint32_t events);
+
         /*
          * Handler of events (e.g. receiving a packet,
          *   error of a specific fd etc...)
@@ -55,6 +84,19 @@ namespace vnet::netqueue {
         * Returns false if the connection should be closed.
         */
         bool flush_write_buffer(NetworkElement* element);
+
+        /* Advance a pending connect or handshake. Returns false when the
+         * element is not ready yet and process() should stop. */
+        bool step_connecting(NetworkElement* element);
+        bool step_handshake(NetworkElement* element);
+        void fire_connected(NetworkElement* element);
+
+        /**
+        * Shared body of send and send_data. With drop_when_full, a write
+        * buffer that cannot take n more bytes makes the call return
+        * false and leaves the connection alone.
+        */
+        bool send_impl(int fd, const void* data, size_t n, bool drop_when_full);
 
     public:
 
@@ -76,9 +118,17 @@ namespace vnet::netqueue {
 
         /**
         * Send a protobuf message with the 6-byte packet header
-        * through the queue's write path.
+        * through the queue's write path, as one write.
         */
         bool send(int fd, protocol::PacketType type, const google::protobuf::Message& msg);
+
+        /**
+        * Send a data packet: a 6-byte header of the given type followed by
+        * the bytes as they are. When the peer's write buffer is full the
+        * packet is dropped and false is returned; the connection stays
+        * open, since the overlay's own transport retransmits.
+        */
+        bool send_data(int fd, protocol::PacketType type, const void* data, size_t n);
 
         /**
         * Send a heartbeat (header-only) through the queue's write path.
@@ -134,10 +184,10 @@ namespace vnet::netqueue {
         void close (int fd);
         /**
          * Close the current network element and remove it from
-         * the queue. It also closes the file descriptor and frees
-         * the network element.
+         * the queue. Fires onClose once, closes the file descriptor,
+         * and frees the element after the current epoll batch.
          */
-        void close (NetworkElement* element);
+        void close (NetworkElement* element, close_reason reason = CLOSE_ERROR);
 
         /**
          * Take a network element (that is an object containing
@@ -216,6 +266,46 @@ namespace vnet::netqueue {
          * will return NULL
          */
         NetworkElement* put_sck (int fd, void* ptr);
+
+        /**
+         * Put a socket whose connect() is in progress (EINPROGRESS) or
+         * just completed. When the connection is up, the TLS handshake
+         * runs on it if ssl is given (a client session from
+         * tls::new_session), and onConnected fires once packets can flow.
+         * The queue owns ssl from here on.
+         */
+        NetworkElement* put_sck_connecting (int fd, void* ptr, ssl_st* ssl);
+
+        /**
+         * Put an accepted socket that must complete a TLS handshake as the
+         * server before any packet is read. ssl is a fresh session from
+         * tls::new_session; the queue owns it. onConnected fires when the
+         * handshake is done.
+         */
+        NetworkElement* put_sck_tls_server (int fd, void* ptr, ssl_st* ssl);
+
+        /**
+         * Put a connected socket that must complete a TLS handshake as the
+         * client before any packet is read. Same ownership and callback as
+         * put_sck_tls_server.
+         */
+        NetworkElement* put_sck_tls_client (int fd, void* ptr, ssl_st* ssl);
+
+        /**
+         * Attach a finished TLS session to a socket already in the queue.
+         * Later reads and writes go through SSL_read / SSL_write.
+         */
+        void adopt_tls(int fd, ssl_st* ssl) {
+            NetworkElement* element = get_network_element_from_fd(fd);
+            if (!element) return;
+            element->ssl = ssl;
+        }
+
+        /**
+         * Handshake can pull the first application record into OpenSSL.
+         * Epoll will not see those bytes, so read them now.
+         */
+        void drain_tls(int fd);
 
         /**
          * Create a network queue with the given

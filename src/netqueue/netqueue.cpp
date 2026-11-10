@@ -3,10 +3,13 @@
 #include "vnet/protocol/header.hpp"
 
 #include <sys/epoll.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include <iostream>
 #include <cerrno>
-#include <unordered_set>
+#include <cstring>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 
 using namespace vnet::netqueue;
 
@@ -14,11 +17,89 @@ void _real_close (int fd) {
     close(fd);
 }
 
+static void free_tls(NetworkElement* element) {
+    if (!element || !element->ssl) return;
+    SSL_free(reinterpret_cast<SSL*>(element->ssl));
+    element->ssl = nullptr;
+}
+
+/*
+ * SSL_get_error reads the thread's error queue, so an error left there by
+ * one socket would be reported for the next socket's call. Clear it before
+ * every OpenSSL call and after every failure.
+ */
+static ssize_t io_read(NetworkElement* element, void* buf, size_t n) {
+    if (!element->ssl)
+        return ::read(element->fd, buf, n);
+    SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    ERR_clear_error();
+    int r = SSL_read(ssl, buf, static_cast<int>(n));
+    if (r > 0) return r;
+    int err = SSL_get_error(ssl, r);
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        errno = EAGAIN;
+        return -1;
+    }
+    if (err == SSL_ERROR_ZERO_RETURN) return 0;
+    // A peer that vanished without close_notify: an EOF, not a fault.
+    if ((err == SSL_ERROR_SYSCALL && r == 0) ||
+        (err == SSL_ERROR_SSL &&
+         ERR_GET_REASON(ERR_peek_error()) == SSL_R_UNEXPECTED_EOF_WHILE_READING)) {
+        ERR_clear_error();
+        return 0;
+    }
+    ERR_clear_error();
+    errno = EIO;
+    return -1;
+}
+
+static ssize_t io_write(NetworkElement* element, const void* buf, size_t n) {
+    if (!element->ssl)
+        return ::write(element->fd, buf, n);
+    SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    ERR_clear_error();
+    int r = SSL_write(ssl, buf, static_cast<int>(n));
+    if (r > 0) return r;
+    int err = SSL_get_error(ssl, r);
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        errno = EAGAIN;
+        return -1;
+    }
+    ERR_clear_error();
+    errno = EIO;
+    return -1;
+}
+
 NetworkElement* NetQueue::put_tun (int tun_fd, void* data) {
     return put(tun_fd, data, FiniteStateMachine::TUN_RECEIVE);
 }
 NetworkElement* NetQueue::put_sck (int sck_fd, void* data) {
     return put(sck_fd, data, FiniteStateMachine::SCK_HEADER);
+}
+
+NetworkElement* NetQueue::put_sck_connecting (int sck_fd, void* data, ssl_st* ssl) {
+    NetworkElement* element = put(sck_fd, data, FiniteStateMachine::SCK_CONNECTING);
+    if (!element) return nullptr;
+    element->ssl = ssl;
+    return element;
+}
+NetworkElement* NetQueue::put_sck_tls_server (int sck_fd, void* data, ssl_st* ssl) {
+    if (!ssl) return nullptr;
+    NetworkElement* element = put(sck_fd, data, FiniteStateMachine::SCK_TLS_ACCEPT);
+    if (!element) return nullptr;
+    element->ssl = ssl;
+    return element;
+}
+NetworkElement* NetQueue::put_sck_tls_client (int sck_fd, void* data, ssl_st* ssl) {
+    if (!ssl) return nullptr;
+    NetworkElement* element = put(sck_fd, data, FiniteStateMachine::SCK_TLS_CONNECT);
+    if (!element) return nullptr;
+    element->ssl = ssl;
+    return element;
+}
+
+static bool is_pending_state(FiniteStateMachine state) {
+    return state == SCK_CONNECTING || state == SCK_TLS_ACCEPT || state == SCK_TLS_CONNECT;
 }
 
 NetworkElement* NetQueue::put (int fd, void* data, FiniteStateMachine state) {
@@ -35,6 +116,10 @@ NetworkElement* NetQueue::put (int fd, void* data, FiniteStateMachine state) {
     struct epoll_event event;
     event.data.ptr = element;
     event.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
+    // A connect in progress completes with the socket becoming writable,
+    // and a TLS client must get a first turn to send its ClientHello.
+    if (state == SCK_CONNECTING || state == SCK_TLS_CONNECT)
+        event.events |= EPOLLOUT;
 
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event) < 0) {
         delete element;
@@ -57,9 +142,9 @@ bool NetQueue::flush_write_buffer(NetworkElement* element) {
     auto& offset = element->write_buffer_offset;
 
     while (offset < buf.size()) {
-        ssize_t r = ::write(element->fd,
-                            buf.data() + offset,
-                            buf.size() - offset);
+        ssize_t r = io_write(element,
+                             buf.data() + offset,
+                             buf.size() - offset);
         if (r < 0) {
             if (errno == EINTR) continue;
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -85,34 +170,43 @@ bool NetQueue::flush_write_buffer(NetworkElement* element) {
 }
 
 bool NetQueue::send(int fd, const void* data, size_t n) {
+    return send_impl(fd, data, n, /*drop_when_full=*/false);
+}
+
+bool NetQueue::send_impl(int fd, const void* data, size_t n, bool drop_when_full) {
     NetworkElement* element = get_network_element_from_fd(fd);
-    if (!element) return false;
+    if (!element || element->dead) return false;
 
     const uint8_t* ptr   = static_cast<const uint8_t*>(data);
     size_t         total = 0;
 
     // If there's already buffered data, append to it to preserve order
     if (!element->write_buffer.empty()) {
-        size_t already_buffered = element->write_buffer.size()
-                                    - element->write_buffer_offset;
+        auto& buf = element->write_buffer;
+        size_t already_buffered = buf.size() - element->write_buffer_offset;
         if (already_buffered + n > WRITE_BUFFER_MAX) {
+            if (drop_when_full) return false;
             element->state = SCK_ERROR;
             return false;
         }
-        element->write_buffer.reserve(element->write_buffer.size() + n);
-        for (size_t i = 0; i < n; i++) {
-            element->write_buffer.push_back(ptr[i]);
+        // Drop the bytes already written before growing the vector.
+        if (element->write_buffer_offset > 0) {
+            buf.erase(buf.begin(), buf.begin() + element->write_buffer_offset);
+            element->write_buffer_offset = 0;
         }
+        buf.insert(buf.end(), ptr, ptr + n);
         return true;
     }
 
     // Try to write directly first
     while (total < n) {
-        ssize_t r = ::write(fd, ptr + total, n - total);
+        ssize_t r = io_write(element, ptr + total, n - total);
         if (r < 0) {
             if (errno == EINTR) continue;
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // Buffer the remainder
+                // Buffer the remainder. A packet partly written cannot be
+                // dropped, so the full-buffer case closes the link; n is
+                // at most one packet, far below WRITE_BUFFER_MAX.
                 size_t remaining = n - total;
                 if (remaining > WRITE_BUFFER_MAX) {
                     element->state = SCK_ERROR;
@@ -139,16 +233,33 @@ bool NetQueue::send(int fd, const void* data, size_t n) {
 
 bool NetQueue::send(int fd, protocol::PacketType type,
                     const google::protobuf::Message& msg) {
-    std::string body;
-    if (!msg.SerializeToString(&body)) return false;
+    size_t body_size = msg.ByteSizeLong();
+    if (body_size > protocol::MAX_PAYLOAD_SIZE) return false;
 
-    protocol::PacketHeader hdr(static_cast<uint32_t>(body.size()), type);
+    // Header and body leave in one write: one system call per packet,
+    // and a full buffer cannot split them.
+    std::string frame(protocol::PACKET_HEADER_SIZE + body_size, '\0');
+    protocol::PacketHeader hdr(static_cast<uint32_t>(body_size), type);
+    memcpy(&frame[0], &hdr, protocol::PACKET_HEADER_SIZE);
+    if (body_size > 0 &&
+        !msg.SerializeToArray(&frame[protocol::PACKET_HEADER_SIZE],
+                              static_cast<int>(body_size)))
+        return false;
 
-    if (!send(fd, &hdr, protocol::PACKET_HEADER_SIZE)) return false;
-    if (!body.empty()) {
-        if (!send(fd, body.data(), body.size())) return false;
-    }
-    return true;
+    return send(fd, frame.data(), frame.size());
+}
+
+bool NetQueue::send_data(int fd, protocol::PacketType type,
+                         const void* data, size_t n) {
+    if (n > protocol::MAX_PAYLOAD_SIZE) return false;
+
+    uint8_t frame[protocol::PACKET_HEADER_SIZE + NET_BUFFER_SIZE];
+    protocol::PacketHeader hdr(static_cast<uint32_t>(n), type);
+    memcpy(frame, &hdr, protocol::PACKET_HEADER_SIZE);
+    memcpy(frame + protocol::PACKET_HEADER_SIZE, data, n);
+
+    return send_impl(fd, frame, protocol::PACKET_HEADER_SIZE + n,
+                     /*drop_when_full=*/true);
 }
 
 bool NetQueue::send_heartbeat(int fd) {
@@ -158,7 +269,8 @@ bool NetQueue::send_heartbeat(int fd) {
 
 NetQueue::NetQueue (NetworkQueueHandler handler) : NetQueue(handler, -1) {}
 NetQueue::NetQueue (NetworkQueueHandler handler, int epoll_timeout) {
-    if (handler.onClose == nullptr || handler.onSocketReady == nullptr || handler.onTunReady == nullptr) {
+    if (handler.onClose == nullptr || handler.onSocketReady == nullptr ||
+        handler.onTunReady == nullptr || handler.onConnected == nullptr) {
         throw std::invalid_argument( "handlers should exist" );
     }
 
@@ -171,82 +283,220 @@ NetQueue::NetQueue (NetworkQueueHandler handler, int epoll_timeout) {
     this->handler       = handler;
 }
 
-void NetQueue::wait_and_process () {
-    struct epoll_event events[EPOLL_MAX_EVENTS];
-    int nb_events = epoll_wait(epoll_fd, events, EPOLL_MAX_EVENTS, epoll_timeout);
-    if (nb_events < 0) {
-        return ;
-    }
+void NetQueue::reap_closed() {
+    for (NetworkElement* element : deferred_delete)
+        delete element;
+    deferred_delete.clear();
+}
 
-    std::unordered_set<NetworkElement*> elements_closed;
+void NetQueue::drain_tls(int fd) {
+    NetworkElement* element = get_network_element_from_fd(fd);
+    if (!element || !element->ssl || element->dead) return;
+    SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    if (SSL_pending(ssl) <= 0 && !SSL_has_pending(ssl)) return;
+
+    process(element);
+    if (element->dead) return;
+    if (element->state == SCK_ERROR || element->state == TUN_ERROR)
+        close(element, CLOSE_ERROR);
+    else if (element->state == SCK_EOF || element->state == TUN_EOF)
+        close(element, CLOSE_HANGUP);
+}
+
+void NetQueue::wait_and_process () {
+    reap_closed();
+    turn++;
+
+    // Elements put down at the packet cap last turn have input waiting
+    // that epoll may not report again (TLS keeps it inside the session),
+    // so they go first and the wait does not sleep.
+    std::vector<NetworkElement*> carried;
+    carried.swap(backlog);
+    int timeout = carried.empty() ? epoll_timeout : 0;
+
+    struct epoll_event events[EPOLL_MAX_EVENTS];
+    int nb_events = epoll_wait(epoll_fd, events, EPOLL_MAX_EVENTS, timeout);
+    if (nb_events < 0) {
+        nb_events = 0;
+    }
 
     for (int i_event = 0; i_event < nb_events; i_event ++) {
         NetworkElement* current_element = (NetworkElement*) events[i_event].data.ptr;
-        if (elements_closed.find(current_element) != elements_closed.end())
+        if (current_element->dead)
             continue ;
-        
-        bool should_close = false;
-        close_reason reason = CLOSE_ERROR;
-        if (events[i_event].events & EPOLLIN) {
-            process(current_element);
+        current_element->last_turn = turn;
+        handle_ready(current_element, events[i_event].events);
+    }
 
-            if (current_element->state == SCK_ERROR || current_element->state == TUN_ERROR) {
-                should_close = true;
-                reason = CLOSE_ERROR;
-            } else if (current_element->state == SCK_EOF || current_element->state == TUN_EOF) {
-                should_close = true;
-                reason = CLOSE_HANGUP;
-            }
-        }
-        if (events[i_event].events & EPOLLOUT) {
-            if (!flush_write_buffer(current_element)) {
-                should_close = true;
-                reason = CLOSE_ERROR;
-            }
-        }
-        if (events[i_event].events & EPOLLERR) {
+    for (NetworkElement* element : carried) {
+        if (element->dead || element->last_turn == turn) continue;
+        element->last_turn = turn;
+        element->has_backlog = false;
+        handle_ready(element, EPOLLIN);
+    }
+
+    reap_closed();
+}
+
+void NetQueue::handle_ready(NetworkElement* current_element, uint32_t ev) {
+    bool should_close = false;
+    close_reason reason = CLOSE_ERROR;
+    // A TLS write can need a read before it finishes. Finish that write
+    // before SSL_read, or the session fails and the conductor drops the peer.
+    if (!current_element->write_buffer.empty() && (ev & (EPOLLIN | EPOLLOUT))) {
+        if (!flush_write_buffer(current_element)) {
             should_close = true;
             reason = CLOSE_ERROR;
         }
-        if (events[i_event].events & EPOLLHUP) {
+    }
+    bool pending = is_pending_state(current_element->state);
+    if (!should_close && current_element->write_buffer.empty() &&
+        ((ev & EPOLLIN) || (pending && (ev & EPOLLOUT)))) {
+        process(current_element);
+        if (current_element->dead)
+            return ;
+
+        if (current_element->state == SCK_ERROR || current_element->state == TUN_ERROR) {
+            should_close = true;
+            reason = CLOSE_ERROR;
+        } else if (current_element->state == SCK_EOF || current_element->state == TUN_EOF) {
             should_close = true;
             reason = CLOSE_HANGUP;
         }
-
-        if (!should_close) {
-            struct epoll_event event;
-            event.data.ptr = current_element;
-            event.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
-            if (!current_element->write_buffer.empty()) {
-                event.events |= EPOLLOUT;
-            }
-            if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, current_element->fd, &event) < 0) {
-                should_close = true;
-                reason = CLOSE_EPOLL;
-            }
-        }
-        if (should_close) {
-            close_data data;
-            data.fd = current_element->fd;
-            data.net_element = current_element;
-            data.ptr_data = current_element->ptr;
-            data.reason = reason;
-
-            handler.onClose(handler.ptr_data, data);
-
-            elements_closed.insert(current_element);
-
-            close(current_element);
+    }
+    if (current_element->dead)
+        return ;
+    if (ev & EPOLLERR) {
+        should_close = true;
+        reason = CLOSE_ERROR;
+    }
+    if (ev & EPOLLHUP) {
+        // Input left behind the cap is still readable; come back for it
+        // before the hangup is acted on.
+        if (!current_element->has_backlog) {
+            should_close = true;
+            reason = CLOSE_HANGUP;
         }
     }
+
+    if (!should_close && !current_element->dead) {
+        if (current_element->has_backlog)
+            backlog.push_back(current_element);
+
+        struct epoll_event event;
+        event.data.ptr = current_element;
+        event.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
+        if (!current_element->write_buffer.empty() ||
+            current_element->want_write ||
+            current_element->state == SCK_CONNECTING) {
+            event.events |= EPOLLOUT;
+        }
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, current_element->fd, &event) < 0) {
+            should_close = true;
+            reason = CLOSE_EPOLL;
+        }
+    }
+    if (should_close)
+        close(current_element, reason);
+}
+
+bool NetQueue::step_connecting(NetworkElement* element) {
+    int soerr = 0;
+    socklen_t slen = sizeof(soerr);
+    if (getsockopt(element->fd, SOL_SOCKET, SO_ERROR, &soerr, &slen) < 0) {
+        element->state = SCK_ERROR;
+        return true;
+    }
+    if (soerr == EINPROGRESS || soerr == EALREADY) {
+        // Not there yet; EPOLLOUT will say when.
+        return false;
+    }
+    if (soerr != 0) {
+        errno = soerr;
+        element->state = SCK_ERROR;
+        return true;
+    }
+    if (element->ssl) {
+        element->state = SCK_TLS_CONNECT;
+    } else {
+        element->state = SCK_HEADER;
+        fire_connected(element);
+    }
+    return true;
+}
+
+bool NetQueue::step_handshake(NetworkElement* element) {
+    SSL* ssl = reinterpret_cast<SSL*>(element->ssl);
+    if (!ssl) {
+        element->state = SCK_ERROR;
+        return true;
+    }
+    ERR_clear_error();
+    int rc = element->state == SCK_TLS_ACCEPT ? SSL_accept(ssl) : SSL_connect(ssl);
+    if (rc == 1) {
+        element->want_write = false;
+        element->state = SCK_HEADER;
+        fire_connected(element);
+        return true;
+    }
+    int err = SSL_get_error(ssl, rc);
+    if (err == SSL_ERROR_WANT_READ) {
+        element->want_write = false;
+        return false;
+    }
+    if (err == SSL_ERROR_WANT_WRITE) {
+        element->want_write = true;
+        return false;
+    }
+    element->want_write = false;
+    if (err == SSL_ERROR_ZERO_RETURN ||
+        (err == SSL_ERROR_SYSCALL && (rc == 0 || errno == 0 || errno == ECONNRESET || errno == EPIPE))) {
+        // The peer went away mid-handshake: a port probe, not a fault here.
+        ERR_clear_error();
+        element->state = SCK_EOF;
+        return true;
+    }
+    if (err == SSL_ERROR_SSL) {
+        std::cerr << "[TLS] handshake failed on fd " << element->fd << "\n";
+        ERR_print_errors_fp(stderr);
+    }
+    element->state = SCK_ERROR;
+    return true;
+}
+
+void NetQueue::fire_connected(NetworkElement* element) {
+    socket_data sck_data{};
+    sck_data.fd = element->fd;
+    sck_data.ptr_data = element->ptr;
+    sck_data.net_element = element;
+    handler.onConnected(handler.ptr_data, sck_data);
 }
 
 void NetQueue::process (NetworkElement* element) {
+    int delivered = 0;
+    element->has_backlog = false;
     while (1) {
+        if (delivered >= PACKETS_PER_TURN) {
+            // Enough for this turn; the rest waits until the other
+            // elements have had theirs.
+            element->has_backlog = true;
+            return ;
+        }
         switch (element->state) {
+            case SCK_CONNECTING: {
+                if (!step_connecting(element)) return ;
+                break ;
+            }
+            case SCK_TLS_ACCEPT:
+            case SCK_TLS_CONNECT: {
+                if (!step_handshake(element)) return ;
+                // The handler may have closed or rejected the element.
+                if (element->dead) return ;
+                break ;
+            }
             case SCK_HEADER: {
                 ssize_t nb_rem  = protocol::PACKET_HEADER_SIZE - element->net_buffer_used;
-                ssize_t nb_read = read(element->fd, element->net_buffer + element->net_buffer_used, nb_rem);
+                ssize_t nb_read = io_read(element, element->net_buffer + element->net_buffer_used, nb_rem);
                 if (nb_read < 0) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK)
                         return ;
@@ -261,6 +511,13 @@ void NetQueue::process (NetworkElement* element) {
 
                 element->net_buffer_used += nb_read;
                 if (element->net_buffer_used == protocol::PACKET_HEADER_SIZE) {
+                    // The payload is read into net_buffer right after the
+                    // header, so a larger size would write past its end.
+                    protocol::PacketHeader* header = (protocol::PacketHeader*) element->net_buffer;
+                    if (header->get_payload_size() > protocol::MAX_PAYLOAD_SIZE) {
+                        element->state = SCK_ERROR;
+                        break ;
+                    }
                     element->state = SCK_PAYLOAD;
                 }
                 
@@ -270,7 +527,12 @@ void NetQueue::process (NetworkElement* element) {
                 protocol::PacketHeader* header = (protocol::PacketHeader*) element->net_buffer;
                 
                 size_t  buffer_size = header->get_payload_size() + protocol::PACKET_HEADER_SIZE;
-                ssize_t number_read = read(element->fd, element->net_buffer + element->net_buffer_used, buffer_size - element->net_buffer_used);
+                if (element->net_buffer_used == buffer_size) {
+                    // Header-only packet, such as a heartbeat: nothing to read.
+                    element->state = SCK_READY;
+                    break ;
+                }
+                ssize_t number_read = io_read(element, element->net_buffer + element->net_buffer_used, buffer_size - element->net_buffer_used);
                 if (number_read < 0) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK)
                         return ;
@@ -303,9 +565,15 @@ void NetQueue::process (NetworkElement* element) {
                 sck_data.packet_buffer = element->net_buffer + sizeof(protocol::PacketHeader);
 
                 handler.onSocketReady(handler.ptr_data, sck_data);
+                delivered++;
 
+                // The handler may have closed the element, or rejected the
+                // peer by setting an error state; both must stick.
+                if (element->dead)
+                    return ;
                 element->net_buffer_used = 0;
-                element->state = SCK_HEADER;
+                if (element->state == SCK_READY)
+                    element->state = SCK_HEADER;
                 break ;
             }
             case SCK_ERROR:
@@ -314,7 +582,7 @@ void NetQueue::process (NetworkElement* element) {
                 return ;
             
             case TUN_RECEIVE: {
-                ssize_t nb_read = read(element->fd, element->net_buffer, NET_BUFFER_SIZE);
+                ssize_t nb_read = io_read(element, element->net_buffer, NET_BUFFER_SIZE);
                 if (nb_read < 0) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK)
                         return ;
@@ -341,7 +609,8 @@ void NetQueue::process (NetworkElement* element) {
                 data.ip_buffer_size = element->net_buffer_used;
                 
                 handler.onTunReady(handler.ptr_data, data);
-                
+                delivered++;
+
                 element->state = TUN_RECEIVE;
 
                 break ;
@@ -361,11 +630,13 @@ NetQueue::~NetQueue () {
     if (epoll_fd < 0) return ;
 
     for (std::pair<int, NetworkElement*> fd_with_network_element : fd_to_network_element) {
+        free_tls(fd_with_network_element.second);
         _real_close(fd_with_network_element.first);
         delete fd_with_network_element.second;
     }
 
     fd_to_network_element.clear();
+    reap_closed();
 
     _real_close(epoll_fd);
 }
@@ -387,24 +658,44 @@ void NetQueue::close (int fd) {
         return ;
     }
 
-    close(element);
+    close(element, CLOSE_ERROR);
 }
-void NetQueue::close (NetworkElement* element) {
+void NetQueue::close (NetworkElement* element, close_reason reason) {
     if (element == nullptr) {
         return ;
     }
 
-    std::lock_guard<std::mutex> lock (fd_to_network_element_mutex);
-    
-    int fd = element->fd;
-
-    auto it = fd_to_network_element.find(fd);
-    if (it == fd_to_network_element.end() || (*it).second != element) {
-        return ;
+    {
+        std::lock_guard<std::mutex> lock (fd_to_network_element_mutex);
+        if (element->dead) {
+            return ;
+        }
+        auto it = fd_to_network_element.find(element->fd);
+        // The caller still owns an element that was never put in the queue.
+        if (it == fd_to_network_element.end() || (*it).second != element) {
+            return ;
+        }
+        element->dead = true;
     }
 
-    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-    _real_close(fd);
-    delete element;
-    fd_to_network_element.erase(it);
+    close_data data;
+    data.fd = element->fd;
+    data.net_element = element;
+    data.ptr_data = element->ptr;
+    data.reason = reason;
+    // onClose may send on another socket, which takes the same mutex.
+    handler.onClose(handler.ptr_data, data);
+    free_tls(element);
+
+    std::lock_guard<std::mutex> lock (fd_to_network_element_mutex);
+
+    int fd = element->fd;
+    auto it = fd_to_network_element.find(fd);
+    if (it != fd_to_network_element.end() && (*it).second == element) {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+        _real_close(fd);
+        fd_to_network_element.erase(it);
+    }
+
+    deferred_delete.push_back(element);
 }

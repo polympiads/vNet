@@ -5,6 +5,15 @@ services:
       dockerfile: docker/Dockerfile.conductor
     container_name: vnet-conductor
     networks: [vnet]
+    environment:
+      - VNET_AUTH_FILE=/etc/vnet/auth.txt
+      - VNET_TLS=1
+      - VNET_TLS_CERT=/etc/vnet/tls/conductor.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/conductor.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
+    volumes:
+      - ./auth.txt:/etc/vnet/auth.txt:ro
+      - ./certs:/etc/vnet/tls:ro
     healthcheck:
       test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/5000' || exit 1"]
       interval: 3s
@@ -30,7 +39,23 @@ services:
     environment:
       - CONDUCTOR_IP=vnet-conductor
       - CONDUCTOR_PORT=5000
-    command: ["/usr/local/bin/switch", "switch1", "authkey1", "6000"]
+      - VNET_CONFIG_PATH=/etc/vnet/config.txt
+      - VNET_TLS=1
+      - VNET_AUTH_KEY=authkey1
+      - VNET_TLS_CERT=/etc/vnet/tls/switch1.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/switch1.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
+    volumes:
+      - ./switch1.txt:/etc/vnet/config.txt:ro
+      - ./certs:/etc/vnet/tls:ro
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    command: ["/usr/local/bin/switch", "switch1", "6000"]
     healthcheck:
       test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/6000' || exit 1"]
       interval: 3s
@@ -55,7 +80,23 @@ services:
     environment:
       - CONDUCTOR_IP=vnet-conductor
       - CONDUCTOR_PORT=5000
-    command: ["/usr/local/bin/switch", "switch2", "authkey2", "6001"]
+      - VNET_CONFIG_PATH=/etc/vnet/config.txt
+      - VNET_TLS=1
+      - VNET_AUTH_KEY=authkey2
+      - VNET_TLS_CERT=/etc/vnet/tls/switch2.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/switch2.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
+    volumes:
+      - ./switch2.txt:/etc/vnet/config.txt:ro
+      - ./certs:/etc/vnet/tls:ro
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    command: ["/usr/local/bin/switch", "switch2", "6001"]
     healthcheck:
       test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/6001' || exit 1"]
       interval: 3s
@@ -80,7 +121,23 @@ services:
     environment:
       - CONDUCTOR_IP=vnet-conductor
       - CONDUCTOR_PORT=5000
-    command: ["/usr/local/bin/switch", "switch3", "authkey3", "6002"]
+      - VNET_CONFIG_PATH=/etc/vnet/config.txt
+      - VNET_TLS=1
+      - VNET_AUTH_KEY=authkey3
+      - VNET_TLS_CERT=/etc/vnet/tls/switch3.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/switch3.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
+    volumes:
+      - ./switch3.txt:/etc/vnet/config.txt:ro
+      - ./certs:/etc/vnet/tls:ro
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    command: ["/usr/local/bin/switch", "switch3", "6002"]
     healthcheck:
       test: ["CMD", "bash", "-c", "timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/6002' || exit 1"]
       interval: 3s
@@ -109,7 +166,53 @@ services:
     environment:
       - CONDUCTOR_IP=vnet-conductor
       - CONDUCTOR_PORT=5000
-    command: ["/usr/local/bin/agent", "agent1", "agentkey1"]
+      - VNET_TLS=1
+      - VNET_AUTH_KEY=agentkey1
+      - VNET_TLS_CERT=/etc/vnet/tls/agent1.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/agent1.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./certs:/etc/vnet/tls:ro
+    command: ["/usr/local/bin/agent", "agent1"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  agent2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: vnet-agent2
+    networks: [vnet]
+    depends_on:
+      switch1:
+        condition: service_healthy
+      switch2:
+        condition: service_healthy
+      switch3:
+        condition: service_healthy
+    environment:
+      - CONDUCTOR_IP=vnet-conductor
+      - CONDUCTOR_PORT=5000
+      - VNET_TLS=1
+      - VNET_AUTH_KEY=agentkey2
+      - VNET_TLS_CERT=/etc/vnet/tls/agent2.pem
+      - VNET_TLS_KEY=/etc/vnet/tls/agent2.key
+      - VNET_TLS_CA=/etc/vnet/tls/ca.pem
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./certs:/etc/vnet/tls:ro
+    command: ["/usr/local/bin/agent", "agent2"]
     logging:
       driver: "json-file"
       options:

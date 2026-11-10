@@ -54,6 +54,40 @@ TEST(NetQueueSocket, ProcessHeader_Success) {
     close(fd_server);
 }
 
+TEST(NetQueueSocket, ProcessHeader_OversizedPayload) {
+    PREPARE_NETWORK_TEST(SCK_HEADER)
+
+    PacketHeader header(MAX_PAYLOAD_SIZE + 1, (PacketType) 0x32);
+    EXPECT_EQ( write(fd_server, &header, sizeof(header)), sizeof(header) );
+
+    NetQueue* queue = new NetQueue(NetworkQueueHandler());
+    queue->process(element);
+
+    EXPECT_EQ( element->state, SCK_ERROR );
+
+    delete queue;
+    delete element;
+    close(fd_client);
+    close(fd_server);
+}
+TEST(NetQueueSocket, ProcessHeader_MaxPayloadAccepted) {
+    PREPARE_NETWORK_TEST(SCK_HEADER)
+
+    PacketHeader header(MAX_PAYLOAD_SIZE, (PacketType) 0x32);
+    EXPECT_EQ( write(fd_server, &header, sizeof(header)), sizeof(header) );
+
+    NetQueue* queue = new NetQueue(NetworkQueueHandler());
+    queue->process(element);
+
+    EXPECT_EQ( element->net_buffer_used, sizeof(header) );
+    EXPECT_EQ( element->state, SCK_PAYLOAD );
+
+    delete queue;
+    delete element;
+    close(fd_client);
+    close(fd_server);
+}
+
 TEST(NetQueueSocket, ProcessPayload_Failure) {
     PREPARE_NETWORK_TEST(SCK_PAYLOAD)
 
@@ -109,6 +143,34 @@ TEST(NetQueueSocket, ProcessPayload_Success) {
     
     EXPECT_EQ( element->net_buffer_used, 0 );
     EXPECT_EQ( element->state, SCK_HEADER );
+
+    delete queue;
+    delete element;
+    close(fd_client);
+    close(fd_server);
+}
+
+static void rejectOnSocketReady (void*, socket_data data) {
+    data.net_element->state = SCK_ERROR;
+}
+
+TEST(NetQueueSocket, ProcessReady_HandlerRejectKeepsError) {
+    PREPARE_NETWORK_TEST(SCK_HEADER)
+
+    // Two complete packets: the second must not be read once the handler
+    // rejected the first.
+    PacketHeader header(0, (PacketType) 0x32);
+    EXPECT_EQ( write(fd_server, &header, sizeof(header)), sizeof(header) );
+    EXPECT_EQ( write(fd_server, &header, sizeof(header)), sizeof(header) );
+
+    NetworkQueueHandler handler;
+    handler.onSocketReady = &rejectOnSocketReady;
+    NetQueue* queue = new NetQueue(handler);
+    queue->process(element);
+
+    EXPECT_EQ( element->state, SCK_ERROR );
+    uint8_t rest[sizeof(header)];
+    EXPECT_EQ( read(fd_client, rest, sizeof(rest)), (ssize_t) sizeof(rest) );
 
     delete queue;
     delete element;

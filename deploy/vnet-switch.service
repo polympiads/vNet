@@ -1,0 +1,22 @@
+[Unit]
+Description=vNet switch
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Written by tools/vnet-roster.py: VNET_SWITCH_NAME, VNET_SWITCH_PORT,
+# VNET_AUTH_KEY, VNET_CONFIG_PATH, CONDUCTOR_IP, CONDUCTOR_PORT, TLS files.
+EnvironmentFile=/etc/vnet/switch.env
+ExecStart=/usr/local/bin/switch ${VNET_SWITCH_NAME} ${VNET_SWITCH_PORT}
+# SIGHUP reloads the config; SIGUSR1 prints the counters.
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=2
+# One socket per machine, plus the peers; the default 1024 is too few.
+LimitNOFILE=65536
+# Needs the TUN device, routes and iptables: runs as root.
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+DeviceAllow=/dev/net/tun rw
+
+[Install]
+WantedBy=multi-user.target

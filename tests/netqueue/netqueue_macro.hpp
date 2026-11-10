@@ -9,6 +9,18 @@
 #include "utils/malloc_wrapper.hpp"
 #include "utils/tun_wrapper.hpp"
 
+#include <string>
+#include <unistd.h>
+
+/*
+ * Whether fd is open in this process, read from /proc without a system
+ * call on fd itself: valgrind's file descriptor tracking counts a call
+ * on a closed descriptor as an error.
+ */
+inline bool fd_is_open(int fd) {
+    return access(("/proc/self/fd/" + std::to_string(fd)).c_str(), F_OK) == 0;
+}
+
 #define PREPARE_SOCKET_PAIR \
     int sv[2]; \
     EXPECT_EQ(socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sv), 0); \

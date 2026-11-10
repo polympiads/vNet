@@ -16,6 +16,7 @@ RUN apt-get update && \
         libpthread-stubs0-dev \
         protobuf-compiler \
         libprotobuf-dev \
+        libssl-dev \
         libgtest-dev \
         libgmock-dev \
         lcov \

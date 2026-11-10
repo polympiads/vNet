@@ -3,14 +3,22 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
+#include <cerrno>
+#include <sys/time.h>
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <vector>
+#include <cstdlib>
 #include <stdexcept>
 
 #include "common/config.h"
 #include "common/socket_utils.h"
 #include "vnet/protocol/header.hpp"
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 
 using namespace vnet::protocol;
 
@@ -47,17 +55,102 @@ int connect_to(const MachineConfig& mc) {
     return sock;
 }
 
+uint32_t resolve_ipv4(const std::string& host) {
+    struct addrinfo hints{}, *result = nullptr;
+    hints.ai_family   = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    if (getaddrinfo(host.c_str(), nullptr, &hints, &result) != 0 || !result)
+        return 0;
+    uint32_t addr = reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr.s_addr;
+    freeaddrinfo(result);
+    return addr;
+}
+
+int connect_start(const std::string& host, uint16_t port) {
+    struct addrinfo hints{}, *result = nullptr;
+    hints.ai_family   = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    std::string port_str = std::to_string(port);
+    if (getaddrinfo(host.c_str(), port_str.c_str(), &hints, &result) != 0 || !result) {
+        if (result) freeaddrinfo(result);
+        return -1;
+    }
+
+    int sock = socket(result->ai_family, result->ai_socktype | SOCK_NONBLOCK,
+                      result->ai_protocol);
+    if (sock < 0) {
+        freeaddrinfo(result);
+        return -1;
+    }
+    int flag = 1;
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
+    int rc = connect(sock, result->ai_addr, result->ai_addrlen);
+    freeaddrinfo(result);
+    if (rc < 0 && errno != EINPROGRESS) {
+        close(sock);
+        return -1;
+    }
+    return sock;
+}
+
 bool set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0) return false;
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK) >= 0;
 }
 
-bool write_n_bytes(int sock, const void* buffer, size_t n) {
+bool set_blocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) return false;
+    return fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) >= 0;
+}
+
+bool set_socket_timeout(int fd, int ms) {
+    timeval tv{};
+    tv.tv_sec = ms / 1000;
+    tv.tv_usec = (ms % 1000) * 1000;
+    return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0 &&
+           setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) == 0;
+}
+
+/* The error queue is per thread: clear it around every OpenSSL call so one
+ * socket's failure is never read as another's. */
+static ssize_t io_write_fd(int sock, ssl_st* ssl, const void* buf, size_t n) {
+    if (!ssl) return ::write(sock, buf, n);
+    ERR_clear_error();
+    int r = SSL_write(reinterpret_cast<SSL*>(ssl), buf, static_cast<int>(n));
+    if (r > 0) return r;
+    int err = SSL_get_error(reinterpret_cast<SSL*>(ssl), r);
+    ERR_clear_error();
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        errno = EAGAIN;
+        return -1;
+    }
+    return -1;
+}
+
+static ssize_t io_read_fd(int sock, ssl_st* ssl, void* buf, size_t n) {
+    if (!ssl) return ::read(sock, buf, n);
+    ERR_clear_error();
+    int r = SSL_read(reinterpret_cast<SSL*>(ssl), buf, static_cast<int>(n));
+    if (r > 0) return r;
+    int err = SSL_get_error(reinterpret_cast<SSL*>(ssl), r);
+    ERR_clear_error();
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        errno = EAGAIN;
+        return -1;
+    }
+    if (err == SSL_ERROR_ZERO_RETURN || (err == SSL_ERROR_SYSCALL && r == 0)) return 0;
+    return -1;
+}
+
+bool write_n_bytes(int sock, const void* buffer, size_t n, ssl_st* ssl) {
     size_t total = 0;
     const char* ptr = static_cast<const char*>(buffer);
     while (total < n) {
-        ssize_t r = write(sock, ptr + total, n - total);
+        ssize_t r = io_write_fd(sock, ssl, ptr + total, n - total);
         if (r < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
                 usleep(200);          // brief yield, then retry
@@ -71,11 +164,11 @@ bool write_n_bytes(int sock, const void* buffer, size_t n) {
     return true;
 }
 
-bool read_n_bytes(int sock, void* buffer, size_t n) {
+bool read_n_bytes(int sock, void* buffer, size_t n, ssl_st* ssl) {
     size_t total = 0;
     char* ptr = static_cast<char*>(buffer);
     while (total < n) {
-        ssize_t r = read(sock, ptr + total, n - total);
+        ssize_t r = io_read_fd(sock, ssl, ptr + total, n - total);
         if (r < 0) {
             if (errno == EINTR) continue;
             return false;               // EAGAIN = not ready, treat as error in blocking context
@@ -99,28 +192,28 @@ bool read_n_bytes(int sock, void* buffer, size_t n) {
 // ---------------------------------------------------------------------------
 
 bool send_protobuf_packet(int sock, PacketType type,
-                          const google::protobuf::Message& msg) {
+                          const google::protobuf::Message& msg, ssl_st* ssl) {
     std::string body;
     if (!msg.SerializeToString(&body)) return false;
 
     PacketHeader hdr(static_cast<uint32_t>(body.size()), type);
 
     // Write header (6 bytes)
-    if (!write_n_bytes(sock, &hdr, PACKET_HEADER_SIZE)) return false;
+    if (!write_n_bytes(sock, &hdr, PACKET_HEADER_SIZE, ssl)) return false;
 
     // Write protobuf payload
     if (!body.empty()) {
-        if (!write_n_bytes(sock, body.data(), body.size())) return false;
+        if (!write_n_bytes(sock, body.data(), body.size(), ssl)) return false;
     }
 
     return true;
 }
 
 bool read_protobuf_packet(int sock, PacketType expected_type,
-                          google::protobuf::Message& msg) {
+                          google::protobuf::Message& msg, ssl_st* ssl) {
     // Read 6-byte header
     PacketHeader hdr;
-    if (!read_n_bytes(sock, &hdr, PACKET_HEADER_SIZE)) return false;
+    if (!read_n_bytes(sock, &hdr, PACKET_HEADER_SIZE, ssl)) return false;
 
     PacketType type = hdr.get_packet_type();
     uint32_t   len  = hdr.get_payload_size();
@@ -129,16 +222,18 @@ bool read_protobuf_packet(int sock, PacketType expected_type,
     // expected type (or any non-heartbeat).
     while (type == PacketType::HEARTBEAT) {
         // Heartbeat has zero-length payload, but honour the field anyway
+        if (len > MAX_PAYLOAD_SIZE) return false;
         if (len > 0) {
             std::vector<char> skip(len);
-            if (!read_n_bytes(sock, skip.data(), len)) return false;
+            if (!read_n_bytes(sock, skip.data(), len, ssl)) return false;
         }
-        if (!read_n_bytes(sock, &hdr, PACKET_HEADER_SIZE)) return false;
+        if (!read_n_bytes(sock, &hdr, PACKET_HEADER_SIZE, ssl)) return false;
         type = hdr.get_packet_type();
         len  = hdr.get_payload_size();
     }
 
     if (type != expected_type) return false;
+    if (len > MAX_PAYLOAD_SIZE) return false;
 
     if (len == 0) {
         msg.Clear();
@@ -146,7 +241,7 @@ bool read_protobuf_packet(int sock, PacketType expected_type,
     }
 
     std::vector<char> buf(len);
-    if (!read_n_bytes(sock, buf.data(), len)) return false;
+    if (!read_n_bytes(sock, buf.data(), len, ssl)) return false;
 
     return msg.ParseFromArray(buf.data(), buf.size());
 }
@@ -157,6 +252,7 @@ bool read_raw_packet(int sock, PacketType& type, std::vector<char>& buffer) {
 
     type          = hdr.get_packet_type();
     uint32_t len  = hdr.get_payload_size();
+    if (len > MAX_PAYLOAD_SIZE) return false;
 
     buffer.resize(len);
     if (len > 0) {
@@ -190,4 +286,23 @@ uint32_t string_to_ipv4(const std::string& ip) {
         throw std::runtime_error("Invalid IPv4 string: " + ip);
     }
     return addr;
+}
+
+bool read_default_route(std::string& iface, uint32_t& gateway_nbo) {
+    std::ifstream in("/proc/net/route");
+    if (!in) return false;
+
+    std::string line;
+    std::getline(in, line);
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        std::istringstream iss(line);
+        std::string name, dest, gateway;
+        if (!(iss >> name >> dest >> gateway)) continue;
+        if (dest != "00000000") continue;
+        iface = name;
+        gateway_nbo = static_cast<uint32_t>(std::strtoul(gateway.c_str(), nullptr, 16));
+        return true;
+    }
+    return false;
 }

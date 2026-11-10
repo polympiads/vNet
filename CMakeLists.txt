@@ -5,6 +5,7 @@ SET(CMAKE_CXX_FLAGS "-g -Wall -Werror -std=c++17")
 option(ENABLE_COVERAGE "Enable code coverage instrumentation (requires gcov/lcov)" OFF)
 
 find_program(VALGRIND_EXECUTABLE NAMES valgrind)
+find_package(OpenSSL REQUIRED)
 
 if (ENABLE_COVERAGE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage -O0")
@@ -22,8 +23,11 @@ if (ENABLE_COVERAGE)
         COMMAND lcov --directory . --zerocounters --rc branch_coverage=1
         COMMAND ctest
 
-        COMMAND lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch --rc branch_coverage=1
-        COMMAND lcov --remove coverage.info '/usr/*' '*test*' --output-file coverage_filtered.info --rc branch_coverage=1 --ignore-errors unused
+        # gcov reports a test body's end line past its last statement; lcov 2.x
+        # calls that "inconsistent" (newer versions make it an error) and older
+        # ones "mismatch". Neither changes the figures, so both are ignored.
+        COMMAND lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch,inconsistent --rc branch_coverage=1
+        COMMAND lcov --remove coverage.info '/usr/*' '*test*' --output-file coverage_filtered.info --rc branch_coverage=1 --ignore-errors unused,inconsistent
         COMMAND genhtml coverage_filtered.info --output-directory html_report --rc branch_coverage=1
     )
 endif()
@@ -41,6 +45,9 @@ include_directories(${ProtobufIncludePath})
 
 SET(VNET_SOURCE_FILES
         src/common/socket_utils.cpp
+        src/common/tun.cpp
+        src/common/sysutil.cpp
+        
         src/protocol/header.cpp
         src/protocol/types.cpp
         src/protocol/dispatch.cpp
@@ -50,14 +57,19 @@ SET(VNET_SOURCE_FILES
         src/netqueue/handler.cpp
 
         src/blackbox/ipv4.cpp
+        src/blackbox/ratelimit.cpp
         src/blackbox/agent_registry.cpp
         src/blackbox/routing_table.cpp
         src/blackbox/config.cpp
-        src/blackbox/blackbox.cpp)
+        src/blackbox/blackbox.cpp
+
+        src/tls/session.cpp)
 
 add_library(vnet STATIC ${VNET_SOURCE_FILES})
-target_link_libraries(vnet PUBLIC vnet_proto)
-target_link_libraries(vnet PRIVATE gcov)
+target_link_libraries(vnet PUBLIC vnet_proto OpenSSL::SSL)
+if (ENABLE_COVERAGE)
+    target_link_libraries(vnet PRIVATE gcov)
+endif()
 target_include_directories(vnet PUBLIC include)
 
 #############################################################
@@ -67,16 +79,33 @@ target_include_directories(vnet PUBLIC include)
 add_subdirectory(src/conductor)
 add_subdirectory(src/switch)
 add_subdirectory(src/agent)
+add_subdirectory(src/tools)
+
+#############################################################
+########################## INSTALL ##########################
+#############################################################
+
+install(TARGETS conductor switch agent vnet-state
+        RUNTIME DESTINATION bin)
+install(PROGRAMS tools/vnet-certs.sh  RENAME vnet-certs  DESTINATION bin)
+install(PROGRAMS tools/vnet-roster.py RENAME vnet-roster DESTINATION bin)
+install(FILES deploy/vnet-conductor.service deploy/vnet-switch.service deploy/vnet-agent.service
+        DESTINATION lib/systemd/system)
 
 #############################################################
 ######################## GOOGLE TEST ########################
 #############################################################
 
-include(FetchContent)
-FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
-)
-FetchContent_MakeAvailable(googletest)
+find_package(GTest QUIET)
+if (NOT GTest_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
+    )
+    # The test framework is a build dependency, not something to install.
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+endif()
 enable_testing()
 add_subdirectory(tests)

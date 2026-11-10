@@ -1,4 +1,5 @@
 #include "vnet/protocol/dispatch.hpp"
+#include "vnet/protocol/types.hpp"
 
 using namespace vnet::protocol;
 using namespace vnet::netqueue;
@@ -18,6 +19,9 @@ static void _dispatch_on_socket_ready(void* ptr_data, socket_data data) {
 static void _dispatch_on_tun_ready(void* ptr_data, tun_data data) {
     static_cast<Dispatch*>(ptr_data)->onTunReady(data);
 }
+static void _dispatch_on_connected(void* ptr_data, socket_data data) {
+    static_cast<Dispatch*>(ptr_data)->onConnected(data);
+}
 
 NetworkQueueHandler vnet::protocol::makeNetworkQueueHandler(Dispatch* dispatch) {
     NetworkQueueHandler handler;
@@ -25,6 +29,7 @@ NetworkQueueHandler vnet::protocol::makeNetworkQueueHandler(Dispatch* dispatch) 
     handler.onClose       = _dispatch_on_close;
     handler.onSocketReady = _dispatch_on_socket_ready;
     handler.onTunReady    = _dispatch_on_tun_ready;
+    handler.onConnected   = _dispatch_on_connected;
     return handler;
 }
 
@@ -34,6 +39,7 @@ NetworkQueueHandler vnet::protocol::makeNetworkQueueHandler(Dispatch* dispatch) 
 // ---------------------------------------------------------------------------
 
 void Dispatch::onSocketReady(socket_data data) {
+    onActivity(data);
     switch (data.packet_type) {
         case HEARTBEAT: {
             onHeartbeat(data);
@@ -88,6 +94,60 @@ void Dispatch::onSocketReady(socket_data data) {
             }
             break;
         }
+        case IPV4_RAW: {
+            if (data.payload_size > 0)
+                onIPv4Raw(data, data.packet_buffer, data.payload_size);
+            break;
+        }
+        case AGENT_REGISTERED: {
+            mip::PacketAgentRegistered packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onAgentRegistered(data, packet);
+            }
+            break;
+        }
+        case SWITCH_ROUTE_UPDATE: {
+            mip::PacketSwitchRouteUpdate packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onSwitchRouteUpdate(data, packet);
+            }
+            break;
+        }
+        case SWITCH_DISCONNECTED: {
+            mip::PacketSwitchDisconnected packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onSwitchDisconnected(data, packet);
+            }
+            break;
+        }
+        case SWITCH_HELLO: {
+            mip::PacketSwitchHello packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onSwitchHello(data, packet);
+            }
+            break;
+        }
+        case AGENT_UNREGISTERED: {
+            mip::PacketAgentUnregistered packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onAgentUnregistered(data, packet);
+            }
+            break;
+        }
+        case PEER_TOKEN: {
+            mip::PacketPeerToken packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onPeerToken(data, packet);
+            }
+            break;
+        }
+        case SWITCH_CONFIG: {
+            mip::PacketSwitchConfig packet;
+            if (packet.ParseFromArray(data.packet_buffer, data.payload_size)) {
+                onSwitchConfig(data, packet);
+            }
+            break;
+        }
         default:
             break;
     }
@@ -97,8 +157,10 @@ void Dispatch::onSocketReady(socket_data data) {
 //  Default (no-op) implementations of all virtual handlers
 // ---------------------------------------------------------------------------
 
+void Dispatch::onActivity   (socket_data)                                         {}
 void Dispatch::onClose       (close_data)                                          {}
 void Dispatch::onTunReady    (tun_data)                                            {}
+void Dispatch::onConnected   (socket_data)                                         {}
 void Dispatch::onHeartbeat   (socket_data)                                         {}
 
 void Dispatch::onSwitchMIP   (socket_data, mip::PacketSwitchMIP&)                 {}
@@ -110,3 +172,12 @@ void Dispatch::onAgentConnectionToken(socket_data, mip::PacketAgentConnectionTok
 void Dispatch::onConnectionAccepted  (socket_data, mip::PacketConnectionAccepted&) {}
 
 void Dispatch::onAgentMRP (socket_data, mip::PacketAgentMRP&)                      {}
+
+void Dispatch::onIPv4Raw               (socket_data, const uint8_t*, size_t)           {}
+void Dispatch::onAgentRegistered       (socket_data, mip::PacketAgentRegistered&)       {}
+void Dispatch::onSwitchRouteUpdate     (socket_data, mip::PacketSwitchRouteUpdate&)     {}
+void Dispatch::onSwitchDisconnected    (socket_data, mip::PacketSwitchDisconnected&)    {}
+void Dispatch::onSwitchHello           (socket_data, mip::PacketSwitchHello&)           {}
+void Dispatch::onAgentUnregistered     (socket_data, mip::PacketAgentUnregistered&)     {}
+void Dispatch::onPeerToken             (socket_data, mip::PacketPeerToken&)             {}
+void Dispatch::onSwitchConfig          (socket_data, mip::PacketSwitchConfig&)          {}

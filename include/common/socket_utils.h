@@ -14,21 +14,49 @@
 int connect_to(const MachineConfig& mc);
 
 /**
+ * @brief Start a non-blocking connect to host:port (IPv4; host may be a
+ *        name). The connect may still be in progress when this returns;
+ *        NetQueue::put_sck_connecting finishes it.
+ * @return the socket fd, or -1 when the name does not resolve or the
+ *         connect fails at once.
+ */
+int connect_start(const std::string& host, uint16_t port);
+
+/**
+ * @brief Resolve an IPv4 address or host name to an address in network
+ *        order; 0 when it does not resolve.
+ */
+uint32_t resolve_ipv4(const std::string& host);
+
+/**
  * @brief Set a file descriptor to non-blocking mode.
  * @return true on success.
  */
 bool set_nonblocking(int fd);
 
+/** Clear O_NONBLOCK so a TLS handshake can run to completion. */
+bool set_blocking(int fd);
+
+/**
+ * Bound each blocking read and write on fd to ms milliseconds; 0 removes
+ * the bound. Used around blocking TLS handshakes so a silent peer cannot
+ * hold an event loop.
+ * @return true on success.
+ */
+bool set_socket_timeout(int fd, int ms);
+
 /**
  * @brief Read exactly n bytes from a socket (blocking).
+ *        ssl, when set, reads through that finished TLS session.
  */
-bool read_n_bytes(int sock, void* buffer, size_t n);
+bool read_n_bytes(int sock, void* buffer, size_t n, struct ssl_st* ssl = nullptr);
 
 /**
  * @brief Write exactly n bytes to a socket.
  *        Handles EAGAIN for non-blocking fds via retry.
+ *        ssl, when set, writes through that finished TLS session.
  */
-bool write_n_bytes(int sock, const void* buffer, size_t n);
+bool write_n_bytes(int sock, const void* buffer, size_t n, struct ssl_st* ssl = nullptr);
 
 /**
  * @brief Send a protobuf message with the 6-byte packet header.
@@ -45,7 +73,8 @@ bool write_n_bytes(int sock, const void* buffer, size_t n);
  * AFTER the 6-byte header, matching NetQueue::process().
  */
 bool send_protobuf_packet(int sock, vnet::protocol::PacketType type,
-                          const google::protobuf::Message& msg);
+                          const google::protobuf::Message& msg,
+                          struct ssl_st* ssl = nullptr);
 
 /**
  * @brief Read a protobuf message with the 6-byte packet header (blocking).
@@ -58,7 +87,8 @@ bool send_protobuf_packet(int sock, vnet::protocol::PacketType type,
  * @param received_type  If non-null, receives the actual packet type.
  */
 bool read_protobuf_packet(int sock, vnet::protocol::PacketType expected_type,
-                          google::protobuf::Message& msg);
+                          google::protobuf::Message& msg,
+                          struct ssl_st* ssl = nullptr);
 
 /**
  * @brief Read a packet header and payload, returning the type.
@@ -86,3 +116,11 @@ std::string ipv4_to_string(uint32_t ipv4);
  * @brief Convert an IPv4 string to network-order uint32_t.
  */
 uint32_t string_to_ipv4(const std::string& ip);
+
+/**
+ * @brief Read the IPv4 default route from /proc/net/route.
+ * @param iface        Receives the outbound interface name.
+ * @param gateway_nbo  Receives the gateway address in network order.
+ * @return true when a default route exists.
+ */
+bool read_default_route(std::string& iface, uint32_t& gateway_nbo);

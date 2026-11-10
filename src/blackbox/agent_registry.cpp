@@ -57,6 +57,13 @@ namespace vnet::blackbox {
         return by_name_.size();
     }
 
+    std::vector<const AgentEntry*> AgentRegistry::entries() const {
+        std::vector<const AgentEntry*> out;
+        out.reserve(by_name_.size());
+        for (const auto& [name, entry] : by_name_) out.push_back(entry);
+        return out;
+    }
+
     void AgentRegistry::remove_entry(AgentEntry* entry) {
         if (!entry) return;
 

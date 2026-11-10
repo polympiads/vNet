@@ -21,7 +21,7 @@ namespace vnet::blackbox {
      */
     enum class SourceType {
         AGENT,      // From a local agent (needs source validation)
-        SWITCH,     // From a peer switch (source already validated by origin switch)
+        SWITCH,     // From a peer switch (ACL and source route checked again here)
         TUN         // From the internet TUN device (return traffic)
     };
 
@@ -31,9 +31,9 @@ namespace vnet::blackbox {
 
     enum class PacketAction {
         DELIVER_LOCAL,      // Write the raw IPv4 payload to target_fd (local agent)
-        FORWARD_SWITCH,     // Wrap in PacketIPv4Raw and send to target_fd (peer switch)
+        FORWARD_SWITCH,     // Send as IPV4_RAW to target_fd (peer switch)
         FORWARD_INTERNET,   // Write the raw IPv4 payload to the TUN fd
-        REQUEST_ROUTE,      // No route known; caller should send PacketPrepareRouteForTarget
+        REQUEST_ROUTE,      // Destination is configured but its route is not known yet; hold the packet
         DROP                // Drop the packet
     };
 
@@ -43,7 +43,21 @@ namespace vnet::blackbox {
         SOURCE_SPOOF,           // Source IP doesn't match the agent's registered IP
         SOURCE_UNKNOWN,         // Source fd not found in agent registry
         DEST_UNREACHABLE,       // No local agent, no route, no internet
-        ACL_DENIED              // ACL check failed (agent-to-agent or internet)
+        ACL_DENIED,             // ACL check failed (agent-to-agent or internet)
+        RATE_LIMITED,           // The agent sent more than its limit allows
+        COUNT
+    };
+
+    const char* drop_reason_name(DropReason reason);
+
+    /** What the black box decided since it was made. */
+    struct Counters {
+        uint64_t delivered_local    = 0;
+        uint64_t forwarded_switch   = 0;
+        uint64_t forwarded_internet = 0;
+        uint64_t route_requested    = 0;
+        uint64_t dropped[static_cast<size_t>(DropReason::COUNT)] = {0};
+        uint64_t dropped_total() const;
     };
 
     struct PacketDecision {
@@ -74,7 +88,7 @@ namespace vnet::blackbox {
      * Lifecycle hooks:
      *   - on_agent_authenticated() : called after MIP, populates agent registry
      *   - on_agent_disconnected()  : called on fd close, cleans up
-     *   - on_route_update()        : called on PacketNextForTarget from conductor
+     *   - on_route_update()        : called on SWITCH_ROUTE_UPDATE and AGENT_UNREGISTERED from the conductor
      *   - on_switch_disconnected() : called when a peer switch drops
      */
     class BlackBox {
@@ -88,6 +102,21 @@ namespace vnet::blackbox {
          *                or -1 if internet is not available.
          */
         BlackBox(const Config& config, int tun_fd);
+
+        /**
+         * Limit what each agent may send: packets per second and bytes
+         * per second, each with a burst of one second's worth. 0 means
+         * no limit. Applies to agents registered after the call.
+         */
+        void set_agent_limits(uint64_t pps, uint64_t bytes_per_sec);
+
+        /**
+         * Put a newly loaded config in force. Rules apply to the next
+         * packet. Agents already registered keep the virtual IP they
+         * were given; a changed or removed assignment takes effect when
+         * that agent next connects.
+         */
+        void replace_config(const Config& config);
 
         // ----- Packet processing -----
 
@@ -123,8 +152,8 @@ namespace vnet::blackbox {
         void on_agent_disconnected(int fd);
 
         /**
-         * Received PacketNextForTarget from the conductor.
-         * Updates the routing table.
+         * The conductor published or withdrew the route to an agent on
+         * another switch. Updates the routing table.
          *
          * @param dest_ipv4       Target IP (network order).
          * @param next_switch_fd  The peer switch fd to forward to,
@@ -138,18 +167,30 @@ namespace vnet::blackbox {
          */
         void on_switch_disconnected(int switch_fd);
 
+        /**
+         * A peer session moved from old_fd to new_fd.
+         * Routes stay; only the socket changes.
+         */
+        void retarget_switch(int old_fd, int new_fd);
+
         // ----- Accessors (for logging, debugging) -----
 
         const AgentRegistry& agents() const;
         const RoutingTable&  routes() const;
         const Config&        config() const;
+        const Counters&      counters() const;
+
+        /** The counters as one line, and one line per agent. */
+        std::string summary() const;
+        std::string agent_lines() const;
 
     private:
         PacketDecision process_from_agent(int source_fd,
                                           const IPv4Header& hdr,
                                           const uint8_t* raw, size_t len);
 
-        PacketDecision process_from_switch(const IPv4Header& hdr,
+        PacketDecision process_from_switch(int source_fd,
+                                           const IPv4Header& hdr,
                                            const uint8_t* raw, size_t len);
 
         PacketDecision process_from_tun(const IPv4Header& hdr,
@@ -157,11 +198,15 @@ namespace vnet::blackbox {
 
         PacketDecision route_to_destination(uint32_t src_ipv4,
                                             uint32_t dest_ipv4);
+        PacketDecision record(const PacketDecision& decision, size_t len);
 
         Config         config_;
         AgentRegistry  registry_;
         RoutingTable   routing_;
         int            tun_fd_;
+        uint64_t       limit_pps_ = 0;
+        uint64_t       limit_bps_ = 0;
+        Counters       counters_;
     };
 
 };

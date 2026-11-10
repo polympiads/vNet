@@ -9,10 +9,9 @@ namespace vnet::blackbox {
      * Maintains the next-hop switch for each destination IPv4 address
      * that is not owned by a local agent.
      *
-     * Populated by PacketNextForTarget messages from the conductor.
-     *
-     * When switch_ipv4 is 0 in PacketNextForTarget, the target has
-     * disconnected and the route should be removed.
+     * Populated from the SWITCH_ROUTE_UPDATE messages the conductor
+     * broadcasts when an agent registers, and emptied by
+     * AGENT_UNREGISTERED and SWITCH_DISCONNECTED.
      *
      * Thread safety: NOT thread-safe. Single-threaded event loop.
      */
@@ -28,9 +27,8 @@ namespace vnet::blackbox {
         void set_route(uint32_t dest_ipv4, int next_switch_fd);
 
         /**
-         * Remove a route. Called when the conductor sends a
-         * PacketNextForTarget with switch_ipv4 = 0 (target disconnected),
-         * or when a switch-to-switch connection drops.
+         * Remove a route. Called when the conductor withdraws an agent
+         * (AGENT_UNREGISTERED) or when a switch-to-switch connection drops.
          */
         void remove_route(uint32_t dest_ipv4);
 
@@ -39,6 +37,12 @@ namespace vnet::blackbox {
          * Called when a switch-to-switch connection drops.
          */
         void remove_routes_for_switch(int switch_fd);
+
+        /**
+         * Point every route that used old_fd at new_fd.
+         * Used when two peer dials collapse onto one socket.
+         */
+        void retarget(int old_fd, int new_fd);
 
         /**
          * Look up the next-hop fd for a destination IPv4.

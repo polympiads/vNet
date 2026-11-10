@@ -1,0 +1,6 @@
+agent1  10.0.1.1
+agent2  10.0.1.2
+
+agent1  agent2
+agent1  ::internet:8.8.8.8
+agent2  ::internet:8.8.8.8
