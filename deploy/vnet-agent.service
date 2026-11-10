@@ -5,9 +5,11 @@ Wants=network-online.target
 
 [Service]
 # Written by tools/vnet-roster.py: VNET_AGENT_NAME, VNET_AUTH_KEY,
-# CONDUCTOR_IP, CONDUCTOR_PORT, TLS files, VNET_LOCKDOWN.
+# CONDUCTOR_IP, CONDUCTOR_PORT, TLS files, VNET_LOCKDOWN, VNET_BYPASS_FILE.
 EnvironmentFile=/etc/vnet/agent.env
 ExecStart=/usr/local/bin/agent ${VNET_AGENT_NAME}
+# SIGHUP reads the bypass file again.
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=2
 # Needs the TUN device, routes and iptables: runs as root.

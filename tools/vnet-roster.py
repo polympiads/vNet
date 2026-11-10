@@ -2,17 +2,22 @@
 """Generate every vNet file for an event from one roster.
 
 The roster is a text file. Blank lines and lines starting with # are
-ignored. Three kinds of lines:
+ignored. Four kinds of lines:
 
     switch <name>
-    agent  <name> <virtual ip> [group,group,...] [internet=cidr,cidr,...] [lockdown]
+    agent  <name> <virtual ip> [group,group,...] [internet=cidr,cidr,...] [lockdown] [droplog]
     allow  <group or name> <group or name>
+    bypass <group or name> <bypass file line>
 
 An agent is in the groups it lists (its own name is always a group of
 one). "allow a b" lets every member of a talk to every member of b, in
 both directions; "allow x x" connects a group to itself. "internet="
 allows those internet addresses or prefixes to the agent; "lockdown"
-turns the host firewall on for that machine.
+turns the host firewall on for that machine; "droplog" makes it log
+what the firewall drops. "bypass g <line>" puts that line (route, in,
+out, in6 or out6, see the agent's bypass file) in the bypass file of
+every member of g: what stays on the physical network, such as a VDI
+broker or the admins' network.
 
 Example:
 
@@ -22,12 +27,15 @@ Example:
     agent  c001  10.0.1.1 contestants lockdown
     agent  c002  10.0.1.2 contestants lockdown
     allow  contestants judges
+    bypass contestants route 192.0.2.10/32
+    bypass contestants in -p tcp -s 198.51.100.0/24 --dport 22443 -j ACCEPT
 
 Output, in the given directory:
 
     auth.txt                 the conductor's VNET_AUTH_FILE
-    switch.txt               the config every switch loads
+    switch.txt               the switch config; the conductor sends it to every switch
     machines/<name>.env      environment for that machine's systemd unit
+    machines/<name>.bypass   that agent's bypass file, when it has bypass lines
     certs/                   with --tls: a CA and one certificate per machine
 
 Keys are random and written only to auth.txt and the machine's env file;
@@ -52,7 +60,7 @@ def fail(line_no, msg):
 
 
 def parse_roster(path):
-    switches, agents, allows = [], {}, []
+    switches, agents, allows, bypasses = [], {}, [], []
     groups = {}
     with open(path) as f:
         for line_no, raw in enumerate(f, 1):
@@ -70,7 +78,7 @@ def parse_roster(path):
                 switches.append(name)
             elif kind == "agent":
                 if len(parts) < 3:
-                    fail(line_no, "expected: agent <name> <ip> [groups] [internet=...] [lockdown]")
+                    fail(line_no, "expected: agent <name> <ip> [groups] [internet=...] [lockdown] [droplog]")
                 name, ip = parts[1], parts[2]
                 if not NAME_RE.match(name) or len(name) > AGENT_NAME_MAX:
                     fail(line_no, "agent name %r must be 1 to %d characters from [A-Za-z0-9_-]"
@@ -81,10 +89,13 @@ def parse_roster(path):
                     fail(line_no, "bad IPv4 address %r" % ip)
                 if name in agents:
                     fail(line_no, "agent %s given twice" % name)
-                agent = {"ip": ip, "groups": [name], "internet": [], "lockdown": False}
+                agent = {"ip": ip, "groups": [name], "internet": [], "lockdown": False,
+                         "droplog": False}
                 for extra in parts[3:]:
                     if extra == "lockdown":
                         agent["lockdown"] = True
+                    elif extra == "droplog":
+                        agent["droplog"] = True
                     elif extra.startswith("internet="):
                         for cidr in extra[len("internet="):].split(","):
                             if not cidr:
@@ -107,6 +118,17 @@ def parse_roster(path):
                 if len(parts) != 3:
                     fail(line_no, "expected: allow <group> <group>")
                 allows.append((line_no, parts[1], parts[2]))
+            elif kind == "bypass":
+                if len(parts) < 4 or parts[2] not in ("route", "in", "out", "in6", "out6"):
+                    fail(line_no, "expected: bypass <group> route|in|out|in6|out6 ...")
+                if parts[2] == "route":
+                    if len(parts) != 4:
+                        fail(line_no, "expected: bypass <group> route a.b.c.d/n")
+                    try:
+                        ipaddress.IPv4Network(parts[3], strict=False)
+                    except ValueError:
+                        fail(line_no, "bad prefix %r" % parts[3])
+                bypasses.append((line_no, parts[1], " ".join(parts[2:])))
             else:
                 fail(line_no, "unknown line kind %r" % kind)
 
@@ -121,7 +143,10 @@ def parse_roster(path):
         for g in (a, b):
             if g not in groups:
                 fail(line_no, "unknown group or agent %r" % g)
-    return switches, agents, allows, groups
+    for line_no, g, _ in bypasses:
+        if g not in groups:
+            fail(line_no, "unknown group or agent %r" % g)
+    return switches, agents, allows, groups, bypasses
 
 
 def existing_keys(auth_path):
@@ -166,7 +191,7 @@ def main():
     host, _, port = args.conductor.partition(":")
     port = int(port) if port else 5000
 
-    switches, agents, allows, groups = parse_roster(args.roster)
+    switches, agents, allows, groups, bypasses = parse_roster(args.roster)
     os.makedirs(os.path.join(args.outdir, "machines"), exist_ok=True)
     auth_path = os.path.join(args.outdir, "auth.txt")
     keys = existing_keys(auth_path)
@@ -185,7 +210,8 @@ def main():
     write_if_changed(auth_path, "\n".join(lines) + "\n")
 
     # switch.txt
-    lines = ["# generated by vnet-roster.py; copy to every switch", "", "# virtual addresses"]
+    lines = ["# generated by vnet-roster.py; the conductor sends it to every switch",
+             "", "# virtual addresses"]
     for name, a in agents.items():
         lines.append("%s %s" % (name, a["ip"]))
     pairs = set()
@@ -226,22 +252,37 @@ def main():
     common = ["CONDUCTOR_IP=%s" % host, "CONDUCTOR_PORT=%d" % port]
     write_if_changed(os.path.join(args.outdir, "machines", "conductor.env"), "\n".join(
         ["# conductor", "CONDUCTOR_PORT=%d" % port,
-         "VNET_AUTH_FILE=%s/auth.txt" % args.install_dir] + tls_env("conductor")) + "\n")
+         "VNET_AUTH_FILE=%s/auth.txt" % args.install_dir,
+         "VNET_CONFIG_PATH=%s/switch.txt" % args.install_dir] + tls_env("conductor")) + "\n")
     for i, sw in enumerate(switches):
         write_if_changed(os.path.join(args.outdir, "machines", sw + ".env"), "\n".join(
             ["# switch %s" % sw, "VNET_SWITCH_NAME=%s" % sw,
              "VNET_SWITCH_PORT=%d" % (args.switch_port + i),
-             "VNET_AUTH_KEY=%s" % key_for("switch", sw),
-             "VNET_CONFIG_PATH=%s/switch.txt" % args.install_dir] + common + tls_env(sw)) + "\n")
+             "VNET_AUTH_KEY=%s" % key_for("switch", sw)] + common + tls_env(sw)) + "\n")
+    bypass_files = 0
     for name, a in agents.items():
         env = ["# agent %s (%s)" % (name, a["ip"]), "VNET_AGENT_NAME=%s" % name,
                "VNET_AUTH_KEY=%s" % key_for("agent", name)] + common + tls_env(name)
         if a["lockdown"]:
             env.append("VNET_LOCKDOWN=1")
+        if a["droplog"]:
+            env.append("VNET_LOCKDOWN_LOG=1")
+        # The bypass lines of every group the agent is in, in roster order.
+        mine = [text for _, g, text in bypasses if name in groups[g]]
+        bypass_path = os.path.join(args.outdir, "machines", name + ".bypass")
+        if mine:
+            env.append("VNET_BYPASS_FILE=%s/bypass.conf" % args.install_dir)
+            write_if_changed(bypass_path, "\n".join(
+                ["# generated by vnet-roster.py for %s; install as %s/bypass.conf"
+                 % (name, args.install_dir)] + mine) + "\n")
+            bypass_files += 1
+        elif os.path.exists(bypass_path):
+            os.remove(bypass_path)
         write_if_changed(os.path.join(args.outdir, "machines", name + ".env"), "\n".join(env) + "\n")
 
-    print("wrote %s: %d switch(es), %d agent(s), %d allowed pair(s)%s"
-          % (args.outdir, len(switches), len(agents), len(pairs), ", certificates" if args.tls else ""))
+    print("wrote %s: %d switch(es), %d agent(s), %d allowed pair(s), %d bypass file(s)%s"
+          % (args.outdir, len(switches), len(agents), len(pairs), bypass_files,
+             ", certificates" if args.tls else ""))
 
 
 if __name__ == "__main__":

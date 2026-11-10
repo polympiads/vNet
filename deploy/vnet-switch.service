@@ -5,10 +5,11 @@ Wants=network-online.target
 
 [Service]
 # Written by tools/vnet-roster.py: VNET_SWITCH_NAME, VNET_SWITCH_PORT,
-# VNET_AUTH_KEY, VNET_CONFIG_PATH, CONDUCTOR_IP, CONDUCTOR_PORT, TLS files.
+# VNET_AUTH_KEY, CONDUCTOR_IP, CONDUCTOR_PORT, TLS files. The config
+# comes from the conductor; VNET_CONFIG_PATH names a file of its own.
 EnvironmentFile=/etc/vnet/switch.env
 ExecStart=/usr/local/bin/switch ${VNET_SWITCH_NAME} ${VNET_SWITCH_PORT}
-# SIGHUP reloads the config; SIGUSR1 prints the counters.
+# SIGHUP reloads a config file of its own; SIGUSR1 prints the counters.
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=2
