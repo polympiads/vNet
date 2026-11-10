@@ -41,6 +41,12 @@ namespace vnet::netqueue {
 
         /* A handshake step asked for the socket to become writable. */
         bool want_write = false;
+
+        /* Set when process() stopped at the per-turn packet cap with input
+         * still to read; the queue comes back to it next turn. */
+        bool has_backlog = false;
+        /* The last turn of wait_and_process that handled this element. */
+        uint64_t last_turn = 0;
     
         NetworkElement (int fd, void *ptr, FiniteStateMachine state);
     };

@@ -22,6 +22,13 @@ namespace vnet::netqueue {
     const int EPOLL_MAX_EVENTS = 256;
 
     /**
+     * Packets one element may deliver in one turn of wait_and_process.
+     * A socket that is fed without pause is put down after this many and
+     * taken up again next turn, so it cannot starve the other elements.
+     */
+    const int PACKETS_PER_TURN = 64;
+
+    /**
      * Instances of this class represents a general
      * purpose pool of file descriptors intended to
      * represent a queue for incoming network packets.
@@ -53,7 +60,15 @@ namespace vnet::netqueue {
          * batch that still holds their pointer can skip them safely. */
         std::vector<NetworkElement*> deferred_delete;
 
+        /* Elements that hit PACKETS_PER_TURN with input left: handled
+         * first next turn, which then does not sleep in epoll_wait. */
+        std::vector<NetworkElement*> backlog;
+        uint64_t turn = 0;
+
         void reap_closed();
+
+        /* One element that epoll (or the backlog) reported ready. */
+        void handle_ready(NetworkElement* element, uint32_t events);
 
         /*
          * Handler of events (e.g. receiving a packet,

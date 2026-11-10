@@ -96,10 +96,11 @@ start_conductor() {
       VNET_DUMP_PATH="$LOGS/dump.bin" "$BIN/conductor" >> "$LOGS/conductor.log" 2>&1 &
   PID[conductor]=$!
 }
+SWITCH_ENV=()   # extra settings for the switches of one scenario
 start_switch() {  # i [cert name]
   ip netns exec s$1 env "${HB[@]}" $(tls_env ${2:-switch$1}) CONDUCTOR_IP=172.30.$1.1 CONDUCTOR_PORT=5000 \
       VNET_CONFIG_PATH="${SWITCH_CONFIG:-$LOGS/switch.txt}" VNET_AUTH_KEY=key$1 VNET_STATS_SEC=0 \
-      "$BIN/switch" switch$1 600$1 >> "$LOGS/switch$1.log" 2>&1 &
+      "${SWITCH_ENV[@]}" "$BIN/switch" switch$1 600$1 >> "$LOGS/switch$1.log" 2>&1 &
   PID[switch$1]=$!
 }
 start_agent() {  # i [extra env...]
@@ -333,14 +334,22 @@ scenario_duplicate_identity() {
 scenario_flood() {
   command -v iperf3 >/dev/null || { echo "SKIP flood (no iperf3)"; return; }
   topo_up flood
-  standard_start || { fail flood "agents did not register"; return; }
-  start_agent 3; sleep 2
-  wait_for "$LOGS/conductor.log" "registered with IP" 3 10 || { fail flood "agent3 did not register"; return; }
-  # agent3 floods agent1; agent2 pings agent1 meanwhile. The flooder's
-  # own agent is busy, so the victim is the one to measure.
+  # Fixed placement through networks: switch1 serves room1 (agent1 and
+  # agent3), switch2 serves room2 (agent2). Low limits, so the flooded
+  # agent gets little even on a small machine.
+  start_conductor; sleep 0.5
+  SWITCH_ENV=(VNET_AGENT_PPS=5000 VNET_AGENT_MBPS=50 VNET_NETWORK=room1); start_switch 1
+  SWITCH_ENV=(VNET_AGENT_PPS=5000 VNET_AGENT_MBPS=50 VNET_NETWORK=room2); start_switch 2
+  SWITCH_ENV=(); sleep 1.5
+  start_agent 1 VNET_NETWORK=room1; start_agent 2 VNET_NETWORK=room2; start_agent 3 VNET_NETWORK=room1; sleep 2
+  wait_for "$LOGS/conductor.log" "registered with IP" 3 15 || { fail flood "agents did not register"; return; }
+  grep -q "agent3 registered with IP 10.0.1.3 on switch switch1" "$LOGS/conductor.log" || { fail flood "placement by network did not hold"; return; }
+  # agent3 floods agent1 on the same switch; agent2 pings agent1 from the
+  # other switch meanwhile. The flooder's own agent is busy, so the
+  # victim is the one to measure.
   in_ns a1 iperf3 -s -1 -p 5201 > "$LOGS/iperf-server.log" 2>&1 &
   sleep 0.5
-  in_ns a3 iperf3 -c 10.0.1.1 -u -b 0 -l 1400 -t 5 -p 5201 > "$LOGS/iperf.log" 2>&1 &
+  in_ns a3 iperf3 -c 10.0.1.1 -u -b 300M -l 1400 -t 5 -p 5201 > "$LOGS/iperf.log" 2>&1 &
   local iperf=$!
   sleep 1
   local got

@@ -133,3 +133,43 @@ TEST(NetQueueSocket, ProcessEOF) {
     
     delete queue;
 }
+
+/*
+ * One socket with a thousand packets waiting must not keep the queue
+ * from serving another socket in the same turn, and must still get all
+ * its packets over the following turns.
+ */
+TEST(NetQueueEpoll, BusySocketIsCappedPerTurn) {
+    socket_datas.clear();
+    NetQueue* queue = new NetQueue(createTestHandler(), 100);
+
+    int a[2], b[2];
+    ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, a), 0);
+    ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, b), 0);
+    ASSERT_NE(queue->put_sck(a[0], (void*) 0xA), nullptr);
+    ASSERT_NE(queue->put_sck(b[0], (void*) 0xB), nullptr);
+
+    PacketHeader header(0, (PacketType) 0x32);
+    const int many = 1000;
+    std::vector<uint8_t> bytes;
+    for (int i = 0; i < many; i++)
+        bytes.insert(bytes.end(), (uint8_t*) &header, (uint8_t*) &header + sizeof(header));
+    ASSERT_EQ(write(a[1], bytes.data(), bytes.size()), (ssize_t) bytes.size());
+    ASSERT_EQ(write(b[1], &header, sizeof(header)), (ssize_t) sizeof(header));
+
+    queue->wait_and_process();
+    int from_a = 0, from_b = 0;
+    for (const auto& d : socket_datas) (d.ptr_data == (void*) 0xA ? from_a : from_b)++;
+    EXPECT_EQ(from_b, 1);
+    EXPECT_EQ(from_a, PACKETS_PER_TURN);
+
+    for (int turns = 0; turns < 2 * many / PACKETS_PER_TURN + 2 && from_a < many; turns++) {
+        queue->wait_and_process();
+        from_a = 0;
+        for (const auto& d : socket_datas) if (d.ptr_data == (void*) 0xA) from_a++;
+    }
+    EXPECT_EQ(from_a, many);
+
+    close(a[1]); close(b[1]);
+    delete queue;
+}

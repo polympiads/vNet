@@ -305,75 +305,99 @@ void NetQueue::drain_tls(int fd) {
 
 void NetQueue::wait_and_process () {
     reap_closed();
+    turn++;
+
+    // Elements put down at the packet cap last turn have input waiting
+    // that epoll may not report again (TLS keeps it inside the session),
+    // so they go first and the wait does not sleep.
+    std::vector<NetworkElement*> carried;
+    carried.swap(backlog);
+    int timeout = carried.empty() ? epoll_timeout : 0;
 
     struct epoll_event events[EPOLL_MAX_EVENTS];
-    int nb_events = epoll_wait(epoll_fd, events, EPOLL_MAX_EVENTS, epoll_timeout);
+    int nb_events = epoll_wait(epoll_fd, events, EPOLL_MAX_EVENTS, timeout);
     if (nb_events < 0) {
-        return ;
+        nb_events = 0;
     }
 
     for (int i_event = 0; i_event < nb_events; i_event ++) {
         NetworkElement* current_element = (NetworkElement*) events[i_event].data.ptr;
         if (current_element->dead)
             continue ;
+        current_element->last_turn = turn;
+        handle_ready(current_element, events[i_event].events);
+    }
 
-        bool should_close = false;
-        close_reason reason = CLOSE_ERROR;
-        // A TLS write can need a read before it finishes. Finish that write
-        // before SSL_read, or the session fails and the conductor drops the peer.
-        if (!current_element->write_buffer.empty() &&
-            (events[i_event].events & (EPOLLIN | EPOLLOUT))) {
-            if (!flush_write_buffer(current_element)) {
-                should_close = true;
-                reason = CLOSE_ERROR;
-            }
-        }
-        bool pending = is_pending_state(current_element->state);
-        if (!should_close && current_element->write_buffer.empty() &&
-            ((events[i_event].events & EPOLLIN) ||
-             (pending && (events[i_event].events & EPOLLOUT)))) {
-            process(current_element);
-            if (current_element->dead)
-                continue ;
-
-            if (current_element->state == SCK_ERROR || current_element->state == TUN_ERROR) {
-                should_close = true;
-                reason = CLOSE_ERROR;
-            } else if (current_element->state == SCK_EOF || current_element->state == TUN_EOF) {
-                should_close = true;
-                reason = CLOSE_HANGUP;
-            }
-        }
-        if (current_element->dead)
-            continue ;
-        if (events[i_event].events & EPOLLERR) {
-            should_close = true;
-            reason = CLOSE_ERROR;
-        }
-        if (events[i_event].events & EPOLLHUP) {
-            should_close = true;
-            reason = CLOSE_HANGUP;
-        }
-
-        if (!should_close && !current_element->dead) {
-            struct epoll_event event;
-            event.data.ptr = current_element;
-            event.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
-            if (!current_element->write_buffer.empty() ||
-                current_element->want_write ||
-                current_element->state == SCK_CONNECTING) {
-                event.events |= EPOLLOUT;
-            }
-            if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, current_element->fd, &event) < 0) {
-                should_close = true;
-                reason = CLOSE_EPOLL;
-            }
-        }
-        if (should_close)
-            close(current_element, reason);
+    for (NetworkElement* element : carried) {
+        if (element->dead || element->last_turn == turn) continue;
+        element->last_turn = turn;
+        element->has_backlog = false;
+        handle_ready(element, EPOLLIN);
     }
 
     reap_closed();
+}
+
+void NetQueue::handle_ready(NetworkElement* current_element, uint32_t ev) {
+    bool should_close = false;
+    close_reason reason = CLOSE_ERROR;
+    // A TLS write can need a read before it finishes. Finish that write
+    // before SSL_read, or the session fails and the conductor drops the peer.
+    if (!current_element->write_buffer.empty() && (ev & (EPOLLIN | EPOLLOUT))) {
+        if (!flush_write_buffer(current_element)) {
+            should_close = true;
+            reason = CLOSE_ERROR;
+        }
+    }
+    bool pending = is_pending_state(current_element->state);
+    if (!should_close && current_element->write_buffer.empty() &&
+        ((ev & EPOLLIN) || (pending && (ev & EPOLLOUT)))) {
+        process(current_element);
+        if (current_element->dead)
+            return ;
+
+        if (current_element->state == SCK_ERROR || current_element->state == TUN_ERROR) {
+            should_close = true;
+            reason = CLOSE_ERROR;
+        } else if (current_element->state == SCK_EOF || current_element->state == TUN_EOF) {
+            should_close = true;
+            reason = CLOSE_HANGUP;
+        }
+    }
+    if (current_element->dead)
+        return ;
+    if (ev & EPOLLERR) {
+        should_close = true;
+        reason = CLOSE_ERROR;
+    }
+    if (ev & EPOLLHUP) {
+        // Input left behind the cap is still readable; come back for it
+        // before the hangup is acted on.
+        if (!current_element->has_backlog) {
+            should_close = true;
+            reason = CLOSE_HANGUP;
+        }
+    }
+
+    if (!should_close && !current_element->dead) {
+        if (current_element->has_backlog)
+            backlog.push_back(current_element);
+
+        struct epoll_event event;
+        event.data.ptr = current_element;
+        event.events   = EPOLLIN | EPOLLET | EPOLLONESHOT;
+        if (!current_element->write_buffer.empty() ||
+            current_element->want_write ||
+            current_element->state == SCK_CONNECTING) {
+            event.events |= EPOLLOUT;
+        }
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, current_element->fd, &event) < 0) {
+            should_close = true;
+            reason = CLOSE_EPOLL;
+        }
+    }
+    if (should_close)
+        close(current_element, reason);
 }
 
 bool NetQueue::step_connecting(NetworkElement* element) {
@@ -449,7 +473,15 @@ void NetQueue::fire_connected(NetworkElement* element) {
 }
 
 void NetQueue::process (NetworkElement* element) {
+    int delivered = 0;
+    element->has_backlog = false;
     while (1) {
+        if (delivered >= PACKETS_PER_TURN) {
+            // Enough for this turn; the rest waits until the other
+            // elements have had theirs.
+            element->has_backlog = true;
+            return ;
+        }
         switch (element->state) {
             case SCK_CONNECTING: {
                 if (!step_connecting(element)) return ;
@@ -533,6 +565,7 @@ void NetQueue::process (NetworkElement* element) {
                 sck_data.packet_buffer = element->net_buffer + sizeof(protocol::PacketHeader);
 
                 handler.onSocketReady(handler.ptr_data, sck_data);
+                delivered++;
 
                 // The handler may have closed the element, or rejected the
                 // peer by setting an error state; both must stick.
@@ -576,7 +609,8 @@ void NetQueue::process (NetworkElement* element) {
                 data.ip_buffer_size = element->net_buffer_used;
                 
                 handler.onTunReady(handler.ptr_data, data);
-                
+                delivered++;
+
                 element->state = TUN_RECEIVE;
 
                 break ;

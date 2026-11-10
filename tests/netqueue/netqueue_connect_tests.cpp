@@ -317,3 +317,39 @@ TEST_F(NetQueueTls, VanishedPeerDoesNotPoisonOtherLinks) {
 
     delete queue;
 }
+
+/*
+ * Over TLS the packets beyond the cap sit inside the session, where epoll
+ * does not see them; the queue must come back for them on its own.
+ */
+TEST_F(NetQueueTls, BacklogInsideTheSessionIsDrained) {
+    PREPARE_SOCKET_PAIR
+    NetQueue* queue = new NetQueue(handlerWithConnected(), 100);
+    ASSERT_NE(queue->put_sck_tls_server(fd_server, (void*) 0x5, vnet::tls::new_session(fd_server)), nullptr);
+    ASSERT_NE(queue->put_sck_tls_client(fd_client, (void*) 0xC, vnet::tls::new_session(fd_client)), nullptr);
+    for (int i = 0; i < 100 && connected_datas.size() < 2; i++) queue->wait_and_process();
+    ASSERT_EQ(connected_datas.size(), 2u);
+
+    // Many heartbeats in one write: one or two TLS records.
+    const int many = 500;
+    std::vector<uint8_t> bytes;
+    PacketHeader header(0, (PacketType) 0x32);
+    for (int i = 0; i < many; i++)
+        bytes.insert(bytes.end(), (uint8_t*) &header, (uint8_t*) &header + sizeof(header));
+    EXPECT_TRUE(queue->send(fd_client, bytes.data(), bytes.size()));
+
+    size_t got = 0;
+    for (int turns = 0; turns < 2 * many / PACKETS_PER_TURN + 4 && got < (size_t) many; turns++) {
+        queue->wait_and_process();
+        got = 0;
+        for (const auto& d : socket_datas) {
+            if (d.fd == fd_server) got++;
+        }
+        if (turns == 0) {
+            EXPECT_LE(got, (size_t) PACKETS_PER_TURN);
+        }
+    }
+    EXPECT_EQ(got, (size_t) many);
+
+    delete queue;
+}
