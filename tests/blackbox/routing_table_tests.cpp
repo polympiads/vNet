@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include "vnet/blackbox/routing_table.hpp"
+#include <algorithm>
+#include <vector>
 
 #include <arpa/inet.h>
 
@@ -48,11 +50,23 @@ TEST(RoutingTable, RemoveRoutesForSwitch) {
     rt.set_route(ip("10.0.1.2"), 7);
     rt.set_route(ip("10.0.1.3"), 8);
 
-    rt.remove_routes_for_switch(7);
+    std::vector<uint32_t> removed = rt.remove_routes_for_switch(7);
+    std::sort(removed.begin(), removed.end());
+    std::vector<uint32_t> expected = {ip("10.0.1.1"), ip("10.0.1.2")};
+    std::sort(expected.begin(), expected.end());
+    EXPECT_EQ(removed, expected);
 
     EXPECT_EQ(rt.lookup(ip("10.0.1.1")), -1);
     EXPECT_EQ(rt.lookup(ip("10.0.1.2")), -1);
     EXPECT_EQ(rt.lookup(ip("10.0.1.3")), 8);
+    EXPECT_EQ(rt.size(), 1u);
+}
+
+TEST(RoutingTable, RemoveRoutesForSwitchWithNone) {
+    RoutingTable rt;
+    rt.set_route(ip("10.0.1.3"), 8);
+
+    EXPECT_TRUE(rt.remove_routes_for_switch(7).empty());
     EXPECT_EQ(rt.size(), 1u);
 }
 

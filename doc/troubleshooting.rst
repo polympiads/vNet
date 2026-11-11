@@ -127,10 +127,9 @@ They are on different switches and the switches are not linked
       [Switch] Peer switch1 did not answer the dial
 
    The switch ports must be reachable between switches, not only from
-   the machines. If the link was up and dropped earlier
-   (``Heartbeat timeout``, ``Connection closed: switch1``), the routes
-   through it are not restored by themselves in this version: restart the
-   conductor (:doc:`concepts/recovery`).
+   the machines. A link that dropped earlier (``Heartbeat timeout``,
+   ``Connection closed: switch1``) is dialed again every 2 seconds and
+   its routes come back with it (:doc:`concepts/recovery`).
 
 The receiving machine filters it
    The switch delivered it (``local`` or ``to-switch`` rises) but the

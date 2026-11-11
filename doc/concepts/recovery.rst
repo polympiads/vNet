@@ -78,15 +78,10 @@ internet are not affected. The switches dial each other again every 2
 seconds and give up on an attempt after 5 seconds, so the link comes back
 on its own (``Peer <name> link up``).
 
-.. warning::
-
-   In this version the routes through the link are not restored when it
-   comes back: the statistics line shows ``peers=1`` but fewer ``routes``
-   than before, and the machines on the two switches still cannot reach
-   each other. Restart the conductor (``systemctl restart
-   vnet-conductor``): the switches re-announce their machines and every
-   route is published again within seconds, without disturbing the
-   machines. Restarting the agents concerned also works.
+Each switch keeps the routes that went through the link
+(``Link to <switch> lost; N route(s) kept until it is back``) and
+installs them again as soon as the link is up, so traffic resumes
+without any action.
 
 Two machines use the same name
 ------------------------------

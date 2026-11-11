@@ -216,6 +216,33 @@ scenario_switch_link() {
   pass switch_link
 }
 
+# The link between two switches drops while both stay up and registered:
+# when it comes back, the routes through it must work again.
+scenario_peer_link() {
+  topo_up peer_link
+  start_conductor; sleep 0.5
+  SWITCH_ENV=(VNET_NETWORK=room1); start_switch 1
+  SWITCH_ENV=(VNET_NETWORK=room2); start_switch 2
+  SWITCH_ENV=(); sleep 1.5
+  start_agent 1 VNET_NETWORK=room1; start_agent 2 VNET_NETWORK=room2; sleep 2
+  wait_for "$LOGS/conductor.log" "registered with IP" 2 15 || { fail peer_link "agents did not register"; return; }
+  [ "$(pings 1 10.0.1.2 3)" = 3 ] || { fail peer_link "initial ping"; return; }
+  # Cut only switch-to-switch traffic; both conductor links stay up.
+  in_ns core iptables -I FORWARD -s 172.30.1.0/24 -d 172.30.2.0/24 -j DROP
+  in_ns core iptables -I FORWARD -s 172.30.2.0/24 -d 172.30.1.0/24 -j DROP
+  wait_for "$LOGS/switch1.log" "Connection closed: switch2" 1 20 || { fail peer_link "peer link not closed"; return; }
+  in_ns core iptables -D FORWARD -s 172.30.1.0/24 -d 172.30.2.0/24 -j DROP
+  in_ns core iptables -D FORWARD -s 172.30.2.0/24 -d 172.30.1.0/24 -j DROP
+  wait_for "$LOGS/switch1.log" "Peer switch2 link up" 2 20 || { fail peer_link "peer link not back"; return; }
+  sleep 1
+  local r12 r21
+  r12=$(pings 1 10.0.1.2 3); r21=$(pings 2 10.0.1.1 3)
+  say "after the switch-to-switch link came back: a1->a2 $r12/3, a2->a1 $r21/3"
+  [ "$r12" = 3 ] && [ "$r21" = 3 ] || { fail peer_link "routes not restored"; return; }
+  [ "$(grep -c 'Switch registered' "$LOGS/conductor.log")" = 2 ] || { fail peer_link "a switch re-registered"; return; }
+  pass peer_link
+}
+
 scenario_agent_exit() {
   topo_up agent_exit
   standard_start || { fail agent_exit "agents did not register"; return; }
@@ -504,7 +531,7 @@ scenario_throughput() {
 # ---------------------------------------------------------------- main
 
 make_certs
-ALL="basic attacks conductor_restart switch_restart switch_link agent_exit agent_crash duplicate_identity lockdown bypass config config_files auth_reload flood throughput"
+ALL="basic attacks conductor_restart switch_restart switch_link peer_link agent_exit agent_crash duplicate_identity lockdown bypass config config_files auth_reload flood throughput"
 for s in ${@:-$ALL}; do
   echo "== $s"
   topo_down

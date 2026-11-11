@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <string>
+#include <vector>
 
 #include "vnet/blackbox/config.hpp"
 #include "vnet/blackbox/agent_registry.hpp"
@@ -164,8 +165,10 @@ namespace vnet::blackbox {
         /**
          * A peer switch fd was closed.
          * Removes all routes pointing to that switch.
+         *
+         * @return The destinations that were routed through it.
          */
-        void on_switch_disconnected(int switch_fd);
+        std::vector<uint32_t> on_switch_disconnected(int switch_fd);
 
         /**
          * A peer session moved from old_fd to new_fd.

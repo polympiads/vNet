@@ -154,7 +154,24 @@ struct PeerTarget {
 static std::unordered_map<std::string, PeerTarget> g_peer_targets;
 /* Per peer switch, the token the conductor issued for that pair. */
 static std::unordered_map<std::string, uint64_t>   g_peer_tokens;
+/*
+ * Per peer switch, the destinations routed through it while there is no
+ * link to it: routes the conductor pushed before the link was up, and
+ * routes kept when the link dropped while that switch stayed registered.
+ * Installed when the link is up again.
+ */
 static std::unordered_map<std::string, std::vector<uint32_t>> g_routes_waiting;
+
+/* A destination the conductor moved or withdrew is no longer waiting on
+ * any peer: a link that comes back later must not bring it back. */
+static void forget_waiting_route(uint32_t dest_ipv4) {
+    for (auto it = g_routes_waiting.begin(); it != g_routes_waiting.end(); ) {
+        auto& ips = it->second;
+        ips.erase(std::remove(ips.begin(), ips.end(), dest_ipv4), ips.end());
+        if (ips.empty()) it = g_routes_waiting.erase(it);
+        else ++it;
+    }
+}
 
 // ---------------------------------------------------------------------------
 //  Packets waiting on a route the conductor has not pushed yet
@@ -593,8 +610,18 @@ struct SwitchDispatch : public Dispatch {
             auto it = g_state.peer_switches.find(info->name);
             if (it != g_state.peer_switches.end() && it->second == info)
                 g_state.peer_switches.erase(it);
-            if (!info->skip_route_cleanup)
-                g_blackbox->on_switch_disconnected(data.fd);
+            if (!info->skip_route_cleanup) {
+                std::vector<uint32_t> lost = g_blackbox->on_switch_disconnected(data.fd);
+                // Only the link dropped: the conductor still lists that
+                // switch and will not push these routes again. Keep them
+                // for when the link is back (retry_peers redials it).
+                if (!lost.empty() && g_peer_targets.count(info->name)) {
+                    auto& waiting = g_routes_waiting[info->name];
+                    waiting.insert(waiting.end(), lost.begin(), lost.end());
+                    std::cout << "[Switch] Link to " << info->name << " lost; "
+                              << lost.size() << " route(s) kept until it is back\n";
+                }
+            }
         }
 
         if (info == g_state.conductor) {
@@ -744,6 +771,7 @@ struct SwitchDispatch : public Dispatch {
                              mip::PacketAgentUnregistered& pkt) override {
         if (!from_conductor(data, "route withdrawal")) return;
         g_blackbox->on_route_update(pkt.virtual_ipv4(), -1);
+        forget_waiting_route(pkt.virtual_ipv4());
         std::cout << "[Switch] Route withdrawn: "
                   << ipv4_to_string(pkt.virtual_ipv4()) << "\n";
     }
@@ -768,6 +796,7 @@ struct SwitchDispatch : public Dispatch {
             known->second.port = static_cast<uint16_t>(sw_port);
         }
 
+        forget_waiting_route(agent_ip);
         auto it = g_state.peer_switches.find(sw_name);
         if (it != g_state.peer_switches.end()) {
             g_blackbox->on_route_update(agent_ip, it->second->fd);

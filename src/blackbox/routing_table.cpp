@@ -19,13 +19,17 @@ namespace vnet::blackbox {
         }
     }
 
-    void RoutingTable::remove_routes_for_switch(int switch_fd) {
+    std::vector<uint32_t> RoutingTable::remove_routes_for_switch(int switch_fd) {
+        std::vector<uint32_t> removed;
         for (auto it = routes_.begin(); it != routes_.end(); ) {
-            if (it->second == switch_fd)
+            if (it->second == switch_fd) {
+                removed.push_back(it->first);
                 it = routes_.erase(it);
-            else
+            } else {
                 ++it;
+            }
         }
+        return removed;
     }
 
     int RoutingTable::lookup(uint32_t dest_ipv4) const {

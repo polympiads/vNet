@@ -123,6 +123,9 @@ Switch
      - a link between two switches is being made, or is up
    * - ``Peer <switch> did not answer the dial``
      - the other switch's port cannot be reached from here
+   * - ``Link to <switch> lost; <n> route(s) kept until it is back``
+     - the link to another switch dropped while that switch is still
+       registered; its routes return when the link is up again
    * - ``Peer switch disconnected: <switch>``
      - the conductor reported that switch gone
    * - ``Conductor link lost; agents keep their data path, retrying every 2s``
