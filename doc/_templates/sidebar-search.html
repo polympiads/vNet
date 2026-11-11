@@ -1,0 +1,8 @@
+{#- A search field without a heading or button; Enter searches. -#}
+{%- if pagename != "search" and builder != "singlehtml" %}
+<div id="searchbox" role="search">
+  <form class="search" action="{{ pathto('search') }}" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div>
+{%- endif %}

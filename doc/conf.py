@@ -45,7 +45,6 @@ html_static_path = ['_static']
 html_css_files = ['custom.css']
 html_title = 'vNet documentation'
 html_theme_options = {
-    'description': 'A centrally enforced overlay network for on-site programming contests.',
     'github_user': 'polympiads',
     'github_repo': 'vNet',
     'github_button': False,
@@ -57,6 +56,7 @@ html_theme_options = {
     'head_font_family': 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
     'code_font_family': 'ui-monospace, "SFMono-Regular", Menlo, Consolas, "DejaVu Sans Mono", monospace',
     'font_size': '15px',
+    'caption_font_size': '15px',
     'code_font_size': '0.9em',
 }
 
@@ -66,6 +66,6 @@ highlight_language = "none"
 html_version_root = "https://polympiads.github.io/vNet/"
 
 html_sidebars = {
-   '**': ['about.html', 'searchbox.html', 'navigation.html', 'versions.html']
+   '**': ['about.html', 'sidebar-search.html', 'sidebar-nav.html', 'versions.html']
 }
 html_context = module.generate_gitdata(html_version_root)
