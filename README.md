@@ -1,5 +1,7 @@
 # polympiads/vNet — Virtualized Network
 
+**Documentation:** [vnet.polympiads.ch](https://vnet.polympiads.ch), with tutorials, guides for running an event, troubleshooting and the full reference. For anything else, email us at [polympiads@epfl.ch](mailto:polympiads@epfl.ch).
+
 vNet is a virtual networking system built for competitive programming events. It creates an isolated overlay network where participants (agents) talk to each other using virtual IPs, no matter where they physically are. Each agent can only reach what the config explicitly allows.
 
 vNet powers the networking infrastructure of olympiads in informatics at EPFL.
