@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>vnet::tls &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Common functions" href="common.html" />
+    <link rel="prev" title="vnet::protocol" href="protocol.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">C++ API reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="blackbox.html">vnet::blackbox</a></li>
+<li class="toctree-l2"><a class="reference internal" href="netqueue.html">vnet::netqueue</a></li>
+<li class="toctree-l2"><a class="reference internal" href="protocol.html">vnet::protocol</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">vnet::tls</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#_CPPv4N4vnet3tlsE"><code class="docutils literal notranslate"><span class="pre">vnet::tls</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls7enabledEv"><code class="docutils literal notranslate"><span class="pre">enabled()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls4initEv"><code class="docutils literal notranslate"><span class="pre">init()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls16handshake_clientEi"><code class="docutils literal notranslate"><span class="pre">handshake_client()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls16handshake_serverEi"><code class="docutils literal notranslate"><span class="pre">handshake_server()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls11new_sessionEi"><code class="docutils literal notranslate"><span class="pre">new_session()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls12free_sessionEP6ssl_st"><code class="docutils literal notranslate"><span class="pre">free_session()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls9peer_roleEP6ssl_st"><code class="docutils literal notranslate"><span class="pre">peer_role()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls13peer_has_roleEP6ssl_stPKc"><code class="docutils literal notranslate"><span class="pre">peer_has_role()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls14ROLE_CONDUCTORE"><code class="docutils literal notranslate"><span class="pre">ROLE_CONDUCTOR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls11ROLE_SWITCHE"><code class="docutils literal notranslate"><span class="pre">ROLE_SWITCH</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet3tls10ROLE_AGENTE"><code class="docutils literal notranslate"><span class="pre">ROLE_AGENT</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="common.html">Common functions</a></li>
+</ul>
+</li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="vnet-tls">
+<h1>vnet::tls<a class="headerlink" href="#vnet-tls" title="Link to this heading">¶</a></h1>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tlsE">
+<span id="_CPPv3N4vnet3tlsE"></span><span id="_CPPv2N4vnet3tlsE"></span><span id="vnet::tls"></span><span class="target" id="namespacevnet_1_1tls"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">tls</span></span></span><a class="headerlink" href="#_CPPv4N4vnet3tlsE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls7enabledEv">
+<span id="_CPPv3N4vnet3tls7enabledEv"></span><span id="_CPPv2N4vnet3tls7enabledEv"></span><span id="vnet::tls::enabled"></span><span class="target" id="namespacevnet_1_1tls_1ae89f9753adefc6ba3fb9bd5a5e27c55d"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">enabled</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet3tls7enabledEv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>True after <a class="reference internal" href="#namespacevnet_1_1tls_1a403cacc2b48497e0dc6bb1804f9cca72"><span class="std std-ref">init()</span></a> when VNET_TLS=1 and the certificate loaded. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls4initEv">
+<span id="_CPPv3N4vnet3tls4initEv"></span><span id="_CPPv2N4vnet3tls4initEv"></span><span id="vnet::tls::init"></span><span class="target" id="namespacevnet_1_1tls_1a403cacc2b48497e0dc6bb1804f9cca72"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">init</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet3tls4initEv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Read VNET_TLS, VNET_TLS_CERT, VNET_TLS_KEY and VNET_TLS_CA. </p>
+<p>When TLS is off this returns true and <a class="reference internal" href="#namespacevnet_1_1tls_1ae89f9753adefc6ba3fb9bd5a5e27c55d"><span class="std std-ref">enabled()</span></a> stays false. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls16handshake_clientEi">
+<span id="_CPPv3N4vnet3tls16handshake_clientEi"></span><span id="_CPPv2N4vnet3tls16handshake_clientEi"></span><span id="vnet::tls::handshake_client__i"></span><span class="target" id="namespacevnet_1_1tls_1a13a0ea5c35b8cf1583a5b6c6dd3da23e"></span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">handshake_client</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet3tls16handshake_clientEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Blocking handshake. </p>
+<p>The fd should be blocking. Returns null on failure. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls16handshake_serverEi">
+<span id="_CPPv3N4vnet3tls16handshake_serverEi"></span><span id="_CPPv2N4vnet3tls16handshake_serverEi"></span><span id="vnet::tls::handshake_server__i"></span><span class="target" id="namespacevnet_1_1tls_1a176100c4da3b624d38401abbbddbdb9f"></span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">handshake_server</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet3tls16handshake_serverEi" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls11new_sessionEi">
+<span id="_CPPv3N4vnet3tls11new_sessionEi"></span><span id="_CPPv2N4vnet3tls11new_sessionEi"></span><span id="vnet::tls::new_session__i"></span><span class="target" id="namespacevnet_1_1tls_1a0979b86e8b2e4ee478be73f27fd7ed45"></span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">new_session</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet3tls11new_sessionEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>A session bound to fd with no handshake done yet, for the non-blocking handshake that NetQueue drives. </p>
+<p>Null when TLS is off or the session cannot be made. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls12free_sessionEP6ssl_st">
+<span id="_CPPv3N4vnet3tls12free_sessionEP6ssl_st"></span><span id="_CPPv2N4vnet3tls12free_sessionEP6ssl_st"></span><span id="vnet::tls::free_session__ssl_stP"></span><span class="target" id="namespacevnet_1_1tls_1a23f1d0c26604b62b076d2a8ab19caa59"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">free_session</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet3tls12free_sessionEP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls9peer_roleEP6ssl_st">
+<span id="_CPPv3N4vnet3tls9peer_roleEP6ssl_st"></span><span id="_CPPv2N4vnet3tls9peer_roleEP6ssl_st"></span><span id="vnet::tls::peer_role__ssl_stP"></span><span class="target" id="namespacevnet_1_1tls_1aaccc00551e3fd6cd8925528a1cff129a"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">peer_role</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet3tls9peer_roleEP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd><p>The role named in the peer certificate’s OU, or “” when there is no certificate or no OU. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls13peer_has_roleEP6ssl_stPKc">
+<span id="_CPPv3N4vnet3tls13peer_has_roleEP6ssl_stPKc"></span><span id="_CPPv2N4vnet3tls13peer_has_roleEP6ssl_stPKc"></span><span id="vnet::tls::peer_has_role__ssl_stP.cCP"></span><span class="target" id="namespacevnet_1_1tls_1a6d968586bc742c76382d816bb5dcf539"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">peer_has_role</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">role</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet3tls13peer_has_roleEP6ssl_stPKc" title="Link to this definition">¶</a><br /></dt>
+<dd><p>True when the peer may act as role: TLS is off, VNET_TLS_ROLE_CHECK=0, or the peer certificate’s OU is exactly role. </p>
+<p>With one certificate per role, a key found on a contestant machine cannot be used to pose as a switch or the conductor. </p>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-variables">Variables</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls14ROLE_CONDUCTORE">
+<span id="_CPPv3N4vnet3tls14ROLE_CONDUCTORE"></span><span id="_CPPv2N4vnet3tls14ROLE_CONDUCTORE"></span><span id="vnet::tls::ROLE_CONDUCTOR__cCPC"></span><span class="target" id="namespacevnet_1_1tls_1a8bcebe097d25057d5b9122b41b7fd98b"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ROLE_CONDUCTOR</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="s"><span class="pre">&quot;conductor&quot;</span></span><a class="headerlink" href="#_CPPv4N4vnet3tls14ROLE_CONDUCTORE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Certificate roles, carried in the subject’s OU field. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls11ROLE_SWITCHE">
+<span id="_CPPv3N4vnet3tls11ROLE_SWITCHE"></span><span id="_CPPv2N4vnet3tls11ROLE_SWITCHE"></span><span id="vnet::tls::ROLE_SWITCH__cCPC"></span><span class="target" id="namespacevnet_1_1tls_1a8ea0587e7ce039038abdb18f969b8a76"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ROLE_SWITCH</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="s"><span class="pre">&quot;switch&quot;</span></span><a class="headerlink" href="#_CPPv4N4vnet3tls11ROLE_SWITCHE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet3tls10ROLE_AGENTE">
+<span id="_CPPv3N4vnet3tls10ROLE_AGENTE"></span><span id="_CPPv2N4vnet3tls10ROLE_AGENTE"></span><span id="vnet::tls::ROLE_AGENT__cCPC"></span><span class="target" id="namespacevnet_1_1tls_1a60107bf991562eba9edfa003be5fb17f"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ROLE_AGENT</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="s"><span class="pre">&quot;agent&quot;</span></span><a class="headerlink" href="#_CPPv4N4vnet3tls10ROLE_AGENTE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/api/tls.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

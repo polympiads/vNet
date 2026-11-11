@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Prepare an event &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="During an event" href="during-event.html" />
+    <link rel="prev" title="Your first event" href="../tutorials/first-event.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Prepare an event</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#size-the-network">Size the network</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#decide-the-rules">Decide the rules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#prepare-the-machines">Prepare the machines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rehearse">Rehearse</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#on-the-day">On the day</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">C++ API reference</a></li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="prepare-an-event">
+<h1>Prepare an event<a class="headerlink" href="#prepare-an-event" title="Link to this heading">¶</a></h1>
+<p>A checklist for the weeks before an event. <a class="reference internal" href="../tutorials/first-event.html"><span class="doc">Your first event</span></a>
+shows the commands once; this page says what to decide and what to test.</p>
+<section id="size-the-network">
+<h2>Size the network<a class="headerlink" href="#size-the-network" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>Switches</dt><dd><p>Each switch handles every packet of its machines. Plan the switches so
+that, with the largest one down, the others can carry its machines:
+with <em>n</em> switches each should be able to carry <code class="docutils literal notranslate"><span class="pre">1/(n-1)</span></code> of the
+event. Measure one switch with <code class="docutils literal notranslate"><span class="pre">vNet-benchmarks</span></code> on the hardware you
+will use rather than guessing.</p>
+</dd>
+<dt>Per-agent limit</dt><dd><p>The default, 20000 packets per second and 200 Mbit/s per machine, is
+far above what a contestant needs and far below what a switch can
+carry. Lower it if a few machines must not be able to load a switch;
+raise it for a judge machine that serves many contestants
+(<code class="docutils literal notranslate"><span class="pre">VNET_AGENT_PPS</span></code>, <code class="docutils literal notranslate"><span class="pre">VNET_AGENT_MBPS</span></code> on the switches; the limit is
+the same for every machine of a switch).</p>
+</dd>
+<dt>File descriptors</dt><dd><p>Each machine holds one socket on its switch and one on the conductor.
+The units raise <code class="docutils literal notranslate"><span class="pre">LimitNOFILE</span></code> to 65536; keep that if you run the
+programs another way.</p>
+</dd>
+<dt>Addresses</dt><dd><p>Give each group its own range inside the overlay prefix (judges in
+<code class="docutils literal notranslate"><span class="pre">10.0.0.0/24</span></code>, contestants in <code class="docutils literal notranslate"><span class="pre">10.0.1.0/24</span></code>, …): rules and logs
+become readable. No organizer machine and no network you need to reach
+may sit inside the overlay prefix; change it with
+<code class="docutils literal notranslate"><span class="pre">VNET_OVERLAY_CIDR</span></code> on every switch and agent if it collides.</p>
+</dd>
+</dl>
+</section>
+<section id="decide-the-rules">
+<h2>Decide the rules<a class="headerlink" href="#decide-the-rules" title="Link to this heading">¶</a></h2>
+<p>Write them as groups in the roster (<a class="reference internal" href="../reference/roster.html"><span class="doc">Roster and vnet-roster</span></a>):</p>
+<ul class="simple">
+<li><p>who may talk to whom (<code class="docutils literal notranslate"><span class="pre">allow</span></code>);</p></li>
+<li><p>which machines reach the internet, and which addresses
+(<code class="docutils literal notranslate"><span class="pre">internet=</span></code>); prefer the few addresses a machine needs over
+<code class="docutils literal notranslate"><span class="pre">0.0.0.0/0</span></code>;</p></li>
+<li><p>which machines are locked down (<code class="docutils literal notranslate"><span class="pre">lockdown</span></code>), and what stays on their
+physical network (<code class="docutils literal notranslate"><span class="pre">bypass</span></code>): a VDI broker, the organizers’ SSH
+access, a DNS server (<a class="reference internal" href="vdi-lockdown.html"><span class="doc">Lock down contestant machines</span></a>).</p></li>
+</ul>
+<p>Remember that a machine with no rule reaches nothing, not even DNS
+through the overlay.</p>
+</section>
+<section id="prepare-the-machines">
+<h2>Prepare the machines<a class="headerlink" href="#prepare-the-machines" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Install the same vNet build everywhere; mixed versions are refused or
+logged (<code class="docutils literal notranslate"><span class="pre">the</span> <span class="pre">two</span> <span class="pre">binaries</span> <span class="pre">parse</span> <span class="pre">it</span> <span class="pre">differently</span></code>).</p></li>
+<li><p>Organizer machines: fixed addresses, the conductor’s port and the switch
+ports open between them and from the contestant network.</p></li>
+<li><p>Contestant image: the agent installed and enabled, <code class="docutils literal notranslate"><span class="pre">/etc/vnet</span></code> filled
+per machine. A machine must not be able to read another machine’s key.</p></li>
+<li><p>Keep <code class="docutils literal notranslate"><span class="pre">out/</span></code> from <code class="docutils literal notranslate"><span class="pre">vnet-roster</span></code> on one organizer machine, with a
+copy offline. Keep <code class="docutils literal notranslate"><span class="pre">ca.key</span></code> out of every event machine.</p></li>
+<li><p>Check that the certificates are valid for the whole event
+(<a class="reference internal" href="certificates.html"><span class="doc">Manage certificates</span></a>).</p></li>
+</ul>
+</section>
+<section id="rehearse">
+<h2>Rehearse<a class="headerlink" href="#rehearse" title="Link to this heading">¶</a></h2>
+<p>Run the full setup at least once with the real machines, or a room of
+them, and walk through these:</p>
+<ol class="arabic simple">
+<li><p>Every machine joins: <code class="docutils literal notranslate"><span class="pre">vnet-state</span> <span class="pre">/var/vnet-dump.bin</span> <span class="pre">/etc/vnet/auth.txt</span></code>
+lists nothing under <em>expected but not connected</em>.</p></li>
+<li><p>The allowed pairs work and the others do not, across two switches.</p></li>
+<li><p>A locked-down machine cannot reach its LAN, the internet directly, or
+any IPv6 address; what the bypass file allows still works.</p></li>
+<li><p>Stop a switch: its machines move to the others within seconds.</p></li>
+<li><p>Stop the conductor: the contest keeps working; start it again: the
+state comes back (<a class="reference internal" href="../concepts/recovery.html"><span class="doc">Failures and recovery</span></a>).</p></li>
+<li><p>Reboot a contestant machine: it joins again by itself.</p></li>
+<li><p>Change a rule and reload the conductor: the change applies at once.</p></li>
+</ol>
+<p>Keep the logs of the rehearsal: they are what a healthy event looks like,
+and the reference when something looks wrong on the day.</p>
+</section>
+<section id="on-the-day">
+<h2>On the day<a class="headerlink" href="#on-the-day" title="Link to this heading">¶</a></h2>
+<p>Before contestants arrive: start the conductor, then the switches, then
+the machines; check <code class="docutils literal notranslate"><span class="pre">vnet-state</span></code>; run the pings of the rehearsal. Then
+see <a class="reference internal" href="during-event.html"><span class="doc">During an event</span></a>.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/guides/prepare-event.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

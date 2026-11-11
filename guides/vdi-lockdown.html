@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Lock down contestant machines &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Monitor the network" href="monitoring.html" />
+    <link rel="prev" title="During an event" href="during-event.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="during-event.html">During an event</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Lock down contestant machines</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#turn-it-on">Turn it on</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-lockdown-allows">What lockdown allows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-bypass-file">The bypass file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#vdi-desktops">VDI desktops</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#other-things-to-keep-in-mind">Other things to keep in mind</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#see-what-is-dropped">See what is dropped</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#free-a-machine-by-hand">Free a machine by hand</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">C++ API reference</a></li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="lock-down-contestant-machines">
+<h1>Lock down contestant machines<a class="headerlink" href="#lock-down-contestant-machines" title="Link to this heading">¶</a></h1>
+<p>The switches only see what a machine sends into its TUN. Without more, a
+contestant machine still reaches its physical LAN directly, and the
+internet over IPv6. <em>Lockdown</em> closes that: the agent installs a host
+firewall so that the machine talks only through the overlay, plus the
+exceptions you list. This page shows how to set it up, in particular for
+contestant machines that are VDI desktops.</p>
+<section id="turn-it-on">
+<h2>Turn it on<a class="headerlink" href="#turn-it-on" title="Link to this heading">¶</a></h2>
+<p>In the roster, add <code class="docutils literal notranslate"><span class="pre">lockdown</span></code> to the machine (and <code class="docutils literal notranslate"><span class="pre">droplog</span></code> to log
+what it drops):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>agent c001 10.0.1.1 contestants lockdown
+</pre></div>
+</div>
+<p>or set <code class="docutils literal notranslate"><span class="pre">VNET_LOCKDOWN=1</span></code> (and <code class="docutils literal notranslate"><span class="pre">VNET_LOCKDOWN_LOG=1</span></code>) in the machine’s
+<code class="docutils literal notranslate"><span class="pre">/etc/vnet/agent.env</span></code>. When the agent joins it logs:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[Agent] Lockdown on: only the conductor, the switch, the overlay and the bypass file (routes: 1, rules: 1) are reachable; IPv6 is blocked
+</pre></div>
+</div>
+</section>
+<section id="what-lockdown-allows">
+<h2>What lockdown allows<a class="headerlink" href="#what-lockdown-allows" title="Link to this heading">¶</a></h2>
+<p>The agent puts two chains, <code class="docutils literal notranslate"><span class="pre">VNET_IN</span></code> and <code class="docutils literal notranslate"><span class="pre">VNET_OUT</span></code>, first in the
+<code class="docutils literal notranslate"><span class="pre">INPUT</span></code> and <code class="docutils literal notranslate"><span class="pre">OUTPUT</span></code> chains, for both iptables and ip6tables. In
+IPv4 they accept, in this order:</p>
+<ul class="simple">
+<li><p>loopback;</p></li>
+<li><p>everything on the TUN, <code class="docutils literal notranslate"><span class="pre">vnet-&lt;name&gt;</span></code> (the switch decides what goes
+through it);</p></li>
+<li><p>outbound TCP to the conductor’s port and to the switch’s port;</p></li>
+<li><p>packets of connections already allowed (<code class="docutils literal notranslate"><span class="pre">ESTABLISHED,RELATED</span></code>);</p></li>
+<li><p>DHCP, so the machine keeps its address;</p></li>
+<li><p>the <code class="docutils literal notranslate"><span class="pre">route</span></code> prefixes of the bypass file, both directions, any port;</p></li>
+<li><p>the <code class="docutils literal notranslate"><span class="pre">in</span></code> and <code class="docutils literal notranslate"><span class="pre">out</span></code> lines of the bypass file;</p></li>
+</ul>
+<p>and drop the rest. In IPv6 they accept loopback and the <code class="docutils literal notranslate"><span class="pre">in6</span></code> and
+<code class="docutils literal notranslate"><span class="pre">out6</span></code> lines, and drop the rest.</p>
+<p>The chains are rebuilt at every join (the switch may change) and at every
+<code class="docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">reload</span> <span class="pre">vnet-agent</span></code>. Stopping the agent removes them.</p>
+</section>
+<section id="the-bypass-file">
+<h2>The bypass file<a class="headerlink" href="#the-bypass-file" title="Link to this heading">¶</a></h2>
+<p>The bypass file lists what stays on the physical network
+(<a class="reference internal" href="../reference/bypass-file.html"><span class="doc">Bypass file</span></a>). In the roster, a <code class="docutils literal notranslate"><span class="pre">bypass</span></code> line puts
+one line in the bypass file of every member of a group:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>bypass contestants route 192.0.2.10/32
+bypass contestants in -p tcp -s 198.51.100.0/24 --dport 22443 -j ACCEPT
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">route</span></code> keeps a prefix off the TUN and opens it in the firewall, in both
+directions. <code class="docutils literal notranslate"><span class="pre">in</span></code> and <code class="docutils literal notranslate"><span class="pre">out</span></code> add an iptables rule exactly as written,
+for a narrower opening (one port, one direction).</p>
+</section>
+<section id="vdi-desktops">
+<h2>VDI desktops<a class="headerlink" href="#vdi-desktops" title="Link to this heading">¶</a></h2>
+<p>When the contestant machine is a virtual desktop, the contestant’s screen
+reaches it over the physical network, from a VDI broker or gateway. That
+connection must survive both the default route moving into the TUN and the
+firewall. Two ways, depending on who opens the connection:</p>
+<dl>
+<dt>The desktop connects out to the broker</dt><dd><p>Keep the broker on the physical network with a route line:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>bypass contestants route 192.0.2.10/32
+</pre></div>
+</div>
+</dd>
+<dt>The gateway connects in to the desktop</dt><dd><p>Open the port it uses, from its addresses only:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>bypass contestants in -p tcp -s 198.51.100.0/24 --dport 3389 -j ACCEPT
+</pre></div>
+</div>
+<p>The replies leave through the <code class="docutils literal notranslate"><span class="pre">ESTABLISHED</span></code> rule. If the gateway is
+not on the desktop’s subnet, add a <code class="docutils literal notranslate"><span class="pre">route</span></code> line for it as well, so the
+replies go back through the physical gateway rather than into the TUN.</p>
+</dd>
+</dl>
+<p>Before the event, check from a locked-down desktop that the session
+survives an agent restart: the chains are rebuilt during a join, and the
+session must not depend on anything else.</p>
+</section>
+<section id="other-things-to-keep-in-mind">
+<h2>Other things to keep in mind<a class="headerlink" href="#other-things-to-keep-in-mind" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>DNS</dt><dd><p>The machine’s resolver is usually on the physical network, and lockdown
+blocks it. Either add a <code class="docutils literal notranslate"><span class="pre">route</span></code> line for the DNS server, or give the
+machine a resolver reachable through the overlay (a judge machine, or an
+internet resolver allowed with <code class="docutils literal notranslate"><span class="pre">internet=</span></code>).</p>
+</dd>
+<dt>Organizer access</dt><dd><p>To keep SSH from the organizers’ network, add
+<code class="docutils literal notranslate"><span class="pre">bypass</span> <span class="pre">contestants</span> <span class="pre">in</span> <span class="pre">-p</span> <span class="pre">tcp</span> <span class="pre">-s</span> <span class="pre">&lt;admin</span> <span class="pre">network&gt;</span> <span class="pre">--dport</span> <span class="pre">22</span> <span class="pre">-j</span> <span class="pre">ACCEPT</span></code>.</p>
+</dd>
+<dt>Time</dt><dd><p>NTP to a server on the physical network needs a <code class="docutils literal notranslate"><span class="pre">route</span></code> line too.</p>
+</dd>
+<dt>Other firewall tools</dt><dd><p>Lockdown inserts its chains first in <code class="docutils literal notranslate"><span class="pre">INPUT</span></code> and <code class="docutils literal notranslate"><span class="pre">OUTPUT</span></code>. A tool
+that rewrites the whole firewall (<code class="docutils literal notranslate"><span class="pre">ufw</span></code>, <code class="docutils literal notranslate"><span class="pre">firewalld</span></code>, a
+configuration-management run) may remove them; <code class="docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">reload</span>
+<span class="pre">vnet-agent</span></code> puts them back.</p>
+</dd>
+<dt>What lockdown cannot do</dt><dd><p>It runs on a machine the contestant may control. A contestant who is
+root can remove it. Filter at the physical network as well when that
+matters (<a class="reference internal" href="../concepts/security.html"><span class="doc">Security model</span></a>).</p>
+</dd>
+</dl>
+</section>
+<section id="see-what-is-dropped">
+<h2>See what is dropped<a class="headerlink" href="#see-what-is-dropped" title="Link to this heading">¶</a></h2>
+<p>With <code class="docutils literal notranslate"><span class="pre">droplog</span></code> (<code class="docutils literal notranslate"><span class="pre">VNET_LOCKDOWN_LOG=1</span></code>), every drop is written to the
+kernel log, at most one per second with a burst of 50, with one of these
+prefixes:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Prefix</p></th>
+<th class="head"><p>Dropped</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">vnet-drop-in:</span></code></p></td>
+<td><p>an IPv4 packet arriving</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vnet-drop-out:</span></code></p></td>
+<td><p>an IPv4 packet leaving</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">vnet-drop-in6:</span></code></p></td>
+<td><p>an IPv6 packet arriving</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vnet-drop-out6:</span></code></p></td>
+<td><p>an IPv6 packet leaving</p></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sudo<span class="w"> </span>journalctl<span class="w"> </span>-k<span class="w"> </span>-g<span class="w"> </span>vnet-drop<span class="w"> </span>-n<span class="w"> </span><span class="m">20</span>
+</pre></div>
+</div>
+<p>Each line has the addresses and ports, which is what to put in a bypass
+line if the traffic should be allowed.</p>
+</section>
+<section id="free-a-machine-by-hand">
+<h2>Free a machine by hand<a class="headerlink" href="#free-a-machine-by-hand" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">systemctl</span> <span class="pre">stop</span> <span class="pre">vnet-agent</span></code> removes everything. If the agent is
+gone (crashed, uninstalled) and the machine is still closed:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sudo<span class="w"> </span>iptables<span class="w">  </span>-D<span class="w"> </span>INPUT<span class="w"> </span>-j<span class="w"> </span>VNET_IN<span class="p">;</span><span class="w">  </span>sudo<span class="w"> </span>iptables<span class="w">  </span>-D<span class="w"> </span>OUTPUT<span class="w"> </span>-j<span class="w"> </span>VNET_OUT
+<span class="gp">$ </span>sudo<span class="w"> </span>ip6tables<span class="w"> </span>-D<span class="w"> </span>INPUT<span class="w"> </span>-j<span class="w"> </span>VNET_IN<span class="p">;</span><span class="w">  </span>sudo<span class="w"> </span>ip6tables<span class="w"> </span>-D<span class="w"> </span>OUTPUT<span class="w"> </span>-j<span class="w"> </span>VNET_OUT
+<span class="gp">$ </span>sudo<span class="w"> </span>ip<span class="w"> </span>route<span class="w"> </span>replace<span class="w"> </span>default<span class="w"> </span>via<span class="w"> </span>&lt;gateway&gt;<span class="w"> </span>dev<span class="w"> </span>&lt;interface&gt;
+</pre></div>
+</div>
+<p>The gateway and interface the machine had before are in
+<code class="docutils literal notranslate"><span class="pre">/run/vnet/agent-&lt;name&gt;.route</span></code>.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/guides/vdi-lockdown.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

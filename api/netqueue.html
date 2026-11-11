@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>vnet::netqueue &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="vnet::protocol" href="protocol.html" />
+    <link rel="prev" title="vnet::blackbox" href="blackbox.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">C++ API reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="blackbox.html">vnet::blackbox</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">vnet::netqueue</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#_CPPv4N4vnet8netqueueE"><code class="docutils literal notranslate"><span class="pre">vnet::netqueue</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachineE"><code class="docutils literal notranslate"><span class="pre">FiniteStateMachine</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine11TUN_RECEIVEE"><code class="docutils literal notranslate"><span class="pre">TUN_RECEIVE</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine9TUN_READYE"><code class="docutils literal notranslate"><span class="pre">TUN_READY</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine9TUN_ERRORE"><code class="docutils literal notranslate"><span class="pre">TUN_ERROR</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine7TUN_EOFE"><code class="docutils literal notranslate"><span class="pre">TUN_EOF</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine10SCK_HEADERE"><code class="docutils literal notranslate"><span class="pre">SCK_HEADER</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine11SCK_PAYLOADE"><code class="docutils literal notranslate"><span class="pre">SCK_PAYLOAD</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine9SCK_READYE"><code class="docutils literal notranslate"><span class="pre">SCK_READY</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine9SCK_ERRORE"><code class="docutils literal notranslate"><span class="pre">SCK_ERROR</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine7SCK_EOFE"><code class="docutils literal notranslate"><span class="pre">SCK_EOF</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine14SCK_CONNECTINGE"><code class="docutils literal notranslate"><span class="pre">SCK_CONNECTING</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine14SCK_TLS_ACCEPTE"><code class="docutils literal notranslate"><span class="pre">SCK_TLS_ACCEPT</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine15SCK_TLS_CONNECTE"><code class="docutils literal notranslate"><span class="pre">SCK_TLS_CONNECT</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue12close_reasonE"><code class="docutils literal notranslate"><span class="pre">close_reason</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue12close_reason11CLOSE_ERRORE"><code class="docutils literal notranslate"><span class="pre">CLOSE_ERROR</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue12close_reason11CLOSE_EPOLLE"><code class="docutils literal notranslate"><span class="pre">CLOSE_EPOLL</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue12close_reason12CLOSE_HANGUPE"><code class="docutils literal notranslate"><span class="pre">CLOSE_HANGUP</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue16doNothingOnCloseEPv10close_data"><code class="docutils literal notranslate"><span class="pre">doNothingOnClose()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue22doNothingOnSocketReadyEPv11socket_data"><code class="docutils literal notranslate"><span class="pre">doNothingOnSocketReady()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue19doNothingOnTunReadyEPv8tun_data"><code class="docutils literal notranslate"><span class="pre">doNothingOnTunReady()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue20doNothingOnConnectedEPv11socket_data"><code class="docutils literal notranslate"><span class="pre">doNothingOnConnected()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue16WRITE_BUFFER_MAXE"><code class="docutils literal notranslate"><span class="pre">WRITE_BUFFER_MAX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue16EPOLL_MAX_EVENTSE"><code class="docutils literal notranslate"><span class="pre">EPOLL_MAX_EVENTS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue16PACKETS_PER_TURNE"><code class="docutils literal notranslate"><span class="pre">PACKETS_PER_TURN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE"><code class="docutils literal notranslate"><span class="pre">vnet::netqueue::NetworkElement</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement14NetworkElementEiPv18FiniteStateMachine"><code class="docutils literal notranslate"><span class="pre">NetworkElement()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement5stateE"><code class="docutils literal notranslate"><span class="pre">state</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement2fdE"><code class="docutils literal notranslate"><span class="pre">fd</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement3ptrE"><code class="docutils literal notranslate"><span class="pre">ptr</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement15net_buffer_usedE"><code class="docutils literal notranslate"><span class="pre">net_buffer_used</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement10net_bufferE"><code class="docutils literal notranslate"><span class="pre">net_buffer</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement12write_bufferE"><code class="docutils literal notranslate"><span class="pre">write_buffer</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement19write_buffer_offsetE"><code class="docutils literal notranslate"><span class="pre">write_buffer_offset</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement4deadE"><code class="docutils literal notranslate"><span class="pre">dead</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement3sslE"><code class="docutils literal notranslate"><span class="pre">ssl</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement10want_writeE"><code class="docutils literal notranslate"><span class="pre">want_write</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement11has_backlogE"><code class="docutils literal notranslate"><span class="pre">has_backlog</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElement9last_turnE"><code class="docutils literal notranslate"><span class="pre">last_turn</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue10close_dataE"><code class="docutils literal notranslate"><span class="pre">vnet::netqueue::close_data</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue10close_data11net_elementE"><code class="docutils literal notranslate"><span class="pre">net_element</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue10close_data8ptr_dataE"><code class="docutils literal notranslate"><span class="pre">ptr_data</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue10close_data2fdE"><code class="docutils literal notranslate"><span class="pre">fd</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue10close_data6reasonE"><code class="docutils literal notranslate"><span class="pre">reason</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_dataE"><code class="docutils literal notranslate"><span class="pre">vnet::netqueue::socket_data</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_data11net_elementE"><code class="docutils literal notranslate"><span class="pre">net_element</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_data8ptr_dataE"><code class="docutils literal notranslate"><span class="pre">ptr_data</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_data2fdE"><code class="docutils literal notranslate"><span class="pre">fd</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_data11packet_typeE"><code class="docutils literal notranslate"><span class="pre">packet_type</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_data13packet_bufferE"><code class="docutils literal notranslate"><span class="pre">packet_buffer</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_data12payload_sizeE"><code class="docutils literal notranslate"><span class="pre">payload_size</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_data11full_bufferE"><code class="docutils literal notranslate"><span class="pre">full_buffer</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_data16full_buffer_sizeE"><code class="docutils literal notranslate"><span class="pre">full_buffer_size</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8tun_dataE"><code class="docutils literal notranslate"><span class="pre">vnet::netqueue::tun_data</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8tun_data11net_elementE"><code class="docutils literal notranslate"><span class="pre">net_element</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8tun_data8ptr_dataE"><code class="docutils literal notranslate"><span class="pre">ptr_data</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8tun_data2fdE"><code class="docutils literal notranslate"><span class="pre">fd</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8tun_data9ip_bufferE"><code class="docutils literal notranslate"><span class="pre">ip_buffer</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8tun_data14ip_buffer_sizeE"><code class="docutils literal notranslate"><span class="pre">ip_buffer_size</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandlerE"><code class="docutils literal notranslate"><span class="pre">vnet::netqueue::NetworkQueueHandler</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler7onCloseE"><code class="docutils literal notranslate"><span class="pre">onClose</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler13onSocketReadyE"><code class="docutils literal notranslate"><span class="pre">onSocketReady</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler10onTunReadyE"><code class="docutils literal notranslate"><span class="pre">onTunReady</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler11onConnectedE"><code class="docutils literal notranslate"><span class="pre">onConnected</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler8ptr_dataE"><code class="docutils literal notranslate"><span class="pre">ptr_data</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueueE"><code class="docutils literal notranslate"><span class="pre">vnet::netqueue::NetQueue</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue4sendEiPKv6size_t"><code class="docutils literal notranslate"><span class="pre">send()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue4sendEiN8protocol10PacketTypeERKN6google8protobuf7MessageE"><code class="docutils literal notranslate"><span class="pre">send()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue9send_dataEiN8protocol10PacketTypeEPKv6size_t"><code class="docutils literal notranslate"><span class="pre">send_data()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue14send_heartbeatEi"><code class="docutils literal notranslate"><span class="pre">send_heartbeat()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue3putEiPv18FiniteStateMachine"><code class="docutils literal notranslate"><span class="pre">put()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue27get_network_element_from_fdEi"><code class="docutils literal notranslate"><span class="pre">get_network_element_from_fd()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue5closeEi"><code class="docutils literal notranslate"><span class="pre">close()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue5closeEP14NetworkElement12close_reason"><code class="docutils literal notranslate"><span class="pre">close()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue7processEP14NetworkElement"><code class="docutils literal notranslate"><span class="pre">process()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue16wait_and_processEv"><code class="docutils literal notranslate"><span class="pre">wait_and_process()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue7put_tunEiPv"><code class="docutils literal notranslate"><span class="pre">put_tun()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue7put_sckEiPv"><code class="docutils literal notranslate"><span class="pre">put_sck()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue18put_sck_connectingEiPvP6ssl_st"><code class="docutils literal notranslate"><span class="pre">put_sck_connecting()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue18put_sck_tls_serverEiPvP6ssl_st"><code class="docutils literal notranslate"><span class="pre">put_sck_tls_server()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue18put_sck_tls_clientEiPvP6ssl_st"><code class="docutils literal notranslate"><span class="pre">put_sck_tls_client()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue9adopt_tlsEiP6ssl_st"><code class="docutils literal notranslate"><span class="pre">adopt_tls()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue9drain_tlsEi"><code class="docutils literal notranslate"><span class="pre">drain_tls()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandler"><code class="docutils literal notranslate"><span class="pre">NetQueue()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandleri"><code class="docutils literal notranslate"><span class="pre">NetQueue()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8netqueue8NetQueueD0Ev"><code class="docutils literal notranslate"><span class="pre">~NetQueue()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="protocol.html">vnet::protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tls.html">vnet::tls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="common.html">Common functions</a></li>
+</ul>
+</li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="vnet-netqueue">
+<h1>vnet::netqueue<a class="headerlink" href="#vnet-netqueue" title="Link to this heading">¶</a></h1>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueueE">
+<span id="_CPPv3N4vnet8netqueueE"></span><span id="_CPPv2N4vnet8netqueueE"></span><span id="vnet::netqueue"></span><span class="target" id="namespacevnet_1_1netqueue"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">netqueue</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueueE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-enums">Enums</p>
+<dl class="cpp enum">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachineE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachineE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachineE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FiniteStateMachine</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachineE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>This finite state machine represents the state in which the file descriptor is currently. </p>
+<p>In particular, there are two distinct finite state machines depending on the type of socket.</p>
+<p>Anything in TUN_* represents a device that operates as a queue of packets, under which reading yields the entire IP packet directly and on which you should only write a entire IP packet.</p>
+<p>Anything in SCK_* represents a device that follows the specific protobuf format in the specifications. In particular, it contains first a 6 byte header containing the payload size and payload type. </p>
+<p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine11TUN_RECEIVEE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine11TUN_RECEIVEE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine11TUN_RECEIVEE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893ab1ed48a35fd3b69cd1be0ee61fd69c69"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TUN_RECEIVE</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine11TUN_RECEIVEE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine9TUN_READYE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine9TUN_READYE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine9TUN_READYE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893a22bc64be875a29912435f079ff08b8f7"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TUN_READY</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine9TUN_READYE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine9TUN_ERRORE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine9TUN_ERRORE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine9TUN_ERRORE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893a55b0d3c0d47083d18400db16e90459f4"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TUN_ERROR</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine9TUN_ERRORE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine7TUN_EOFE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine7TUN_EOFE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine7TUN_EOFE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893a6a584f3331de9f32d9416c1d210b9bb6"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TUN_EOF</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine7TUN_EOFE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine10SCK_HEADERE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine10SCK_HEADERE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine10SCK_HEADERE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893a3fe3ef4db69e97b2cf4295236ee97a77"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SCK_HEADER</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine10SCK_HEADERE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine11SCK_PAYLOADE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine11SCK_PAYLOADE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine11SCK_PAYLOADE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893a98d84604aca3da75744e22c33726d6fa"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SCK_PAYLOAD</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine11SCK_PAYLOADE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine9SCK_READYE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine9SCK_READYE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine9SCK_READYE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893a8987ecdcf5cb5fe0247f1c4b2a5fb857"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SCK_READY</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine9SCK_READYE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine9SCK_ERRORE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine9SCK_ERRORE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine9SCK_ERRORE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893aa3980bf384244c51cc006faa1b4ec139"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SCK_ERROR</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine9SCK_ERRORE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine7SCK_EOFE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine7SCK_EOFE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine7SCK_EOFE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893a18d1797ad26b609b305fa43c78ce0410"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SCK_EOF</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine7SCK_EOFE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine14SCK_CONNECTINGE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine14SCK_CONNECTINGE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine14SCK_CONNECTINGE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893a5c1200300213acbbf5dbb65f2bf692f2"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SCK_CONNECTING</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine14SCK_CONNECTINGE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine14SCK_TLS_ACCEPTE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine14SCK_TLS_ACCEPTE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine14SCK_TLS_ACCEPTE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893add64a7895fdafcd59170373ea45d0066"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SCK_TLS_ACCEPT</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine14SCK_TLS_ACCEPTE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue18FiniteStateMachine15SCK_TLS_CONNECTE">
+<span id="_CPPv3N4vnet8netqueue18FiniteStateMachine15SCK_TLS_CONNECTE"></span><span id="_CPPv2N4vnet8netqueue18FiniteStateMachine15SCK_TLS_CONNECTE"></span><span class="target" id="namespacevnet_1_1netqueue_1a8dec610a3d4b97be4f61eb6fe2cb1893ae8566a3e26c6a4c5a5a0c0bd220816e8"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SCK_TLS_CONNECT</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue18FiniteStateMachine15SCK_TLS_CONNECTE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="cpp enum">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue12close_reasonE">
+<span id="_CPPv3N4vnet8netqueue12close_reasonE"></span><span id="_CPPv2N4vnet8netqueue12close_reasonE"></span><span class="target" id="namespacevnet_1_1netqueue_1a007319d3e3d63413855efe297aefd495"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">close_reason</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue12close_reasonE" title="Link to this definition">¶</a><br /></dt>
+<dd><p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue12close_reason11CLOSE_ERRORE">
+<span id="_CPPv3N4vnet8netqueue12close_reason11CLOSE_ERRORE"></span><span id="_CPPv2N4vnet8netqueue12close_reason11CLOSE_ERRORE"></span><span class="target" id="namespacevnet_1_1netqueue_1a007319d3e3d63413855efe297aefd495a701f6e2fd047d3c6908fa86b98aea024"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CLOSE_ERROR</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue12close_reason11CLOSE_ERRORE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue12close_reason11CLOSE_EPOLLE">
+<span id="_CPPv3N4vnet8netqueue12close_reason11CLOSE_EPOLLE"></span><span id="_CPPv2N4vnet8netqueue12close_reason11CLOSE_EPOLLE"></span><span class="target" id="namespacevnet_1_1netqueue_1a007319d3e3d63413855efe297aefd495a1e88c47cf32ed64bfb37c467651df47f"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CLOSE_EPOLL</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue12close_reason11CLOSE_EPOLLE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue12close_reason12CLOSE_HANGUPE">
+<span id="_CPPv3N4vnet8netqueue12close_reason12CLOSE_HANGUPE"></span><span id="_CPPv2N4vnet8netqueue12close_reason12CLOSE_HANGUPE"></span><span class="target" id="namespacevnet_1_1netqueue_1a007319d3e3d63413855efe297aefd495a50eb9f020dd2f239010b913eabe49a4e"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CLOSE_HANGUP</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue12close_reason12CLOSE_HANGUPE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue16doNothingOnCloseEPv10close_data">
+<span id="_CPPv3N4vnet8netqueue16doNothingOnCloseEPv10close_data"></span><span id="_CPPv2N4vnet8netqueue16doNothingOnCloseEPv10close_data"></span><span id="vnet::netqueue::doNothingOnClose__voidP.close_data"></span><span class="target" id="namespacevnet_1_1netqueue_1a101aca38ffab4475afa21f6cdb39f9c6"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">doNothingOnClose</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr_data</span></span>, <a class="reference internal" href="#_CPPv4N4vnet8netqueue10close_dataE" title="vnet::netqueue::close_data"><span class="n"><span class="pre">close_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">close_content</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue16doNothingOnCloseEPv10close_data" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue22doNothingOnSocketReadyEPv11socket_data">
+<span id="_CPPv3N4vnet8netqueue22doNothingOnSocketReadyEPv11socket_data"></span><span id="_CPPv2N4vnet8netqueue22doNothingOnSocketReadyEPv11socket_data"></span><span id="vnet::netqueue::doNothingOnSocketReady__voidP.socket_data"></span><span class="target" id="namespacevnet_1_1netqueue_1aa2b1ae422fb08f84f3cb3543137cf567"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">doNothingOnSocketReady</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr_data</span></span>, <a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue22doNothingOnSocketReadyEPv11socket_data" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue19doNothingOnTunReadyEPv8tun_data">
+<span id="_CPPv3N4vnet8netqueue19doNothingOnTunReadyEPv8tun_data"></span><span id="_CPPv2N4vnet8netqueue19doNothingOnTunReadyEPv8tun_data"></span><span id="vnet::netqueue::doNothingOnTunReady__voidP.tun_data"></span><span class="target" id="namespacevnet_1_1netqueue_1a4bdf7e12da04dfb439d268e18bd4b577"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">doNothingOnTunReady</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr_data</span></span>, <a class="reference internal" href="#_CPPv4N4vnet8netqueue8tun_dataE" title="vnet::netqueue::tun_data"><span class="n"><span class="pre">tun_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue19doNothingOnTunReadyEPv8tun_data" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue20doNothingOnConnectedEPv11socket_data">
+<span id="_CPPv3N4vnet8netqueue20doNothingOnConnectedEPv11socket_data"></span><span id="_CPPv2N4vnet8netqueue20doNothingOnConnectedEPv11socket_data"></span><span id="vnet::netqueue::doNothingOnConnected__voidP.socket_data"></span><span class="target" id="namespacevnet_1_1netqueue_1a3e5f65f393da32d7d57270ba9f2c7fe6"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">doNothingOnConnected</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr_data</span></span>, <a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue20doNothingOnConnectedEPv11socket_data" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-variables">Variables</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue16WRITE_BUFFER_MAXE">
+<span id="_CPPv3N4vnet8netqueue16WRITE_BUFFER_MAXE"></span><span id="_CPPv2N4vnet8netqueue16WRITE_BUFFER_MAXE"></span><span id="vnet::netqueue::WRITE_BUFFER_MAX__s"></span><span class="target" id="namespacevnet_1_1netqueue_1ab625f05a6f9e188700803f9daf3a47ff"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">WRITE_BUFFER_MAX</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">2</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><span class="m"><span class="pre">1024</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><span class="m"><span class="pre">1024</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue16WRITE_BUFFER_MAXE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue16EPOLL_MAX_EVENTSE">
+<span id="_CPPv3N4vnet8netqueue16EPOLL_MAX_EVENTSE"></span><span id="_CPPv2N4vnet8netqueue16EPOLL_MAX_EVENTSE"></span><span id="vnet::netqueue::EPOLL_MAX_EVENTS__iC"></span><span class="target" id="namespacevnet_1_1netqueue_1ab0b642814d96b986628d34de69fc68de"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">EPOLL_MAX_EVENTS</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">256</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue16EPOLL_MAX_EVENTSE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Maximum number of events returned by a single call to epoll_wait. </p>
+<p>A switch with hundreds of agents gets most of them in one turn. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue16PACKETS_PER_TURNE">
+<span id="_CPPv3N4vnet8netqueue16PACKETS_PER_TURNE"></span><span id="_CPPv2N4vnet8netqueue16PACKETS_PER_TURNE"></span><span id="vnet::netqueue::PACKETS_PER_TURN__iC"></span><span class="target" id="namespacevnet_1_1netqueue_1a54f129f07c3a345f450500c64b05dbb5"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PACKETS_PER_TURN</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">64</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue16PACKETS_PER_TURNE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Packets one element may deliver in one turn of wait_and_process. </p>
+<p>A socket that is fed without pause is put down after this many and taken up again next turn, so it cannot starve the other elements. </p>
+</dd></dl>
+
+</div>
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElementE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElementE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElementE"></span><span id="vnet::netqueue::NetworkElement"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NetworkElement</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;element.hpp&gt;</em></div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement14NetworkElementEiPv18FiniteStateMachine">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement14NetworkElementEiPv18FiniteStateMachine"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement14NetworkElementEiPv18FiniteStateMachine"></span><span id="vnet::netqueue::NetworkElement::NetworkElement__i.voidP.FiniteStateMachine"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1a0ccdd62b9960b65cf55109011b4b2117"></span><span class="sig-name descname"><span class="n"><span class="pre">NetworkElement</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr</span></span>, <a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachineE" title="vnet::netqueue::FiniteStateMachine"><span class="n"><span class="pre">FiniteStateMachine</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">state</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement14NetworkElementEiPv18FiniteStateMachine" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement5stateE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement5stateE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement5stateE"></span><span id="vnet::netqueue::NetworkElement::state__FiniteStateMachine"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1ad0cb7f963725c04f3f15836dc0d5a55a"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachineE" title="vnet::netqueue::FiniteStateMachine"><span class="n"><span class="pre">FiniteStateMachine</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">state</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement5stateE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement2fdE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement2fdE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement2fdE"></span><span id="vnet::netqueue::NetworkElement::fd__i"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1aa0cd7a1d6f33bad5102c3cd55c8e33fe"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">fd</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement2fdE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement3ptrE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement3ptrE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement3ptrE"></span><span id="vnet::netqueue::NetworkElement::ptr__voidP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1af7d3fd14c5d48a2787041a7d57e1cc84"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">ptr</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement3ptrE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement15net_buffer_usedE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement15net_buffer_usedE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement15net_buffer_usedE"></span><span id="vnet::netqueue::NetworkElement::net_buffer_used__s"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1a7896ff1eac24449d90e875e307f918a9"></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">net_buffer_used</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement15net_buffer_usedE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement10net_bufferE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement10net_bufferE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement10net_bufferE"></span><span id="vnet::netqueue::NetworkElement::net_buffer__uint8_tA"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1ab79670671ea9838a6614ae5a1ae3c35a"></span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">net_buffer</span></span></span><span class="p"><span class="pre">[</span></span><span class="n"><span class="pre">NET_BUFFER_SIZE</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement10net_bufferE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement12write_bufferE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement12write_bufferE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement12write_bufferE"></span><span id="vnet::netqueue::NetworkElement::write_buffer__std::vector:uint8_t:"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1afdc82089b946652c3d44b6d8c88599ab"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">uint8_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write_buffer</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement12write_bufferE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement19write_buffer_offsetE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement19write_buffer_offsetE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement19write_buffer_offsetE"></span><span id="vnet::netqueue::NetworkElement::write_buffer_offset__s"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1aa49b4dcde517ab365c3820d46904a91d"></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write_buffer_offset</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement19write_buffer_offsetE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement4deadE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement4deadE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement4deadE"></span><span id="vnet::netqueue::NetworkElement::dead__b"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1a9afea2d17a94d4aaf203c9f44ef7a069"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dead</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement4deadE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement3sslE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement3sslE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement3sslE"></span><span id="vnet::netqueue::NetworkElement::ssl__ssl_stP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1a912ceb559860cc093ffc364db904cfbb"></span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">ssl</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">nullptr</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement3sslE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement10want_writeE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement10want_writeE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement10want_writeE"></span><span id="vnet::netqueue::NetworkElement::want_write__b"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1a408f5d4514f4b4a6840e2e36f8910f07"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">want_write</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement10want_writeE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement11has_backlogE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement11has_backlogE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement11has_backlogE"></span><span id="vnet::netqueue::NetworkElement::has_backlog__b"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1a0ba5dace74525c5eec1ab2d5ad58f181"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">has_backlog</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement11has_backlogE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue14NetworkElement9last_turnE">
+<span id="_CPPv3N4vnet8netqueue14NetworkElement9last_turnE"></span><span id="_CPPv2N4vnet8netqueue14NetworkElement9last_turnE"></span><span id="vnet::netqueue::NetworkElement::last_turn__uint64_t"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkElement_1ae2a63d85ef61f72495afd4036a9e94d6"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">last_turn</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue14NetworkElement9last_turnE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue10close_dataE">
+<span id="_CPPv3N4vnet8netqueue10close_dataE"></span><span id="_CPPv2N4vnet8netqueue10close_dataE"></span><span id="vnet::netqueue::close_data"></span><span class="target" id="structvnet_1_1netqueue_1_1close__data"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">close_data</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue10close_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;handler.hpp&gt;</em></div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue10close_data11net_elementE">
+<span id="_CPPv3N4vnet8netqueue10close_data11net_elementE"></span><span id="_CPPv2N4vnet8netqueue10close_data11net_elementE"></span><span id="vnet::netqueue::close_data::net_element__NetworkElementP"></span><span class="target" id="structvnet_1_1netqueue_1_1close__data_1aef0d5761ffbc00fde290ae2f50ed3242"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">net_element</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue10close_data11net_elementE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue10close_data8ptr_dataE">
+<span id="_CPPv3N4vnet8netqueue10close_data8ptr_dataE"></span><span id="_CPPv2N4vnet8netqueue10close_data8ptr_dataE"></span><span id="vnet::netqueue::close_data::ptr_data__voidP"></span><span class="target" id="structvnet_1_1netqueue_1_1close__data_1a0f548ad7a28f6200c285e76da206e8f8"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">ptr_data</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue10close_data8ptr_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue10close_data2fdE">
+<span id="_CPPv3N4vnet8netqueue10close_data2fdE"></span><span id="_CPPv2N4vnet8netqueue10close_data2fdE"></span><span id="vnet::netqueue::close_data::fd__i"></span><span class="target" id="structvnet_1_1netqueue_1_1close__data_1aced7777885d8592e33c528ba05629edf"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">fd</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue10close_data2fdE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue10close_data6reasonE">
+<span id="_CPPv3N4vnet8netqueue10close_data6reasonE"></span><span id="_CPPv2N4vnet8netqueue10close_data6reasonE"></span><span id="vnet::netqueue::close_data::reason__close_reason"></span><span class="target" id="structvnet_1_1netqueue_1_1close__data_1ab0764beeaeae30df8db83008c68394db"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue12close_reasonE" title="vnet::netqueue::close_reason"><span class="n"><span class="pre">close_reason</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">reason</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue10close_data6reasonE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue11socket_dataE">
+<span id="_CPPv3N4vnet8netqueue11socket_dataE"></span><span id="_CPPv2N4vnet8netqueue11socket_dataE"></span><span id="vnet::netqueue::socket_data"></span><span class="target" id="structvnet_1_1netqueue_1_1socket__data"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">socket_data</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue11socket_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;handler.hpp&gt;</em></div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue11socket_data11net_elementE">
+<span id="_CPPv3N4vnet8netqueue11socket_data11net_elementE"></span><span id="_CPPv2N4vnet8netqueue11socket_data11net_elementE"></span><span id="vnet::netqueue::socket_data::net_element__NetworkElementP"></span><span class="target" id="structvnet_1_1netqueue_1_1socket__data_1a7658d64235dca43331ee6567fb467dc4"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">net_element</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue11socket_data11net_elementE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue11socket_data8ptr_dataE">
+<span id="_CPPv3N4vnet8netqueue11socket_data8ptr_dataE"></span><span id="_CPPv2N4vnet8netqueue11socket_data8ptr_dataE"></span><span id="vnet::netqueue::socket_data::ptr_data__voidP"></span><span class="target" id="structvnet_1_1netqueue_1_1socket__data_1aab0eaf91a2f570f5feeb82d2298cbb08"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">ptr_data</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue11socket_data8ptr_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue11socket_data2fdE">
+<span id="_CPPv3N4vnet8netqueue11socket_data2fdE"></span><span id="_CPPv2N4vnet8netqueue11socket_data2fdE"></span><span id="vnet::netqueue::socket_data::fd__i"></span><span class="target" id="structvnet_1_1netqueue_1_1socket__data_1ad4f2ba02c630b173b3e038d6c87a0093"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">fd</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue11socket_data2fdE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue11socket_data11packet_typeE">
+<span id="_CPPv3N4vnet8netqueue11socket_data11packet_typeE"></span><span id="_CPPv2N4vnet8netqueue11socket_data11packet_typeE"></span><span id="vnet::netqueue::socket_data::packet_type__protocol::PacketType"></span><span class="target" id="structvnet_1_1netqueue_1_1socket__data_1ad0d29c39d58b5c4a4e50789027e7f4aa"></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocolE" title="vnet::protocol"><span class="n"><span class="pre">protocol</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">packet_type</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue11socket_data11packet_typeE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue11socket_data13packet_bufferE">
+<span id="_CPPv3N4vnet8netqueue11socket_data13packet_bufferE"></span><span id="_CPPv2N4vnet8netqueue11socket_data13packet_bufferE"></span><span id="vnet::netqueue::socket_data::packet_buffer__unsigned-cP"></span><span class="target" id="structvnet_1_1netqueue_1_1socket__data_1a68d7a02880f31c87df89c60557979723"></span><span class="kt"><span class="pre">unsigned</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">packet_buffer</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue11socket_data13packet_bufferE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue11socket_data12payload_sizeE">
+<span id="_CPPv3N4vnet8netqueue11socket_data12payload_sizeE"></span><span id="_CPPv2N4vnet8netqueue11socket_data12payload_sizeE"></span><span id="vnet::netqueue::socket_data::payload_size__s"></span><span class="target" id="structvnet_1_1netqueue_1_1socket__data_1a7c15b1c61151a50568a44398539328fb"></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">payload_size</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue11socket_data12payload_sizeE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue11socket_data11full_bufferE">
+<span id="_CPPv3N4vnet8netqueue11socket_data11full_bufferE"></span><span id="_CPPv2N4vnet8netqueue11socket_data11full_bufferE"></span><span id="vnet::netqueue::socket_data::full_buffer__unsigned-cP"></span><span class="target" id="structvnet_1_1netqueue_1_1socket__data_1a393cc5a06acda76101775e26e8e35d27"></span><span class="kt"><span class="pre">unsigned</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">full_buffer</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue11socket_data11full_bufferE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue11socket_data16full_buffer_sizeE">
+<span id="_CPPv3N4vnet8netqueue11socket_data16full_buffer_sizeE"></span><span id="_CPPv2N4vnet8netqueue11socket_data16full_buffer_sizeE"></span><span id="vnet::netqueue::socket_data::full_buffer_size__s"></span><span class="target" id="structvnet_1_1netqueue_1_1socket__data_1a9270b880678e5fac3974b6785ad0b9e8"></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">full_buffer_size</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue11socket_data16full_buffer_sizeE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8tun_dataE">
+<span id="_CPPv3N4vnet8netqueue8tun_dataE"></span><span id="_CPPv2N4vnet8netqueue8tun_dataE"></span><span id="vnet::netqueue::tun_data"></span><span class="target" id="structvnet_1_1netqueue_1_1tun__data"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">tun_data</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8tun_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;handler.hpp&gt;</em></div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8tun_data11net_elementE">
+<span id="_CPPv3N4vnet8netqueue8tun_data11net_elementE"></span><span id="_CPPv2N4vnet8netqueue8tun_data11net_elementE"></span><span id="vnet::netqueue::tun_data::net_element__NetworkElementP"></span><span class="target" id="structvnet_1_1netqueue_1_1tun__data_1a45ddbddee73ab59039c80df4f92941aa"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">net_element</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8tun_data11net_elementE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8tun_data8ptr_dataE">
+<span id="_CPPv3N4vnet8netqueue8tun_data8ptr_dataE"></span><span id="_CPPv2N4vnet8netqueue8tun_data8ptr_dataE"></span><span id="vnet::netqueue::tun_data::ptr_data__voidP"></span><span class="target" id="structvnet_1_1netqueue_1_1tun__data_1a037f4d2ee1669ba7e6a8319579370b89"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">ptr_data</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8tun_data8ptr_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8tun_data2fdE">
+<span id="_CPPv3N4vnet8netqueue8tun_data2fdE"></span><span id="_CPPv2N4vnet8netqueue8tun_data2fdE"></span><span id="vnet::netqueue::tun_data::fd__i"></span><span class="target" id="structvnet_1_1netqueue_1_1tun__data_1a48e55bddaa0f141f87d0c042f61c492d"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">fd</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8tun_data2fdE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8tun_data9ip_bufferE">
+<span id="_CPPv3N4vnet8netqueue8tun_data9ip_bufferE"></span><span id="_CPPv2N4vnet8netqueue8tun_data9ip_bufferE"></span><span id="vnet::netqueue::tun_data::ip_buffer__unsigned-cP"></span><span class="target" id="structvnet_1_1netqueue_1_1tun__data_1a8045139b48f0d53c9e4e8519b21351f5"></span><span class="kt"><span class="pre">unsigned</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">ip_buffer</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8tun_data9ip_bufferE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8tun_data14ip_buffer_sizeE">
+<span id="_CPPv3N4vnet8netqueue8tun_data14ip_buffer_sizeE"></span><span id="_CPPv2N4vnet8netqueue8tun_data14ip_buffer_sizeE"></span><span id="vnet::netqueue::tun_data::ip_buffer_size__s"></span><span class="target" id="structvnet_1_1netqueue_1_1tun__data_1a565977ea327844f684add1bd752bf286"></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ip_buffer_size</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8tun_data14ip_buffer_sizeE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue19NetworkQueueHandlerE">
+<span id="_CPPv3N4vnet8netqueue19NetworkQueueHandlerE"></span><span id="_CPPv2N4vnet8netqueue19NetworkQueueHandlerE"></span><span id="vnet::netqueue::NetworkQueueHandler"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkQueueHandler"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NetworkQueueHandler</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandlerE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;handler.hpp&gt;</em></div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue19NetworkQueueHandler7onCloseE">
+<span id="_CPPv3N4vnet8netqueue19NetworkQueueHandler7onCloseE"></span><span id="_CPPv2N4vnet8netqueue19NetworkQueueHandler7onCloseE"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkQueueHandler_1aaa7bbd5cd2d7e02d9addfcf353ee91a5"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">onClose</span></span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">(</span></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n"><span class="pre">ptr_data</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8netqueue10close_dataE" title="vnet::netqueue::close_data"><span class="n"><span class="pre">close_data</span></span></a><span class="w"> </span><span class="n"><span class="pre">close_content</span></span><span class="p"><span class="pre">)</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="o"><span class="pre">&amp;</span></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue16doNothingOnCloseEPv10close_data" title="vnet::netqueue::doNothingOnClose"><span class="n"><span class="pre">doNothingOnClose</span></span></a><a class="headerlink" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler7onCloseE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue19NetworkQueueHandler13onSocketReadyE">
+<span id="_CPPv3N4vnet8netqueue19NetworkQueueHandler13onSocketReadyE"></span><span id="_CPPv2N4vnet8netqueue19NetworkQueueHandler13onSocketReadyE"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkQueueHandler_1aba0c4c4981c273a4b5b9ff1a1c7b082a"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">onSocketReady</span></span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">(</span></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n"><span class="pre">ptr_data</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">)</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="o"><span class="pre">&amp;</span></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue22doNothingOnSocketReadyEPv11socket_data" title="vnet::netqueue::doNothingOnSocketReady"><span class="n"><span class="pre">doNothingOnSocketReady</span></span></a><a class="headerlink" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler13onSocketReadyE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue19NetworkQueueHandler10onTunReadyE">
+<span id="_CPPv3N4vnet8netqueue19NetworkQueueHandler10onTunReadyE"></span><span id="_CPPv2N4vnet8netqueue19NetworkQueueHandler10onTunReadyE"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkQueueHandler_1a7de373cad10ad07c76ffc8a8e7796f89"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">onTunReady</span></span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">(</span></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n"><span class="pre">ptr_data</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8netqueue8tun_dataE" title="vnet::netqueue::tun_data"><span class="n"><span class="pre">tun_data</span></span></a><span class="w"> </span><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">)</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="o"><span class="pre">&amp;</span></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue19doNothingOnTunReadyEPv8tun_data" title="vnet::netqueue::doNothingOnTunReady"><span class="n"><span class="pre">doNothingOnTunReady</span></span></a><a class="headerlink" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler10onTunReadyE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue19NetworkQueueHandler11onConnectedE">
+<span id="_CPPv3N4vnet8netqueue19NetworkQueueHandler11onConnectedE"></span><span id="_CPPv2N4vnet8netqueue19NetworkQueueHandler11onConnectedE"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkQueueHandler_1a4d5caebdde960494b87ad6986f2da74d"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">onConnected</span></span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">(</span></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n"><span class="pre">ptr_data</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">)</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="o"><span class="pre">&amp;</span></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue20doNothingOnConnectedEPv11socket_data" title="vnet::netqueue::doNothingOnConnected"><span class="n"><span class="pre">doNothingOnConnected</span></span></a><a class="headerlink" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler11onConnectedE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue19NetworkQueueHandler8ptr_dataE">
+<span id="_CPPv3N4vnet8netqueue19NetworkQueueHandler8ptr_dataE"></span><span id="_CPPv2N4vnet8netqueue19NetworkQueueHandler8ptr_dataE"></span><span id="vnet::netqueue::NetworkQueueHandler::ptr_data__voidP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetworkQueueHandler_1a328e9ffe495d6512e0383a84b3465a2e"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">ptr_data</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">nullptr</span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandler8ptr_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueueE">
+<span id="_CPPv3N4vnet8netqueue8NetQueueE"></span><span id="_CPPv2N4vnet8netqueue8NetQueueE"></span><span id="vnet::netqueue::NetQueue"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NetQueue</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueueE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;netqueue.hpp&gt;</em></div>
+<p>Instances of this class represents a general purpose pool of file descriptors intended to represent a queue for incoming network packets. </p>
+<p>The process must ignore SIGPIPE: a write to a peer that hung up, including the TLS alert OpenSSL sends on a failed handshake, is reported as an error on that socket instead of ending the process. </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue4sendEiPKv6size_t">
+<span id="_CPPv3N4vnet8netqueue8NetQueue4sendEiPKv6size_t"></span><span id="_CPPv2N4vnet8netqueue8NetQueue4sendEiPKv6size_t"></span><span id="vnet::netqueue::NetQueue::send__i.voidCP.s"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a1ce6a8308da4238dd8afd6c1021da5cf"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">send</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">n</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue4sendEiPKv6size_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Send data to a file descriptor managed by this queue. </p>
+<p>If the kernel send buffer is full (EAGAIN), the remaining bytes are saved in the element’s write buffer and sent when epoll signals the fd is writable (EPOLLOUT).</p>
+<p>If the write buffer exceeds WRITE_BUFFER_MAX the connection is closed and onClose is fired.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>true if all bytes were sent or buffered successfully. false if the fd is not in the queue or the buffer limit was exceeded (connection closed). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue4sendEiN8protocol10PacketTypeERKN6google8protobuf7MessageE">
+<span id="_CPPv3N4vnet8netqueue8NetQueue4sendEiN8protocol10PacketTypeERKN6google8protobuf7MessageE"></span><span id="_CPPv2N4vnet8netqueue8NetQueue4sendEiN8protocol10PacketTypeERKN6google8protobuf7MessageE"></span><span id="vnet::netqueue::NetQueue::send__i.protocol::PacketType.google::protobuf::MessageCR"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a076f586eea0778563b6efe39b489bacf"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">send</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocolE" title="vnet::protocol"><span class="n"><span class="pre">protocol</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">type</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">google</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">protobuf</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Message</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">msg</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue4sendEiN8protocol10PacketTypeERKN6google8protobuf7MessageE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Send a protobuf message with the 6-byte packet header through the queue’s write path, as one write. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue9send_dataEiN8protocol10PacketTypeEPKv6size_t">
+<span id="_CPPv3N4vnet8netqueue8NetQueue9send_dataEiN8protocol10PacketTypeEPKv6size_t"></span><span id="_CPPv2N4vnet8netqueue8NetQueue9send_dataEiN8protocol10PacketTypeEPKv6size_t"></span><span id="vnet::netqueue::NetQueue::send_data__i.protocol::PacketType.voidCP.s"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1aaf00b7c63120d359e995c21611356aaf"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">send_data</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocolE" title="vnet::protocol"><span class="n"><span class="pre">protocol</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">type</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">n</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue9send_dataEiN8protocol10PacketTypeEPKv6size_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Send a data packet: a 6-byte header of the given type followed by the bytes as they are. </p>
+<p>When the peer’s write buffer is full the packet is dropped and false is returned; the connection stays open, since the overlay’s own transport retransmits. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue14send_heartbeatEi">
+<span id="_CPPv3N4vnet8netqueue8NetQueue14send_heartbeatEi"></span><span id="_CPPv2N4vnet8netqueue8NetQueue14send_heartbeatEi"></span><span id="vnet::netqueue::NetQueue::send_heartbeat__i"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a0accdbd885bdb8bccb7af604a40f9122"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">send_heartbeat</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue14send_heartbeatEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Send a heartbeat (header-only) through the queue’s write path. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue3putEiPv18FiniteStateMachine">
+<span id="_CPPv3N4vnet8netqueue8NetQueue3putEiPv18FiniteStateMachine"></span><span id="_CPPv2N4vnet8netqueue8NetQueue3putEiPv18FiniteStateMachine"></span><span id="vnet::netqueue::NetQueue::put__i.voidP.FiniteStateMachine"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a23449fc24dbeee257ac5fe393078db40"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">put</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr</span></span>, <a class="reference internal" href="#_CPPv4N4vnet8netqueue18FiniteStateMachineE" title="vnet::netqueue::FiniteStateMachine"><span class="n"><span class="pre">FiniteStateMachine</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">start</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue3putEiPv18FiniteStateMachine" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Put a file descriptor into the queue with a pointer to some data the user wants to store. </p>
+<p>The user GIVES OWNERSHIP of the file descriptor to the network queue. One should never close it manually. If the user wishes to close the file descriptor, it should use the close method of the network queue.</p>
+<p>The user still HAS OWNERSHIP over the pointer of the data it wanted to store and will be responsible for freeing it or handling it upon receival of an error or a close through the <a class="reference internal" href="#structvnet_1_1netqueue_1_1NetworkQueueHandler"><span class="std std-ref">NetworkQueueHandler</span></a>.</p>
+<p>The user DOES NOT HAVE OWNERSHIP over the resulting network element and should in no case free it, close the internal file descriptor or manipulate the state, buffer and number of bytes used in the buffer.</p>
+<p>The user MAY modify the network’s element internal pointer to some new data it wants to use to handle for example a client reconnecting.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the generated network element. If anything fails whilst trying to put the file descriptor, the method will return NULL </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue27get_network_element_from_fdEi">
+<span id="_CPPv3N4vnet8netqueue8NetQueue27get_network_element_from_fdEi"></span><span id="_CPPv2N4vnet8netqueue8NetQueue27get_network_element_from_fdEi"></span><span id="vnet::netqueue::NetQueue::get_network_element_from_fd__i"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a2ca8c6754d3e0b86835a471276b20859"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">get_network_element_from_fd</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue27get_network_element_from_fdEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Get the network element for the given file descriptor. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>fd</strong> – the file descriptor for the lookup </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the network element for that given file descriptor, or NULL if the file descriptor isn’t inside the queue. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue5closeEi">
+<span id="_CPPv3N4vnet8netqueue8NetQueue5closeEi"></span><span id="_CPPv2N4vnet8netqueue8NetQueue5closeEi"></span><span id="vnet::netqueue::NetQueue::close__i"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a8c8db0bbeea0fab2e8b3e71da15782de"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">close</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue5closeEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Close the current file descriptor and remove it from the queue. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue5closeEP14NetworkElement12close_reason">
+<span id="_CPPv3N4vnet8netqueue8NetQueue5closeEP14NetworkElement12close_reason"></span><span id="_CPPv2N4vnet8netqueue8NetQueue5closeEP14NetworkElement12close_reason"></span><span id="vnet::netqueue::NetQueue::close__NetworkElementP.close_reason"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1ad243ac2f01c33056e6fc266e74ed29fd"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">close</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">element</span></span>, <a class="reference internal" href="#_CPPv4N4vnet8netqueue12close_reasonE" title="vnet::netqueue::close_reason"><span class="n"><span class="pre">close_reason</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">reason</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8netqueue12close_reason11CLOSE_ERRORE" title="vnet::netqueue::CLOSE_ERROR"><span class="n"><span class="pre">CLOSE_ERROR</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue5closeEP14NetworkElement12close_reason" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Close the current network element and remove it from the queue. </p>
+<p>Fires onClose once, closes the file descriptor, and frees the element after the current epoll batch. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue7processEP14NetworkElement">
+<span id="_CPPv3N4vnet8netqueue8NetQueue7processEP14NetworkElement"></span><span id="_CPPv2N4vnet8netqueue8NetQueue7processEP14NetworkElement"></span><span id="vnet::netqueue::NetQueue::process__NetworkElementP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1ae58eb273b3bb157cb43dc2bb83bef6dd"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">process</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">element</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue7processEP14NetworkElement" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Take a network element (that is an object containing the file descriptor, data of the element), and read from it until it outputs EAGAIN. </p>
+<p>The element must be owned by the network queue</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>element</strong> – the network element to be processed </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue16wait_and_processEv">
+<span id="_CPPv3N4vnet8netqueue8NetQueue16wait_and_processEv"></span><span id="_CPPv2N4vnet8netqueue8NetQueue16wait_and_processEv"></span><span id="vnet::netqueue::NetQueue::wait_and_process"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1aa047684ab155163b40c24916b22628da"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">wait_and_process</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue16wait_and_processEv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Calls epoll_wait to get all the available events and their respective network elements, before calling process on them. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue7put_tunEiPv">
+<span id="_CPPv3N4vnet8netqueue8NetQueue7put_tunEiPv"></span><span id="_CPPv2N4vnet8netqueue8NetQueue7put_tunEiPv"></span><span id="vnet::netqueue::NetQueue::put_tun__i.voidP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1ac49e254028fce6d1d3961fe3b77f81ba"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">put_tun</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue7put_tunEiPv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Put a TUN file descriptor into the queue with a pointer to some data the user wants to store. </p>
+<p>The user GIVES OWNERSHIP of the file descriptor to the network queue. One should never close it manually. If the user wishes to close the file descriptor, it should use the close method of the network queue.</p>
+<p>The user still HAS OWNERSHIP over the pointer of the data it wanted to store and will be responsible for freeing it or handling it upon receival of an error or a close through the <a class="reference internal" href="#structvnet_1_1netqueue_1_1NetworkQueueHandler"><span class="std std-ref">NetworkQueueHandler</span></a>.</p>
+<p>The user DOES NOT HAVE OWNERSHIP over the resulting network element and should in no case free it, close the internal file descriptor or manipulate the state, buffer and number of bytes used in the buffer.</p>
+<p>The user MAY modify the network’s element internal pointer to some new data it wants to use to handle for example a client reconnecting.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the generated network element. If anything fails whilst trying to put the file descriptor, the method will return NULL </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue7put_sckEiPv">
+<span id="_CPPv3N4vnet8netqueue8NetQueue7put_sckEiPv"></span><span id="_CPPv2N4vnet8netqueue8NetQueue7put_sckEiPv"></span><span id="vnet::netqueue::NetQueue::put_sck__i.voidP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a98035617d5cd344d350711e8e4f002db"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">put_sck</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue7put_sckEiPv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Put a file descriptor for a socket into the queue with a pointer to some data the user wants to store. </p>
+<p>The user GIVES OWNERSHIP of the file descriptor to the network queue. One should never close it manually. If the user wishes to close the file descriptor, it should use the close method of the network queue.</p>
+<p>The user still HAS OWNERSHIP over the pointer of the data it wanted to store and will be responsible for freeing it or handling it upon receival of an error or a close through the <a class="reference internal" href="#structvnet_1_1netqueue_1_1NetworkQueueHandler"><span class="std std-ref">NetworkQueueHandler</span></a>.</p>
+<p>The user DOES NOT HAVE OWNERSHIP over the resulting network element and should in no case free it, close the internal file descriptor or manipulate the state, buffer and number of bytes used in the buffer.</p>
+<p>The user MAY modify the network’s element internal pointer to some new data it wants to use to handle for example a client reconnecting.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the generated network element. If anything fails whilst trying to put the file descriptor, the method will return NULL </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue18put_sck_connectingEiPvP6ssl_st">
+<span id="_CPPv3N4vnet8netqueue8NetQueue18put_sck_connectingEiPvP6ssl_st"></span><span id="_CPPv2N4vnet8netqueue8NetQueue18put_sck_connectingEiPvP6ssl_st"></span><span id="vnet::netqueue::NetQueue::put_sck_connecting__i.voidP.ssl_stP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a7e3e4c00a5081b251768d743e8dae305"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">put_sck_connecting</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr</span></span>, <span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue18put_sck_connectingEiPvP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Put a socket whose connect() is in progress (EINPROGRESS) or just completed. </p>
+<p>When the connection is up, the TLS handshake runs on it if ssl is given (a client session from <a class="reference internal" href="tls.html#namespacevnet_1_1tls_1a0979b86e8b2e4ee478be73f27fd7ed45"><span class="std std-ref">tls::new_session</span></a>), and onConnected fires once packets can flow. The queue owns ssl from here on. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue18put_sck_tls_serverEiPvP6ssl_st">
+<span id="_CPPv3N4vnet8netqueue8NetQueue18put_sck_tls_serverEiPvP6ssl_st"></span><span id="_CPPv2N4vnet8netqueue8NetQueue18put_sck_tls_serverEiPvP6ssl_st"></span><span id="vnet::netqueue::NetQueue::put_sck_tls_server__i.voidP.ssl_stP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a60fe944a15a4b8e9404fb11d892f933f"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">put_sck_tls_server</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr</span></span>, <span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue18put_sck_tls_serverEiPvP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Put an accepted socket that must complete a TLS handshake as the server before any packet is read. </p>
+<p>ssl is a fresh session from <a class="reference internal" href="tls.html#namespacevnet_1_1tls_1a0979b86e8b2e4ee478be73f27fd7ed45"><span class="std std-ref">tls::new_session</span></a>; the queue owns it. onConnected fires when the handshake is done. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue18put_sck_tls_clientEiPvP6ssl_st">
+<span id="_CPPv3N4vnet8netqueue8NetQueue18put_sck_tls_clientEiPvP6ssl_st"></span><span id="_CPPv2N4vnet8netqueue8NetQueue18put_sck_tls_clientEiPvP6ssl_st"></span><span id="vnet::netqueue::NetQueue::put_sck_tls_client__i.voidP.ssl_stP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1adc0c4344e7723db49e88acec3825e18d"></span><a class="reference internal" href="#_CPPv4N4vnet8netqueue14NetworkElementE" title="vnet::netqueue::NetworkElement"><span class="n"><span class="pre">NetworkElement</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">put_sck_tls_client</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ptr</span></span>, <span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue18put_sck_tls_clientEiPvP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Put a connected socket that must complete a TLS handshake as the client before any packet is read. </p>
+<p>Same ownership and callback as put_sck_tls_server. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue9adopt_tlsEiP6ssl_st">
+<span id="_CPPv3N4vnet8netqueue8NetQueue9adopt_tlsEiP6ssl_st"></span><span id="_CPPv2N4vnet8netqueue8NetQueue9adopt_tlsEiP6ssl_st"></span><span id="vnet::netqueue::NetQueue::adopt_tls__i.ssl_stP"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a209e8b9eb0a9ef221517b541379105e7"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">adopt_tls</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue9adopt_tlsEiP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Attach a finished TLS session to a socket already in the queue. </p>
+<p>Later reads and writes go through SSL_read / SSL_write. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue9drain_tlsEi">
+<span id="_CPPv3N4vnet8netqueue8NetQueue9drain_tlsEi"></span><span id="_CPPv2N4vnet8netqueue8NetQueue9drain_tlsEi"></span><span id="vnet::netqueue::NetQueue::drain_tls__i"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a879ada31786cf7a59ab386d97364f384"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">drain_tls</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue9drain_tlsEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Handshake can pull the first application record into OpenSSL. </p>
+<p>Epoll will not see those bytes, so read them now. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandler">
+<span id="_CPPv3N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandler"></span><span id="_CPPv2N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandler"></span><span id="vnet::netqueue::NetQueue::NetQueue__NetworkQueueHandler"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1aa94802356256bac6626276ae8f5dd04b"></span><span class="sig-name descname"><span class="n"><span class="pre">NetQueue</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandlerE" title="vnet::netqueue::NetworkQueueHandler"><span class="n"><span class="pre">NetworkQueueHandler</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">handler</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandler" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Create a network queue with the given handler for the events. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the network queue created. If anything fails, it will return NULL. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandleri">
+<span id="_CPPv3N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandleri"></span><span id="_CPPv2N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandleri"></span><span id="vnet::netqueue::NetQueue::NetQueue__NetworkQueueHandler.i"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a47225268956f15c60c54895f6b45751e"></span><span class="sig-name descname"><span class="n"><span class="pre">NetQueue</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4vnet8netqueue19NetworkQueueHandlerE" title="vnet::netqueue::NetworkQueueHandler"><span class="n"><span class="pre">NetworkQueueHandler</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">handler</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">epoll_timeout</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueue8NetQueueE19NetworkQueueHandleri" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Create a network queue with the given handler for the events and given wait timeout. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the network queue created. If anything fails, it will return NULL. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8netqueue8NetQueueD0Ev">
+<span id="_CPPv3N4vnet8netqueue8NetQueueD0Ev"></span><span id="_CPPv2N4vnet8netqueue8NetQueueD0Ev"></span><span id="vnet::netqueue::NetQueue::~NetQueue"></span><span class="target" id="structvnet_1_1netqueue_1_1NetQueue_1a3fc6682c4723bc1dffc1272591e47850"></span><span class="sig-name descname"><span class="n"><span class="pre">~NetQueue</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8netqueue8NetQueueD0Ev" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Destroy the network queue. </p>
+<p>This will free all of the network elements and cleanup the EPOLL. This won’t handle destruction of the user data. </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/api/netqueue.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

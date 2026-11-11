@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>vnet::protocol &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="vnet::tls" href="tls.html" />
+    <link rel="prev" title="vnet::netqueue" href="netqueue.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">C++ API reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="blackbox.html">vnet::blackbox</a></li>
+<li class="toctree-l2"><a class="reference internal" href="netqueue.html">vnet::netqueue</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">vnet::protocol</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#_CPPv4N4vnet8protocolE"><code class="docutils literal notranslate"><span class="pre">vnet::protocol</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8protocol13uint_packet_tE"><code class="docutils literal notranslate"><span class="pre">uint_packet_t</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketTypeE"><code class="docutils literal notranslate"><span class="pre">PacketType</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType9HEARTBEATE"><code class="docutils literal notranslate"><span class="pre">HEARTBEAT</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType10SWITCH_MIPE"><code class="docutils literal notranslate"><span class="pre">SWITCH_MIP</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType9AGENT_MIPE"><code class="docutils literal notranslate"><span class="pre">AGENT_MIP</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType17CONNECT_TO_SWITCHE"><code class="docutils literal notranslate"><span class="pre">CONNECT_TO_SWITCH</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType22AGENT_CONNECTION_TOKENE"><code class="docutils literal notranslate"><span class="pre">AGENT_CONNECTION_TOKEN</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType22AUTH_CONNECT_TO_SWITCHE"><code class="docutils literal notranslate"><span class="pre">AUTH_CONNECT_TO_SWITCH</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType19CONNECTION_ACCEPTEDE"><code class="docutils literal notranslate"><span class="pre">CONNECTION_ACCEPTED</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType9AGENT_MRPE"><code class="docutils literal notranslate"><span class="pre">AGENT_MRP</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType8IPV4_RAWE"><code class="docutils literal notranslate"><span class="pre">IPV4_RAW</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType16AGENT_REGISTEREDE"><code class="docutils literal notranslate"><span class="pre">AGENT_REGISTERED</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType19SWITCH_ROUTE_UPDATEE"><code class="docutils literal notranslate"><span class="pre">SWITCH_ROUTE_UPDATE</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType19SWITCH_DISCONNECTEDE"><code class="docutils literal notranslate"><span class="pre">SWITCH_DISCONNECTED</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType12SWITCH_HELLOE"><code class="docutils literal notranslate"><span class="pre">SWITCH_HELLO</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType18AGENT_UNREGISTEREDE"><code class="docutils literal notranslate"><span class="pre">AGENT_UNREGISTERED</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType10PEER_TOKENE"><code class="docutils literal notranslate"><span class="pre">PEER_TOKEN</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType13SWITCH_CONFIGE"><code class="docutils literal notranslate"><span class="pre">SWITCH_CONFIG</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketType11CONFIG_PUSHE"><code class="docutils literal notranslate"><span class="pre">CONFIG_PUSH</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8protocol23makeNetworkQueueHandlerEP8Dispatch"><code class="docutils literal notranslate"><span class="pre">makeNetworkQueueHandler()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8protocol16ntoh_packet_typeE13uint_packet_t"><code class="docutils literal notranslate"><span class="pre">ntoh_packet_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8protocol16hton_packet_typeE10PacketType"><code class="docutils literal notranslate"><span class="pre">hton_packet_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8protocol18PACKET_HEADER_SIZEE"><code class="docutils literal notranslate"><span class="pre">PACKET_HEADER_SIZE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8protocol16MAX_PAYLOAD_SIZEE"><code class="docutils literal notranslate"><span class="pre">MAX_PAYLOAD_SIZE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8protocol8DispatchE"><code class="docutils literal notranslate"><span class="pre">vnet::protocol::Dispatch</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch13onSocketReadyEN8netqueue11socket_dataE"><code class="docutils literal notranslate"><span class="pre">onSocketReady()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch10onActivityEN8netqueue11socket_dataE"><code class="docutils literal notranslate"><span class="pre">onActivity()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch7onCloseEN8netqueue10close_dataE"><code class="docutils literal notranslate"><span class="pre">onClose()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch10onTunReadyEN8netqueue8tun_dataE"><code class="docutils literal notranslate"><span class="pre">onTunReady()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch11onConnectedEN8netqueue11socket_dataE"><code class="docutils literal notranslate"><span class="pre">onConnected()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch11onHeartbeatEN8netqueue11socket_dataE"><code class="docutils literal notranslate"><span class="pre">onHeartbeat()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch11onSwitchMIPEN8netqueue11socket_dataERN3mip15PacketSwitchMIPE"><code class="docutils literal notranslate"><span class="pre">onSwitchMIP()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch10onAgentMIPEN8netqueue11socket_dataERN3mip14PacketAgentMIPE"><code class="docutils literal notranslate"><span class="pre">onAgentMIP()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch17onConnectToSwitchEN8netqueue11socket_dataERN3mip21PacketConnectToSwitchE"><code class="docutils literal notranslate"><span class="pre">onConnectToSwitch()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch21onAuthConnectToSwitchEN8netqueue11socket_dataERN3mip25PacketAuthConnectToSwitchE"><code class="docutils literal notranslate"><span class="pre">onAuthConnectToSwitch()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch22onAgentConnectionTokenEN8netqueue11socket_dataERN3mip26PacketAgentConnectionTokenE"><code class="docutils literal notranslate"><span class="pre">onAgentConnectionToken()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch20onConnectionAcceptedEN8netqueue11socket_dataERN3mip24PacketConnectionAcceptedE"><code class="docutils literal notranslate"><span class="pre">onConnectionAccepted()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch10onAgentMRPEN8netqueue11socket_dataERN3mip14PacketAgentMRPE"><code class="docutils literal notranslate"><span class="pre">onAgentMRP()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch9onIPv4RawEN8netqueue11socket_dataEPK7uint8_t6size_t"><code class="docutils literal notranslate"><span class="pre">onIPv4Raw()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch17onAgentRegisteredEN8netqueue11socket_dataERN3mip21PacketAgentRegisteredE"><code class="docutils literal notranslate"><span class="pre">onAgentRegistered()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch19onSwitchRouteUpdateEN8netqueue11socket_dataERN3mip23PacketSwitchRouteUpdateE"><code class="docutils literal notranslate"><span class="pre">onSwitchRouteUpdate()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch20onSwitchDisconnectedEN8netqueue11socket_dataERN3mip24PacketSwitchDisconnectedE"><code class="docutils literal notranslate"><span class="pre">onSwitchDisconnected()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch13onSwitchHelloEN8netqueue11socket_dataERN3mip17PacketSwitchHelloE"><code class="docutils literal notranslate"><span class="pre">onSwitchHello()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch19onAgentUnregisteredEN8netqueue11socket_dataERN3mip23PacketAgentUnregisteredE"><code class="docutils literal notranslate"><span class="pre">onAgentUnregistered()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch11onPeerTokenEN8netqueue11socket_dataERN3mip15PacketPeerTokenE"><code class="docutils literal notranslate"><span class="pre">onPeerToken()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch14onSwitchConfigEN8netqueue11socket_dataERN3mip18PacketSwitchConfigE"><code class="docutils literal notranslate"><span class="pre">onSwitchConfig()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8Dispatch12onConfigPushEN8netqueue11socket_dataERN3mip16PacketConfigPushE"><code class="docutils literal notranslate"><span class="pre">onConfigPush()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol8DispatchD0Ev"><code class="docutils literal notranslate"><span class="pre">~Dispatch()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8protocol12PacketHeaderE"><code class="docutils literal notranslate"><span class="pre">vnet::protocol::PacketHeader</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8protocol12PacketHeader16get_payload_sizeEv"><code class="docutils literal notranslate"><span class="pre">get_payload_size()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8protocol12PacketHeader15get_packet_typeEv"><code class="docutils literal notranslate"><span class="pre">get_packet_type()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol12PacketHeader12PacketHeaderEv"><code class="docutils literal notranslate"><span class="pre">PacketHeader()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8protocol12PacketHeader12PacketHeaderE8uint32_t10PacketType"><code class="docutils literal notranslate"><span class="pre">PacketHeader()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tls.html">vnet::tls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="common.html">Common functions</a></li>
+</ul>
+</li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="vnet-protocol">
+<h1>vnet::protocol<a class="headerlink" href="#vnet-protocol" title="Link to this heading">¶</a></h1>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocolE">
+<span id="_CPPv3N4vnet8protocolE"></span><span id="_CPPv2N4vnet8protocolE"></span><span id="vnet::protocol"></span><span class="target" id="namespacevnet_1_1protocol"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">protocol</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocolE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-typedefs">Typedefs</p>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol13uint_packet_tE">
+<span id="_CPPv3N4vnet8protocol13uint_packet_tE"></span><span id="_CPPv2N4vnet8protocol13uint_packet_tE"></span><span class="target" id="namespacevnet_1_1protocol_1a848cefe380824545866a06321a3d3acf"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">uint_packet_t</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">uint16_t</span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol13uint_packet_tE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-enums">Enums</p>
+<dl class="cpp enum">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketTypeE">
+<span id="_CPPv3N4vnet8protocol10PacketTypeE"></span><span id="_CPPv2N4vnet8protocol10PacketTypeE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PacketType</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketTypeE" title="Link to this definition">¶</a><br /></dt>
+<dd><p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType9HEARTBEATE">
+<span id="_CPPv3N4vnet8protocol10PacketType9HEARTBEATE"></span><span id="_CPPv2N4vnet8protocol10PacketType9HEARTBEATE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992ae44e5aea3ccbf1378a162751ff139abd"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HEARTBEAT</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType9HEARTBEATE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType10SWITCH_MIPE">
+<span id="_CPPv3N4vnet8protocol10PacketType10SWITCH_MIPE"></span><span id="_CPPv2N4vnet8protocol10PacketType10SWITCH_MIPE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992aa8ea1eb715ad1f814136fe3062417788"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SWITCH_MIP</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType10SWITCH_MIPE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType9AGENT_MIPE">
+<span id="_CPPv3N4vnet8protocol10PacketType9AGENT_MIPE"></span><span id="_CPPv2N4vnet8protocol10PacketType9AGENT_MIPE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992ac6a257775daaf3fb01f37725606fcae5"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AGENT_MIP</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType9AGENT_MIPE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType17CONNECT_TO_SWITCHE">
+<span id="_CPPv3N4vnet8protocol10PacketType17CONNECT_TO_SWITCHE"></span><span id="_CPPv2N4vnet8protocol10PacketType17CONNECT_TO_SWITCHE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992a78cc526b16611a0165de2a5c5bf96f89"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CONNECT_TO_SWITCH</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType17CONNECT_TO_SWITCHE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType22AGENT_CONNECTION_TOKENE">
+<span id="_CPPv3N4vnet8protocol10PacketType22AGENT_CONNECTION_TOKENE"></span><span id="_CPPv2N4vnet8protocol10PacketType22AGENT_CONNECTION_TOKENE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992a7aea61f59cd0d4df45af720e4cb48f8f"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AGENT_CONNECTION_TOKEN</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType22AGENT_CONNECTION_TOKENE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType22AUTH_CONNECT_TO_SWITCHE">
+<span id="_CPPv3N4vnet8protocol10PacketType22AUTH_CONNECT_TO_SWITCHE"></span><span id="_CPPv2N4vnet8protocol10PacketType22AUTH_CONNECT_TO_SWITCHE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992ad8700cc30d7e8c5a02f6b56aa227b2d8"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AUTH_CONNECT_TO_SWITCH</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType22AUTH_CONNECT_TO_SWITCHE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType19CONNECTION_ACCEPTEDE">
+<span id="_CPPv3N4vnet8protocol10PacketType19CONNECTION_ACCEPTEDE"></span><span id="_CPPv2N4vnet8protocol10PacketType19CONNECTION_ACCEPTEDE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992a2b7067c045bd169c1a5b5d60f3704d3b"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CONNECTION_ACCEPTED</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType19CONNECTION_ACCEPTEDE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType9AGENT_MRPE">
+<span id="_CPPv3N4vnet8protocol10PacketType9AGENT_MRPE"></span><span id="_CPPv2N4vnet8protocol10PacketType9AGENT_MRPE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992a0589b78b8575bca80d8cc64e9978b12f"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AGENT_MRP</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType9AGENT_MRPE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType8IPV4_RAWE">
+<span id="_CPPv3N4vnet8protocol10PacketType8IPV4_RAWE"></span><span id="_CPPv2N4vnet8protocol10PacketType8IPV4_RAWE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992ad3a369f0cb6f2cd47a75758a3e4a1be9"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IPV4_RAW</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType8IPV4_RAWE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType16AGENT_REGISTEREDE">
+<span id="_CPPv3N4vnet8protocol10PacketType16AGENT_REGISTEREDE"></span><span id="_CPPv2N4vnet8protocol10PacketType16AGENT_REGISTEREDE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992ae22d38db56257a69d9b42fd7de808a8e"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AGENT_REGISTERED</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType16AGENT_REGISTEREDE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType19SWITCH_ROUTE_UPDATEE">
+<span id="_CPPv3N4vnet8protocol10PacketType19SWITCH_ROUTE_UPDATEE"></span><span id="_CPPv2N4vnet8protocol10PacketType19SWITCH_ROUTE_UPDATEE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992afca30c4d89a1b21d0147727acef2e761"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SWITCH_ROUTE_UPDATE</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType19SWITCH_ROUTE_UPDATEE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType19SWITCH_DISCONNECTEDE">
+<span id="_CPPv3N4vnet8protocol10PacketType19SWITCH_DISCONNECTEDE"></span><span id="_CPPv2N4vnet8protocol10PacketType19SWITCH_DISCONNECTEDE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992a109f720863ae0a2918510a97ee813a78"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SWITCH_DISCONNECTED</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType19SWITCH_DISCONNECTEDE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType12SWITCH_HELLOE">
+<span id="_CPPv3N4vnet8protocol10PacketType12SWITCH_HELLOE"></span><span id="_CPPv2N4vnet8protocol10PacketType12SWITCH_HELLOE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992aed71c3f54caaaa1f4cf73e3681e741a0"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SWITCH_HELLO</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType12SWITCH_HELLOE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType18AGENT_UNREGISTEREDE">
+<span id="_CPPv3N4vnet8protocol10PacketType18AGENT_UNREGISTEREDE"></span><span id="_CPPv2N4vnet8protocol10PacketType18AGENT_UNREGISTEREDE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992ae0447451be1fcea57ce33af9b22d9e4b"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AGENT_UNREGISTERED</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType18AGENT_UNREGISTEREDE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType10PEER_TOKENE">
+<span id="_CPPv3N4vnet8protocol10PacketType10PEER_TOKENE"></span><span id="_CPPv2N4vnet8protocol10PacketType10PEER_TOKENE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992a0c03d36ad4b345ab8920274f1ffa110c"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PEER_TOKEN</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType10PEER_TOKENE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType13SWITCH_CONFIGE">
+<span id="_CPPv3N4vnet8protocol10PacketType13SWITCH_CONFIGE"></span><span id="_CPPv2N4vnet8protocol10PacketType13SWITCH_CONFIGE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992aeb86c8b53ceaa9c05a68ff66c6e7f09b"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SWITCH_CONFIG</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType13SWITCH_CONFIGE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol10PacketType11CONFIG_PUSHE">
+<span id="_CPPv3N4vnet8protocol10PacketType11CONFIG_PUSHE"></span><span id="_CPPv2N4vnet8protocol10PacketType11CONFIG_PUSHE"></span><span class="target" id="namespacevnet_1_1protocol_1ac81f8427a7a8ee2d179fb7b6aa321992a5dc4f9336293a9233e64dd4429f7ac8c"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CONFIG_PUSH</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol10PacketType11CONFIG_PUSHE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol23makeNetworkQueueHandlerEP8Dispatch">
+<span id="_CPPv3N4vnet8protocol23makeNetworkQueueHandlerEP8Dispatch"></span><span id="_CPPv2N4vnet8protocol23makeNetworkQueueHandlerEP8Dispatch"></span><span id="vnet::protocol::makeNetworkQueueHandler__DispatchP"></span><span class="target" id="namespacevnet_1_1protocol_1a9fcc5f831d75e6a563ec818f0de829b8"></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue19NetworkQueueHandlerE" title="vnet::netqueue::NetworkQueueHandler"><span class="n"><span class="pre">NetworkQueueHandler</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">makeNetworkQueueHandler</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4vnet8protocol8DispatchE" title="vnet::protocol::Dispatch"><span class="n"><span class="pre">Dispatch</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">dispatch</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol23makeNetworkQueueHandlerEP8Dispatch" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol16ntoh_packet_typeE13uint_packet_t">
+<span id="_CPPv3N4vnet8protocol16ntoh_packet_typeE13uint_packet_t"></span><span id="_CPPv2N4vnet8protocol16ntoh_packet_typeE13uint_packet_t"></span><span id="vnet::protocol::ntoh_packet_type__uint_packet_t"></span><span class="target" id="namespacevnet_1_1protocol_1a9a9efaf02e76021040298d6e50dfc553"></span><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ntoh_packet_type</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4vnet8protocol13uint_packet_tE" title="vnet::protocol::uint_packet_t"><span class="n"><span class="pre">uint_packet_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">type</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol16ntoh_packet_typeE13uint_packet_t" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol16hton_packet_typeE10PacketType">
+<span id="_CPPv3N4vnet8protocol16hton_packet_typeE10PacketType"></span><span id="_CPPv2N4vnet8protocol16hton_packet_typeE10PacketType"></span><span id="vnet::protocol::hton_packet_type__PacketType"></span><span class="target" id="namespacevnet_1_1protocol_1a5d110e171c7f1d3c81038d73a643ad99"></span><a class="reference internal" href="#_CPPv4N4vnet8protocol13uint_packet_tE" title="vnet::protocol::uint_packet_t"><span class="n"><span class="pre">uint_packet_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hton_packet_type</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">type</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol16hton_packet_typeE10PacketType" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-variables">Variables</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol18PACKET_HEADER_SIZEE">
+<span id="_CPPv3N4vnet8protocol18PACKET_HEADER_SIZEE"></span><span id="_CPPv2N4vnet8protocol18PACKET_HEADER_SIZEE"></span><span id="vnet::protocol::PACKET_HEADER_SIZE__sC"></span><span class="target" id="namespacevnet_1_1protocol_1a2b433cc446f25127c586463e3d619b57"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PACKET_HEADER_SIZE</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">sizeof</span></span><span class="p"><span class="pre">(</span></span><a class="reference internal" href="#_CPPv4N4vnet8protocol12PacketHeaderE" title="vnet::protocol::PacketHeader"><span class="n"><span class="pre">PacketHeader</span></span></a><span class="p"><span class="pre">)</span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol18PACKET_HEADER_SIZEE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol16MAX_PAYLOAD_SIZEE">
+<span id="_CPPv3N4vnet8protocol16MAX_PAYLOAD_SIZEE"></span><span id="_CPPv2N4vnet8protocol16MAX_PAYLOAD_SIZEE"></span><span id="vnet::protocol::MAX_PAYLOAD_SIZE__uint32_tC"></span><span class="target" id="namespacevnet_1_1protocol_1a6e1c7a1b918d75396d1c8479acee4b47"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_PAYLOAD_SIZE</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">NET_BUFFER_SIZE</span></span><span class="w"> </span><span class="o"><span class="pre">-</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8protocol18PACKET_HEADER_SIZEE" title="vnet::protocol::PACKET_HEADER_SIZE"><span class="n"><span class="pre">PACKET_HEADER_SIZE</span></span></a><a class="headerlink" href="#_CPPv4N4vnet8protocol16MAX_PAYLOAD_SIZEE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Largest payload a peer may announce in a header. </p>
+<p>A packet must fit in a NetworkElement receive buffer, so anything larger is a protocol error and the connection is dropped. </p>
+</dd></dl>
+
+</div>
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8DispatchE">
+<span id="_CPPv3N4vnet8protocol8DispatchE"></span><span id="_CPPv2N4vnet8protocol8DispatchE"></span><span id="vnet::protocol::Dispatch"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Dispatch</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol8DispatchE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;dispatch.hpp&gt;</em></div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch13onSocketReadyEN8netqueue11socket_dataE">
+<span id="_CPPv3N4vnet8protocol8Dispatch13onSocketReadyEN8netqueue11socket_dataE"></span><span id="_CPPv2N4vnet8protocol8Dispatch13onSocketReadyEN8netqueue11socket_dataE"></span><span id="vnet::protocol::Dispatch::onSocketReady__netqueue::socket_data"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1abc89a047bd61dcf6f42ce8c606f5ab5c"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onSocketReady</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch13onSocketReadyEN8netqueue11socket_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch10onActivityEN8netqueue11socket_dataE">
+<span id="_CPPv3N4vnet8protocol8Dispatch10onActivityEN8netqueue11socket_dataE"></span><span id="_CPPv2N4vnet8protocol8Dispatch10onActivityEN8netqueue11socket_dataE"></span><span id="vnet::protocol::Dispatch::onActivity__netqueue::socket_data"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a142467925d7dd328e8174594da7e8c3f"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onActivity</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch10onActivityEN8netqueue11socket_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch7onCloseEN8netqueue10close_dataE">
+<span id="_CPPv3N4vnet8protocol8Dispatch7onCloseEN8netqueue10close_dataE"></span><span id="_CPPv2N4vnet8protocol8Dispatch7onCloseEN8netqueue10close_dataE"></span><span id="vnet::protocol::Dispatch::onClose__netqueue::close_data"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a1d8c5e5d12f5cfb1dee68d804c9b5d12"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onClose</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue10close_dataE" title="vnet::netqueue::close_data"><span class="n"><span class="pre">close_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">close_content</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch7onCloseEN8netqueue10close_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch10onTunReadyEN8netqueue8tun_dataE">
+<span id="_CPPv3N4vnet8protocol8Dispatch10onTunReadyEN8netqueue8tun_dataE"></span><span id="_CPPv2N4vnet8protocol8Dispatch10onTunReadyEN8netqueue8tun_dataE"></span><span id="vnet::protocol::Dispatch::onTunReady__netqueue::tun_data"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1af281358c9a057b25b088f97ad1f0ff13"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onTunReady</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue8tun_dataE" title="vnet::netqueue::tun_data"><span class="n"><span class="pre">tun_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch10onTunReadyEN8netqueue8tun_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch11onConnectedEN8netqueue11socket_dataE">
+<span id="_CPPv3N4vnet8protocol8Dispatch11onConnectedEN8netqueue11socket_dataE"></span><span id="_CPPv2N4vnet8protocol8Dispatch11onConnectedEN8netqueue11socket_dataE"></span><span id="vnet::protocol::Dispatch::onConnected__netqueue::socket_data"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a31172dbbfbcca752833b4da6bcb9a96e"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onConnected</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch11onConnectedEN8netqueue11socket_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>A pending connect or TLS handshake finished; packets can flow. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch11onHeartbeatEN8netqueue11socket_dataE">
+<span id="_CPPv3N4vnet8protocol8Dispatch11onHeartbeatEN8netqueue11socket_dataE"></span><span id="_CPPv2N4vnet8protocol8Dispatch11onHeartbeatEN8netqueue11socket_dataE"></span><span id="vnet::protocol::Dispatch::onHeartbeat__netqueue::socket_data"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1acf8158bbfd012d0607dac3aac71765f7"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onHeartbeat</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch11onHeartbeatEN8netqueue11socket_dataE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch11onSwitchMIPEN8netqueue11socket_dataERN3mip15PacketSwitchMIPE">
+<span id="_CPPv3N4vnet8protocol8Dispatch11onSwitchMIPEN8netqueue11socket_dataERN3mip15PacketSwitchMIPE"></span><span id="_CPPv2N4vnet8protocol8Dispatch11onSwitchMIPEN8netqueue11socket_dataERN3mip15PacketSwitchMIPE"></span><span id="vnet::protocol::Dispatch::onSwitchMIP__netqueue::socket_data.mip::PacketSwitchMIPR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a4762851b0e0152abee396c10bfdcc781"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onSwitchMIP</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketSwitchMIP</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch11onSwitchMIPEN8netqueue11socket_dataERN3mip15PacketSwitchMIPE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Machine Initialization Procedure. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch10onAgentMIPEN8netqueue11socket_dataERN3mip14PacketAgentMIPE">
+<span id="_CPPv3N4vnet8protocol8Dispatch10onAgentMIPEN8netqueue11socket_dataERN3mip14PacketAgentMIPE"></span><span id="_CPPv2N4vnet8protocol8Dispatch10onAgentMIPEN8netqueue11socket_dataERN3mip14PacketAgentMIPE"></span><span id="vnet::protocol::Dispatch::onAgentMIP__netqueue::socket_data.mip::PacketAgentMIPR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1af54821f16e00cc41db15b19b4eae1d30"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onAgentMIP</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketAgentMIP</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch10onAgentMIPEN8netqueue11socket_dataERN3mip14PacketAgentMIPE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch17onConnectToSwitchEN8netqueue11socket_dataERN3mip21PacketConnectToSwitchE">
+<span id="_CPPv3N4vnet8protocol8Dispatch17onConnectToSwitchEN8netqueue11socket_dataERN3mip21PacketConnectToSwitchE"></span><span id="_CPPv2N4vnet8protocol8Dispatch17onConnectToSwitchEN8netqueue11socket_dataERN3mip21PacketConnectToSwitchE"></span><span id="vnet::protocol::Dispatch::onConnectToSwitch__netqueue::socket_data.mip::PacketConnectToSwitchR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1afeb23addd4f2e5e15fcda7d712c57461"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onConnectToSwitch</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketConnectToSwitch</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch17onConnectToSwitchEN8netqueue11socket_dataERN3mip21PacketConnectToSwitchE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch21onAuthConnectToSwitchEN8netqueue11socket_dataERN3mip25PacketAuthConnectToSwitchE">
+<span id="_CPPv3N4vnet8protocol8Dispatch21onAuthConnectToSwitchEN8netqueue11socket_dataERN3mip25PacketAuthConnectToSwitchE"></span><span id="_CPPv2N4vnet8protocol8Dispatch21onAuthConnectToSwitchEN8netqueue11socket_dataERN3mip25PacketAuthConnectToSwitchE"></span><span id="vnet::protocol::Dispatch::onAuthConnectToSwitch__netqueue::socket_data.mip::PacketAuthConnectToSwitchR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a4a5205cfd52c0816a561e7c062605aa5"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onAuthConnectToSwitch</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketAuthConnectToSwitch</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch21onAuthConnectToSwitchEN8netqueue11socket_dataERN3mip25PacketAuthConnectToSwitchE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch22onAgentConnectionTokenEN8netqueue11socket_dataERN3mip26PacketAgentConnectionTokenE">
+<span id="_CPPv3N4vnet8protocol8Dispatch22onAgentConnectionTokenEN8netqueue11socket_dataERN3mip26PacketAgentConnectionTokenE"></span><span id="_CPPv2N4vnet8protocol8Dispatch22onAgentConnectionTokenEN8netqueue11socket_dataERN3mip26PacketAgentConnectionTokenE"></span><span id="vnet::protocol::Dispatch::onAgentConnectionToken__netqueue::socket_data.mip::PacketAgentConnectionTokenR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a5461ea698b7cbb2e5ebad8e6777a4bae"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onAgentConnectionToken</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketAgentConnectionToken</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch22onAgentConnectionTokenEN8netqueue11socket_dataERN3mip26PacketAgentConnectionTokenE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch20onConnectionAcceptedEN8netqueue11socket_dataERN3mip24PacketConnectionAcceptedE">
+<span id="_CPPv3N4vnet8protocol8Dispatch20onConnectionAcceptedEN8netqueue11socket_dataERN3mip24PacketConnectionAcceptedE"></span><span id="_CPPv2N4vnet8protocol8Dispatch20onConnectionAcceptedEN8netqueue11socket_dataERN3mip24PacketConnectionAcceptedE"></span><span id="vnet::protocol::Dispatch::onConnectionAccepted__netqueue::socket_data.mip::PacketConnectionAcceptedR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a11daf232cb41c81e4ece039b980931f0"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onConnectionAccepted</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketConnectionAccepted</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch20onConnectionAcceptedEN8netqueue11socket_dataERN3mip24PacketConnectionAcceptedE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch10onAgentMRPEN8netqueue11socket_dataERN3mip14PacketAgentMRPE">
+<span id="_CPPv3N4vnet8protocol8Dispatch10onAgentMRPEN8netqueue11socket_dataERN3mip14PacketAgentMRPE"></span><span id="_CPPv2N4vnet8protocol8Dispatch10onAgentMRPEN8netqueue11socket_dataERN3mip14PacketAgentMRPE"></span><span id="vnet::protocol::Dispatch::onAgentMRP__netqueue::socket_data.mip::PacketAgentMRPR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1ab6c85e5d34cac4a69da916d8b4b0a849"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onAgentMRP</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketAgentMRP</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch10onAgentMRPEN8netqueue11socket_dataERN3mip14PacketAgentMRPE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Reconnection. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch9onIPv4RawEN8netqueue11socket_dataEPK7uint8_t6size_t">
+<span id="_CPPv3N4vnet8protocol8Dispatch9onIPv4RawEN8netqueue11socket_dataEPK7uint8_t6size_t"></span><span id="_CPPv2N4vnet8protocol8Dispatch9onIPv4RawEN8netqueue11socket_dataEPK7uint8_t6size_t"></span><span id="vnet::protocol::Dispatch::onIPv4Raw__netqueue::socket_data.uint8_tCP.s"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a3941f55d45c8064903e669f913e43ae9"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onIPv4Raw</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">raw</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">len</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch9onIPv4RawEN8netqueue11socket_dataEPK7uint8_t6size_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Routing. </p>
+<p>One IPv4 datagram, as it was read from a TUN: no protobuf wrapper. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch17onAgentRegisteredEN8netqueue11socket_dataERN3mip21PacketAgentRegisteredE">
+<span id="_CPPv3N4vnet8protocol8Dispatch17onAgentRegisteredEN8netqueue11socket_dataERN3mip21PacketAgentRegisteredE"></span><span id="_CPPv2N4vnet8protocol8Dispatch17onAgentRegisteredEN8netqueue11socket_dataERN3mip21PacketAgentRegisteredE"></span><span id="vnet::protocol::Dispatch::onAgentRegistered__netqueue::socket_data.mip::PacketAgentRegisteredR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1af168caa439d99762b54004b5540a17b1"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onAgentRegistered</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketAgentRegistered</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch17onAgentRegisteredEN8netqueue11socket_dataERN3mip21PacketAgentRegisteredE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch19onSwitchRouteUpdateEN8netqueue11socket_dataERN3mip23PacketSwitchRouteUpdateE">
+<span id="_CPPv3N4vnet8protocol8Dispatch19onSwitchRouteUpdateEN8netqueue11socket_dataERN3mip23PacketSwitchRouteUpdateE"></span><span id="_CPPv2N4vnet8protocol8Dispatch19onSwitchRouteUpdateEN8netqueue11socket_dataERN3mip23PacketSwitchRouteUpdateE"></span><span id="vnet::protocol::Dispatch::onSwitchRouteUpdate__netqueue::socket_data.mip::PacketSwitchRouteUpdateR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a0956ae0be6de51e1be69a552a96106ce"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onSwitchRouteUpdate</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketSwitchRouteUpdate</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch19onSwitchRouteUpdateEN8netqueue11socket_dataERN3mip23PacketSwitchRouteUpdateE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch20onSwitchDisconnectedEN8netqueue11socket_dataERN3mip24PacketSwitchDisconnectedE">
+<span id="_CPPv3N4vnet8protocol8Dispatch20onSwitchDisconnectedEN8netqueue11socket_dataERN3mip24PacketSwitchDisconnectedE"></span><span id="_CPPv2N4vnet8protocol8Dispatch20onSwitchDisconnectedEN8netqueue11socket_dataERN3mip24PacketSwitchDisconnectedE"></span><span id="vnet::protocol::Dispatch::onSwitchDisconnected__netqueue::socket_data.mip::PacketSwitchDisconnectedR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a583920ddb5fd1ca7cc20d23011e0ed99"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onSwitchDisconnected</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketSwitchDisconnected</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch20onSwitchDisconnectedEN8netqueue11socket_dataERN3mip24PacketSwitchDisconnectedE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch13onSwitchHelloEN8netqueue11socket_dataERN3mip17PacketSwitchHelloE">
+<span id="_CPPv3N4vnet8protocol8Dispatch13onSwitchHelloEN8netqueue11socket_dataERN3mip17PacketSwitchHelloE"></span><span id="_CPPv2N4vnet8protocol8Dispatch13onSwitchHelloEN8netqueue11socket_dataERN3mip17PacketSwitchHelloE"></span><span id="vnet::protocol::Dispatch::onSwitchHello__netqueue::socket_data.mip::PacketSwitchHelloR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a184c774de49fd537cebb14729ba1173a"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onSwitchHello</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketSwitchHello</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch13onSwitchHelloEN8netqueue11socket_dataERN3mip17PacketSwitchHelloE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch19onAgentUnregisteredEN8netqueue11socket_dataERN3mip23PacketAgentUnregisteredE">
+<span id="_CPPv3N4vnet8protocol8Dispatch19onAgentUnregisteredEN8netqueue11socket_dataERN3mip23PacketAgentUnregisteredE"></span><span id="_CPPv2N4vnet8protocol8Dispatch19onAgentUnregisteredEN8netqueue11socket_dataERN3mip23PacketAgentUnregisteredE"></span><span id="vnet::protocol::Dispatch::onAgentUnregistered__netqueue::socket_data.mip::PacketAgentUnregisteredR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a32a0f51a7baaaf863cef011607025381"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onAgentUnregistered</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketAgentUnregistered</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch19onAgentUnregisteredEN8netqueue11socket_dataERN3mip23PacketAgentUnregisteredE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch11onPeerTokenEN8netqueue11socket_dataERN3mip15PacketPeerTokenE">
+<span id="_CPPv3N4vnet8protocol8Dispatch11onPeerTokenEN8netqueue11socket_dataERN3mip15PacketPeerTokenE"></span><span id="_CPPv2N4vnet8protocol8Dispatch11onPeerTokenEN8netqueue11socket_dataERN3mip15PacketPeerTokenE"></span><span id="vnet::protocol::Dispatch::onPeerToken__netqueue::socket_data.mip::PacketPeerTokenR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1acdef430d7e18e6282aefbf8e45168fc1"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onPeerToken</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketPeerToken</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch11onPeerTokenEN8netqueue11socket_dataERN3mip15PacketPeerTokenE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch14onSwitchConfigEN8netqueue11socket_dataERN3mip18PacketSwitchConfigE">
+<span id="_CPPv3N4vnet8protocol8Dispatch14onSwitchConfigEN8netqueue11socket_dataERN3mip18PacketSwitchConfigE"></span><span id="_CPPv2N4vnet8protocol8Dispatch14onSwitchConfigEN8netqueue11socket_dataERN3mip18PacketSwitchConfigE"></span><span id="vnet::protocol::Dispatch::onSwitchConfig__netqueue::socket_data.mip::PacketSwitchConfigR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a80121b2f5465ffd7cfe1137483df9966"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onSwitchConfig</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketSwitchConfig</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch14onSwitchConfigEN8netqueue11socket_dataERN3mip18PacketSwitchConfigE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8Dispatch12onConfigPushEN8netqueue11socket_dataERN3mip16PacketConfigPushE">
+<span id="_CPPv3N4vnet8protocol8Dispatch12onConfigPushEN8netqueue11socket_dataERN3mip16PacketConfigPushE"></span><span id="_CPPv2N4vnet8protocol8Dispatch12onConfigPushEN8netqueue11socket_dataERN3mip16PacketConfigPushE"></span><span id="vnet::protocol::Dispatch::onConfigPush__netqueue::socket_data.mip::PacketConfigPushR"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1a9280778d284a131a04162d24d871cb8b"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">onConfigPush</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueueE" title="vnet::netqueue"><span class="n"><span class="pre">netqueue</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="netqueue.html#_CPPv4N4vnet8netqueue11socket_dataE" title="vnet::netqueue::socket_data"><span class="n"><span class="pre">socket_data</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">mip</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">PacketConfigPush</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">packet</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol8Dispatch12onConfigPushEN8netqueue11socket_dataERN3mip16PacketConfigPushE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>One piece of the switch config, conductor to switch. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol8DispatchD0Ev">
+<span id="_CPPv3N4vnet8protocol8DispatchD0Ev"></span><span id="_CPPv2N4vnet8protocol8DispatchD0Ev"></span><span id="vnet::protocol::Dispatch::~Dispatch"></span><span class="target" id="structvnet_1_1protocol_1_1Dispatch_1add9c278044c117cc5d2263733c5d3a3a"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~Dispatch</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol8DispatchD0Ev" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol12PacketHeaderE">
+<span id="_CPPv3N4vnet8protocol12PacketHeaderE"></span><span id="_CPPv2N4vnet8protocol12PacketHeaderE"></span><span id="vnet::protocol::PacketHeader"></span><span class="target" id="structvnet_1_1protocol_1_1PacketHeader"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PacketHeader</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8protocol12PacketHeaderE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;header.hpp&gt;</em></div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8protocol12PacketHeader16get_payload_sizeEv">
+<span id="_CPPv3NK4vnet8protocol12PacketHeader16get_payload_sizeEv"></span><span id="_CPPv2NK4vnet8protocol12PacketHeader16get_payload_sizeEv"></span><span id="vnet::protocol::PacketHeader::get_payload_sizeC"></span><span class="target" id="structvnet_1_1protocol_1_1PacketHeader_1ab3ad52fe845a2488f9f1f81974297203"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">get_payload_size</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8protocol12PacketHeader16get_payload_sizeEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8protocol12PacketHeader15get_packet_typeEv">
+<span id="_CPPv3NK4vnet8protocol12PacketHeader15get_packet_typeEv"></span><span id="_CPPv2NK4vnet8protocol12PacketHeader15get_packet_typeEv"></span><span id="vnet::protocol::PacketHeader::get_packet_typeC"></span><span class="target" id="structvnet_1_1protocol_1_1PacketHeader_1a4125e39737504334c1f62d3e41762c3d"></span><a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">get_packet_type</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8protocol12PacketHeader15get_packet_typeEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol12PacketHeader12PacketHeaderEv">
+<span id="_CPPv3N4vnet8protocol12PacketHeader12PacketHeaderEv"></span><span id="_CPPv2N4vnet8protocol12PacketHeader12PacketHeaderEv"></span><span id="vnet::protocol::PacketHeader::PacketHeader"></span><span class="target" id="structvnet_1_1protocol_1_1PacketHeader_1ae27e85b87de47e231e6f8258323fc538"></span><span class="sig-name descname"><span class="n"><span class="pre">PacketHeader</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol12PacketHeader12PacketHeaderEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8protocol12PacketHeader12PacketHeaderE8uint32_t10PacketType">
+<span id="_CPPv3N4vnet8protocol12PacketHeader12PacketHeaderE8uint32_t10PacketType"></span><span id="_CPPv2N4vnet8protocol12PacketHeader12PacketHeaderE8uint32_t10PacketType"></span><span id="vnet::protocol::PacketHeader::PacketHeader__uint32_t.PacketType"></span><span class="target" id="structvnet_1_1protocol_1_1PacketHeader_1a7b0425432506e71ec263c6d9d4268f9a"></span><span class="sig-name descname"><span class="n"><span class="pre">PacketHeader</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">payload_size</span></span>, <a class="reference internal" href="#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">packet_type</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8protocol12PacketHeader12PacketHeaderE8uint32_t10PacketType" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/api/protocol.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

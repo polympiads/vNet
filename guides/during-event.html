@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>During an event &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Lock down contestant machines" href="vdi-lockdown.html" />
+    <link rel="prev" title="Prepare an event" href="prepare-event.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">During an event</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#where-the-logs-are">Where the logs are</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#who-is-connected">Who is connected</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-each-switch-is-doing">What each switch is doing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#change-who-may-talk-to-whom">Change who may talk to whom</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#add-a-machine">Add a machine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#remove-a-machine">Remove a machine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#let-one-machine-out-of-lockdown">Let one machine out of lockdown</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#restart-a-program">Restart a program</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#do-not">Do not</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">C++ API reference</a></li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="during-an-event">
+<h1>During an event<a class="headerlink" href="#during-an-event" title="Link to this heading">¶</a></h1>
+<p>What to watch, and how to change things once contestants are working.
+Every command here leaves connected machines connected unless it says
+otherwise.</p>
+<section id="where-the-logs-are">
+<h2>Where the logs are<a class="headerlink" href="#where-the-logs-are" title="Link to this heading">¶</a></h2>
+<p>Each program writes to its systemd journal:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>journalctl<span class="w"> </span>-u<span class="w"> </span>vnet-conductor<span class="w"> </span>-f<span class="w">          </span><span class="c1"># on the conductor</span>
+<span class="gp">$ </span>journalctl<span class="w"> </span>-u<span class="w"> </span>vnet-switch<span class="w"> </span>-f<span class="w">             </span><span class="c1"># on a switch</span>
+<span class="gp">$ </span>journalctl<span class="w"> </span>-u<span class="w"> </span>vnet-agent<span class="w"> </span>-n<span class="w"> </span><span class="m">50</span><span class="w">           </span><span class="c1"># on a machine</span>
+</pre></div>
+</div>
+<p><a class="reference internal" href="../reference/logs.html"><span class="doc">Log messages</span></a> explains the lines.</p>
+</section>
+<section id="who-is-connected">
+<h2>Who is connected<a class="headerlink" href="#who-is-connected" title="Link to this heading">¶</a></h2>
+<p>On the conductor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">kill</span><span class="w"> </span>-s<span class="w"> </span>USR1<span class="w"> </span>vnet-conductor<span class="w">     </span><span class="c1"># write the dump now</span>
+<span class="gp">$ </span>sudo<span class="w"> </span>vnet-state<span class="w"> </span>/var/vnet-dump.bin<span class="w"> </span>/etc/vnet/auth.txt
+<span class="go">dump written 2026-11-11 09:14:02</span>
+
+<span class="go">switches (2)</span>
+<span class="go">  switch1  192.0.2.11:6000  network=::internet  since 2026-11-11 08:01:13</span>
+<span class="go">  switch2  192.0.2.12:6001  network=::internet  since 2026-11-11 08:01:14</span>
+
+<span class="go">agents (3)</span>
+<span class="go">  c001  10.0.1.1  on switch1  since 2026-11-11 08:40:55</span>
+<span class="go">  c002  10.0.1.2  on switch2  since 2026-11-11 08:41:02</span>
+<span class="go">  judge  10.0.0.1  on switch1  since 2026-11-11 08:02:30</span>
+
+<span class="go">expected but not connected (0)</span>
+</pre></div>
+</div>
+<p>The <em>joining</em> list appears only while joins are in progress.</p>
+<p>A machine in <em>expected but not connected</em> is off, has no network, or is
+refused: see <a class="reference internal" href="../troubleshooting.html"><span class="doc">Troubleshooting</span></a>. A <em>since</em> time much later than the
+others means the machine rejoined: look at its agent log. (After the
+conductor restarts, every <em>since</em> is the time the machine reconnected to
+it.)</p>
+</section>
+<section id="what-each-switch-is-doing">
+<h2>What each switch is doing<a class="headerlink" href="#what-each-switch-is-doing" title="Link to this heading">¶</a></h2>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">kill</span><span class="w"> </span>-s<span class="w"> </span>USR1<span class="w"> </span>vnet-switch
+<span class="gp">$ </span>journalctl<span class="w"> </span>-u<span class="w"> </span>vnet-switch<span class="w"> </span>-n<span class="w"> </span><span class="m">20</span>
+</pre></div>
+</div>
+<p>The statistics line, and one line per machine, are explained in
+<a class="reference internal" href="monitoring.html"><span class="doc">Monitor the network</span></a>.</p>
+</section>
+<section id="change-who-may-talk-to-whom">
+<h2>Change who may talk to whom<a class="headerlink" href="#change-who-may-talk-to-whom" title="Link to this heading">¶</a></h2>
+<p>Edit the access list on the conductor, then reload:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sudoedit<span class="w"> </span>/etc/vnet/switch.txt
+<span class="gp">$ </span>sudo<span class="w"> </span>systemctl<span class="w"> </span>reload<span class="w"> </span>vnet-conductor
+<span class="gp">$ </span>journalctl<span class="w"> </span>-u<span class="w"> </span>vnet-conductor<span class="w"> </span>-n<span class="w"> </span><span class="m">5</span>
+<span class="go">[Conductor] Config reloaded, fingerprint 4be1c09a7f3d; sent to 2 switch(es)</span>
+<span class="go">[Conductor] Switch switch1 applied config 4be1c09a7f3d</span>
+<span class="go">[Conductor] Switch switch2 applied config 4be1c09a7f3d</span>
+</pre></div>
+</div>
+<p>The new rules apply to the next packet on every switch. If you generate
+the files with <code class="docutils literal notranslate"><span class="pre">vnet-roster</span></code>, edit the roster, run it again into the same
+directory (keys are kept), and copy <code class="docutils literal notranslate"><span class="pre">switch.txt</span></code> and <code class="docutils literal notranslate"><span class="pre">auth.txt</span></code> to the
+conductor before reloading.</p>
+<p>If the log says <code class="docutils literal notranslate"><span class="pre">Config</span> <span class="pre">reload</span> <span class="pre">failed;</span> <span class="pre">the</span> <span class="pre">previous</span> <span class="pre">config</span> <span class="pre">stays</span> <span class="pre">in</span>
+<span class="pre">force</span></code>, the line before it names the line of the file that is wrong.</p>
+</section>
+<section id="add-a-machine">
+<h2>Add a machine<a class="headerlink" href="#add-a-machine" title="Link to this heading">¶</a></h2>
+<p>Add its key to <code class="docutils literal notranslate"><span class="pre">/etc/vnet/auth.txt</span></code> and its address and rules to
+<code class="docutils literal notranslate"><span class="pre">/etc/vnet/switch.txt</span></code> (or add it to the roster and generate again),
+reload the conductor, install its files and start its agent. No other
+machine is disturbed.</p>
+</section>
+<section id="remove-a-machine">
+<h2>Remove a machine<a class="headerlink" href="#remove-a-machine" title="Link to this heading">¶</a></h2>
+<p>Remove it from the auth file and reload: it can no longer join. A machine
+already connected stays until its next join; stop its agent, or restart
+the switch it is on, to remove it at once. Removing it from the access
+list instead cuts its traffic at once while leaving it connected.</p>
+</section>
+<section id="let-one-machine-out-of-lockdown">
+<h2>Let one machine out of lockdown<a class="headerlink" href="#let-one-machine-out-of-lockdown" title="Link to this heading">¶</a></h2>
+<p>On that machine: <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">systemctl</span> <span class="pre">stop</span> <span class="pre">vnet-agent</span></code>. The default route and
+the firewall are put back as they were; the machine is off the overlay.
+To open only one address, add a line to its bypass file and run <code class="docutils literal notranslate"><span class="pre">sudo</span>
+<span class="pre">systemctl</span> <span class="pre">reload</span> <span class="pre">vnet-agent</span></code> (<a class="reference internal" href="vdi-lockdown.html"><span class="doc">Lock down contestant machines</span></a>).</p>
+</section>
+<section id="restart-a-program">
+<h2>Restart a program<a class="headerlink" href="#restart-a-program" title="Link to this heading">¶</a></h2>
+<p>Any program can be restarted at any time; <a class="reference internal" href="../concepts/recovery.html"><span class="doc">Failures and recovery</span></a>
+says what the machines see. In short: restarting the conductor is
+invisible to the contest; restarting a switch moves its machines to the
+other switches; restarting an agent cuts its machine for a few seconds.</p>
+</section>
+<section id="do-not">
+<h2>Do not<a class="headerlink" href="#do-not" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Edit a file and forget to reload: nothing changes until the reload,
+and the next restart then applies a change you no longer remember.</p></li>
+<li><p>Give two machines the same name or the same env file: they keep
+pushing each other off (<a class="reference internal" href="../concepts/recovery.html"><span class="doc">Failures and recovery</span></a>).</p></li>
+<li><p>Run two conductors. Agents and switches would split between them.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/guides/during-event.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 448" role="img" aria-labelledby="fig2-title fig2-desc" font-size="13">
+<style>
+text { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+.f-ink { fill: #111; } .f-quiet { fill: #555; } .f-band { fill: #f2f2f2; }
+.f-box { fill: #fff; stroke: #111; stroke-width: 1.25; } .f-main { fill: #eef3f8; stroke-width: 2.25; }
+.f-ctl { fill: none; stroke: #111; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.f-data { fill: none; stroke: #111; stroke-width: 1.75; } .f-life { stroke: #ccc; stroke-width: 1.25; }
+.f-msg { fill: none; stroke: #111; stroke-width: 1.25; } .f-msg-main { stroke-width: 2.25; }
+.f-tip, .f-tip-main { fill: #111; }
+.f-lbl { paint-order: stroke; stroke: #fff; stroke-width: 4; stroke-linejoin: round; }
+</style>
+  <title id="fig2-title">The switch learns a machine name from the conductor, never from the machine</title>
+  <desc id="fig2-desc">Sequence of seven messages between an agent, a switch, the conductor and the other switches: 1, agent to conductor, name and key; 2, conductor to agent, switch address and token; 3, conductor to switch, name and one-time token; 4, agent to switch, token only, no name; 5, switch to agent, accepted and address; 6, switch to conductor, machine attached here; 7, conductor to other switches, route to that address.</desc>
+  <defs>
+    <marker id="fig2-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f-tip" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="fig2-arrow-main" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f-tip-main" d="M0 0L10 5L0 10z"/></marker>
+  </defs>
+  <text class="f-ink" x="24" y="34" font-size="15" font-weight="700">The switch learns a machine name from the conductor, never from the machine</text>
+  <text class="f-quiet" x="24" y="54" font-size="11.5">A join in seven messages, read top to bottom. Every message travels inside TLS.</text>
+  <line class="f-life" x1="100" x2="100" y1="120" y2="424"/>
+  <line class="f-life" x1="290" x2="290" y1="120" y2="424"/>
+  <line class="f-life" x1="480" x2="480" y1="120" y2="424"/>
+  <line class="f-life" x1="670" x2="670" y1="120" y2="424"/>
+  <rect class="f-box" x="25" y="64" width="150" height="56"/>
+  <text class="f-ink" x="100" y="88" text-anchor="middle" font-weight="700">Agent</text>
+  <text class="f-quiet" x="100" y="104" text-anchor="middle" font-size="11.5">contestant machine</text>
+  <rect class="f-box" x="215" y="64" width="150" height="56"/>
+  <text class="f-ink" x="290" y="88" text-anchor="middle" font-weight="700">Switch</text>
+  <text class="f-quiet" x="290" y="104" text-anchor="middle" font-size="11.5">organizer machine</text>
+  <rect class="f-box" x="405" y="64" width="150" height="56"/>
+  <text class="f-ink" x="480" y="88" text-anchor="middle" font-weight="700">Conductor</text>
+  <text class="f-quiet" x="480" y="104" text-anchor="middle" font-size="11.5">organizer machine</text>
+  <rect class="f-box" x="595" y="64" width="150" height="56"/>
+  <text class="f-ink" x="670" y="88" text-anchor="middle" font-weight="700">Other switches</text>
+  <text class="f-quiet" x="670" y="104" text-anchor="middle" font-size="11.5">organizer machines</text>
+  <path class="f-msg" d="M100 160H480" marker-end="url(#fig2-arrow)"/>
+  <path class="f-msg" d="M480 200H100" marker-end="url(#fig2-arrow)"/>
+  <path class="f-msg f-msg-main" d="M480 240H290" marker-end="url(#fig2-arrow-main)"/>
+  <path class="f-msg" d="M100 280H290" marker-end="url(#fig2-arrow)"/>
+  <path class="f-msg" d="M290 320H100" marker-end="url(#fig2-arrow)"/>
+  <path class="f-msg" d="M290 360H480" marker-end="url(#fig2-arrow)"/>
+  <path class="f-msg" d="M480 400H670" marker-end="url(#fig2-arrow)"/>
+  <text class="f-ink f-lbl" x="110" y="152" font-size="12">1. name and key</text>
+  <text class="f-ink f-lbl" x="110" y="192" font-size="12">2. switch address + token</text>
+  <text class="f-ink f-lbl" x="300" y="232" font-size="12" font-weight="700">3. name + one-time token</text>
+  <text class="f-ink f-lbl" x="110" y="272" font-size="12">4. token only, no name</text>
+  <text class="f-ink f-lbl" x="110" y="312" font-size="12">5. accepted + address</text>
+  <text class="f-ink f-lbl" x="300" y="352" font-size="12">6. machine attached here</text>
+  <text class="f-ink f-lbl" x="490" y="392" font-size="12">7. route to that address</text>
+</svg>

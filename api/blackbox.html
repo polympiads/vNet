@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>vnet::blackbox &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="vnet::netqueue" href="netqueue.html" />
+    <link rel="prev" title="C++ API reference" href="index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">C++ API reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">vnet::blackbox</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#_CPPv4N4vnet8blackboxE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10SourceTypeE"><code class="docutils literal notranslate"><span class="pre">SourceType</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10SourceType5AGENTE"><code class="docutils literal notranslate"><span class="pre">AGENT</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10SourceType6SWITCHE"><code class="docutils literal notranslate"><span class="pre">SWITCH</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10SourceType3TUNE"><code class="docutils literal notranslate"><span class="pre">TUN</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12PacketActionE"><code class="docutils literal notranslate"><span class="pre">PacketAction</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12PacketAction13DELIVER_LOCALE"><code class="docutils literal notranslate"><span class="pre">DELIVER_LOCAL</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12PacketAction14FORWARD_SWITCHE"><code class="docutils literal notranslate"><span class="pre">FORWARD_SWITCH</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12PacketAction16FORWARD_INTERNETE"><code class="docutils literal notranslate"><span class="pre">FORWARD_INTERNET</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12PacketAction13REQUEST_ROUTEE"><code class="docutils literal notranslate"><span class="pre">REQUEST_ROUTE</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12PacketAction4DROPE"><code class="docutils literal notranslate"><span class="pre">DROP</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReasonE"><code class="docutils literal notranslate"><span class="pre">DropReason</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason4NONEE"><code class="docutils literal notranslate"><span class="pre">NONE</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason16MALFORMED_PACKETE"><code class="docutils literal notranslate"><span class="pre">MALFORMED_PACKET</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason12SOURCE_SPOOFE"><code class="docutils literal notranslate"><span class="pre">SOURCE_SPOOF</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason14SOURCE_UNKNOWNE"><code class="docutils literal notranslate"><span class="pre">SOURCE_UNKNOWN</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason16DEST_UNREACHABLEE"><code class="docutils literal notranslate"><span class="pre">DEST_UNREACHABLE</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason10ACL_DENIEDE"><code class="docutils literal notranslate"><span class="pre">ACL_DENIED</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason12RATE_LIMITEDE"><code class="docutils literal notranslate"><span class="pre">RATE_LIMITED</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason5COUNTE"><code class="docutils literal notranslate"><span class="pre">COUNT</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox16drop_reason_nameE10DropReason"><code class="docutils literal notranslate"><span class="pre">drop_reason_name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10ipv4_parseEPK7uint8_t6size_tR10IPv4Header"><code class="docutils literal notranslate"><span class="pre">ipv4_parse()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10PROTO_ICMPE"><code class="docutils literal notranslate"><span class="pre">PROTO_ICMP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox9PROTO_TCPE"><code class="docutils literal notranslate"><span class="pre">PROTO_TCP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox9PROTO_UDPE"><code class="docutils literal notranslate"><span class="pre">PROTO_UDP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntryE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox::AgentEntry</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry4nameE"><code class="docutils literal notranslate"><span class="pre">name</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry12virtual_ipv4E"><code class="docutils literal notranslate"><span class="pre">virtual_ipv4</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry2fdE"><code class="docutils literal notranslate"><span class="pre">fd</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry3ppsE"><code class="docutils literal notranslate"><span class="pre">pps</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry3bpsE"><code class="docutils literal notranslate"><span class="pre">bps</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry7pkts_inE"><code class="docutils literal notranslate"><span class="pre">pkts_in</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry8bytes_inE"><code class="docutils literal notranslate"><span class="pre">bytes_in</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry8pkts_outE"><code class="docutils literal notranslate"><span class="pre">pkts_out</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry9bytes_outE"><code class="docutils literal notranslate"><span class="pre">bytes_out</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntry7droppedE"><code class="docutils literal notranslate"><span class="pre">dropped</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox13AgentRegistryE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox::AgentRegistry</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox13AgentRegistry14register_agentERKNSt6stringE8uint32_ti"><code class="docutils literal notranslate"><span class="pre">register_agent()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox13AgentRegistry16unregister_by_fdEi"><code class="docutils literal notranslate"><span class="pre">unregister_by_fd()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox13AgentRegistry18unregister_by_nameERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">unregister_by_name()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox13AgentRegistry12find_by_ipv4E8uint32_t"><code class="docutils literal notranslate"><span class="pre">find_by_ipv4()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox13AgentRegistry10find_by_fdEi"><code class="docutils literal notranslate"><span class="pre">find_by_fd()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox13AgentRegistry12find_by_nameERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">find_by_name()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox13AgentRegistry4sizeEv"><code class="docutils literal notranslate"><span class="pre">size()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox13AgentRegistry7entriesEv"><code class="docutils literal notranslate"><span class="pre">entries()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox13AgentRegistryD0Ev"><code class="docutils literal notranslate"><span class="pre">~AgentRegistry()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8CountersE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox::Counters</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox8Counters13dropped_totalEv"><code class="docutils literal notranslate"><span class="pre">dropped_total()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8Counters15delivered_localE"><code class="docutils literal notranslate"><span class="pre">delivered_local</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8Counters16forwarded_switchE"><code class="docutils literal notranslate"><span class="pre">forwarded_switch</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8Counters18forwarded_internetE"><code class="docutils literal notranslate"><span class="pre">forwarded_internet</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8Counters15route_requestedE"><code class="docutils literal notranslate"><span class="pre">route_requested</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8Counters7droppedE"><code class="docutils literal notranslate"><span class="pre">dropped</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox14PacketDecisionE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox::PacketDecision</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox14PacketDecision6actionE"><code class="docutils literal notranslate"><span class="pre">action</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox14PacketDecision9target_fdE"><code class="docutils literal notranslate"><span class="pre">target_fd</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox14PacketDecision9dest_ipv4E"><code class="docutils literal notranslate"><span class="pre">dest_ipv4</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox14PacketDecision11drop_reasonE"><code class="docutils literal notranslate"><span class="pre">drop_reason</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBoxE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox::BlackBox</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBox8BlackBoxERK6Configi"><code class="docutils literal notranslate"><span class="pre">BlackBox()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBox16set_agent_limitsE8uint64_t8uint64_t"><code class="docutils literal notranslate"><span class="pre">set_agent_limits()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBox14replace_configERK6Config"><code class="docutils literal notranslate"><span class="pre">replace_config()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBox7processE10SourceTypeiPK7uint8_t6size_t"><code class="docutils literal notranslate"><span class="pre">process()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBox22on_agent_authenticatedERKNSt6stringEi"><code class="docutils literal notranslate"><span class="pre">on_agent_authenticated()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBox21on_agent_disconnectedEi"><code class="docutils literal notranslate"><span class="pre">on_agent_disconnected()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBox15on_route_updateE8uint32_ti"><code class="docutils literal notranslate"><span class="pre">on_route_update()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBox22on_switch_disconnectedEi"><code class="docutils literal notranslate"><span class="pre">on_switch_disconnected()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox8BlackBox15retarget_switchEii"><code class="docutils literal notranslate"><span class="pre">retarget_switch()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox8BlackBox6agentsEv"><code class="docutils literal notranslate"><span class="pre">agents()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox8BlackBox6routesEv"><code class="docutils literal notranslate"><span class="pre">routes()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox8BlackBox6configEv"><code class="docutils literal notranslate"><span class="pre">config()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox8BlackBox8countersEv"><code class="docutils literal notranslate"><span class="pre">counters()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox8BlackBox7summaryEv"><code class="docutils literal notranslate"><span class="pre">summary()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox8BlackBox11agent_linesEv"><code class="docutils literal notranslate"><span class="pre">agent_lines()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox6ConfigE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox::Config</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox6Config4loadERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">load()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox6Config9load_textERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">load_text()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox6Config11fingerprintEv"><code class="docutils literal notranslate"><span class="pre">fingerprint()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox6Config17find_agent_for_ipE8uint32_t"><code class="docutils literal notranslate"><span class="pre">find_agent_for_ip()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox6Config17find_ip_for_agentERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">find_ip_for_agent()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox6Config6agentsEv"><code class="docutils literal notranslate"><span class="pre">agents()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox6Config22can_agents_communicateE8uint32_t8uint32_t"><code class="docutils literal notranslate"><span class="pre">can_agents_communicate()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox6Config21can_reach_internet_ipE8uint32_t8uint32_t"><code class="docutils literal notranslate"><span class="pre">can_reach_internet_ip()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox6Config23has_any_internet_accessE8uint32_t"><code class="docutils literal notranslate"><span class="pre">has_any_internet_access()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4HeaderE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox::IPv4Header</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4Header7versionE"><code class="docutils literal notranslate"><span class="pre">version</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4Header3ihlE"><code class="docutils literal notranslate"><span class="pre">ihl</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4Header12total_lengthE"><code class="docutils literal notranslate"><span class="pre">total_length</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4Header8protocolE"><code class="docutils literal notranslate"><span class="pre">protocol</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4Header6src_ipE"><code class="docutils literal notranslate"><span class="pre">src_ip</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4Header6dst_ipE"><code class="docutils literal notranslate"><span class="pre">dst_ip</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4Header8src_portE"><code class="docutils literal notranslate"><span class="pre">src_port</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4Header8dst_portE"><code class="docutils literal notranslate"><span class="pre">dst_port</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox11TokenBucketE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox::TokenBucket</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox11TokenBucket11TokenBucketEv"><code class="docutils literal notranslate"><span class="pre">TokenBucket()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox11TokenBucket11TokenBucketE8uint64_t8uint64_t"><code class="docutils literal notranslate"><span class="pre">TokenBucket()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox11TokenBucket4takeE8uint64_t8uint64_t"><code class="docutils literal notranslate"><span class="pre">take()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox11TokenBucket9unlimitedEv"><code class="docutils literal notranslate"><span class="pre">unlimited()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox11TokenBucket4rateEv"><code class="docutils literal notranslate"><span class="pre">rate()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12RoutingTableE"><code class="docutils literal notranslate"><span class="pre">vnet::blackbox::RoutingTable</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12RoutingTable9set_routeE8uint32_ti"><code class="docutils literal notranslate"><span class="pre">set_route()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12RoutingTable12remove_routeE8uint32_t"><code class="docutils literal notranslate"><span class="pre">remove_route()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12RoutingTable24remove_routes_for_switchEi"><code class="docutils literal notranslate"><span class="pre">remove_routes_for_switch()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12RoutingTable8retargetEii"><code class="docutils literal notranslate"><span class="pre">retarget()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox12RoutingTable6lookupE8uint32_t"><code class="docutils literal notranslate"><span class="pre">lookup()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4NK4vnet8blackbox12RoutingTable4sizeEv"><code class="docutils literal notranslate"><span class="pre">size()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N4vnet8blackbox12RoutingTable5clearEv"><code class="docutils literal notranslate"><span class="pre">clear()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="netqueue.html">vnet::netqueue</a></li>
+<li class="toctree-l2"><a class="reference internal" href="protocol.html">vnet::protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tls.html">vnet::tls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="common.html">Common functions</a></li>
+</ul>
+</li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="vnet-blackbox">
+<h1>vnet::blackbox<a class="headerlink" href="#vnet-blackbox" title="Link to this heading">¶</a></h1>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackboxE">
+<span id="_CPPv3N4vnet8blackboxE"></span><span id="_CPPv2N4vnet8blackboxE"></span><span id="vnet::blackbox"></span><span class="target" id="namespacevnet_1_1blackbox"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">blackbox</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackboxE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-enums">Enums</p>
+<dl class="cpp enum-class">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10SourceTypeE">
+<span id="_CPPv3N4vnet8blackbox10SourceTypeE"></span><span id="_CPPv2N4vnet8blackbox10SourceTypeE"></span><span class="target" id="namespacevnet_1_1blackbox_1aa0474bda2efbede7215df09e15c7fa58"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SourceType</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10SourceTypeE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Tells the black box what kind of fd delivered the packet. </p>
+<p>The switch already knows this from ConnInfo::role. </p>
+<p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10SourceType5AGENTE">
+<span id="_CPPv3N4vnet8blackbox10SourceType5AGENTE"></span><span id="_CPPv2N4vnet8blackbox10SourceType5AGENTE"></span><span class="target" id="namespacevnet_1_1blackbox_1aa0474bda2efbede7215df09e15c7fa58a355e2c58b95170df578b37fc88eadcac"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AGENT</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10SourceType5AGENTE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10SourceType6SWITCHE">
+<span id="_CPPv3N4vnet8blackbox10SourceType6SWITCHE"></span><span id="_CPPv2N4vnet8blackbox10SourceType6SWITCHE"></span><span class="target" id="namespacevnet_1_1blackbox_1aa0474bda2efbede7215df09e15c7fa58a4239f063a3d4fb9d38a0182be6e39e76"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SWITCH</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10SourceType6SWITCHE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10SourceType3TUNE">
+<span id="_CPPv3N4vnet8blackbox10SourceType3TUNE"></span><span id="_CPPv2N4vnet8blackbox10SourceType3TUNE"></span><span class="target" id="namespacevnet_1_1blackbox_1aa0474bda2efbede7215df09e15c7fa58a0f2d5329352ed8f095bbce6e7b9181b7"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TUN</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10SourceType3TUNE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="cpp enum-class">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12PacketActionE">
+<span id="_CPPv3N4vnet8blackbox12PacketActionE"></span><span id="_CPPv2N4vnet8blackbox12PacketActionE"></span><span class="target" id="namespacevnet_1_1blackbox_1a62bd4dd8e863ccead90b034d7198bd17"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PacketAction</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12PacketActionE" title="Link to this definition">¶</a><br /></dt>
+<dd><p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12PacketAction13DELIVER_LOCALE">
+<span id="_CPPv3N4vnet8blackbox12PacketAction13DELIVER_LOCALE"></span><span id="_CPPv2N4vnet8blackbox12PacketAction13DELIVER_LOCALE"></span><span class="target" id="namespacevnet_1_1blackbox_1a62bd4dd8e863ccead90b034d7198bd17ac84b070d07ce247be4b692aeffd07542"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DELIVER_LOCAL</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12PacketAction13DELIVER_LOCALE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12PacketAction14FORWARD_SWITCHE">
+<span id="_CPPv3N4vnet8blackbox12PacketAction14FORWARD_SWITCHE"></span><span id="_CPPv2N4vnet8blackbox12PacketAction14FORWARD_SWITCHE"></span><span class="target" id="namespacevnet_1_1blackbox_1a62bd4dd8e863ccead90b034d7198bd17ac32ec8384043bf130377ce704ac87e0c"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FORWARD_SWITCH</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12PacketAction14FORWARD_SWITCHE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12PacketAction16FORWARD_INTERNETE">
+<span id="_CPPv3N4vnet8blackbox12PacketAction16FORWARD_INTERNETE"></span><span id="_CPPv2N4vnet8blackbox12PacketAction16FORWARD_INTERNETE"></span><span class="target" id="namespacevnet_1_1blackbox_1a62bd4dd8e863ccead90b034d7198bd17a3fd58829d97d56f8421790b771f1cc9d"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FORWARD_INTERNET</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12PacketAction16FORWARD_INTERNETE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12PacketAction13REQUEST_ROUTEE">
+<span id="_CPPv3N4vnet8blackbox12PacketAction13REQUEST_ROUTEE"></span><span id="_CPPv2N4vnet8blackbox12PacketAction13REQUEST_ROUTEE"></span><span class="target" id="namespacevnet_1_1blackbox_1a62bd4dd8e863ccead90b034d7198bd17a0f81b67e70c320a2955e9d0e11092e53"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">REQUEST_ROUTE</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12PacketAction13REQUEST_ROUTEE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12PacketAction4DROPE">
+<span id="_CPPv3N4vnet8blackbox12PacketAction4DROPE"></span><span id="_CPPv2N4vnet8blackbox12PacketAction4DROPE"></span><span class="target" id="namespacevnet_1_1blackbox_1a62bd4dd8e863ccead90b034d7198bd17abf8f3be424eb6a72b21549fbb24ffb57"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DROP</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12PacketAction4DROPE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="cpp enum-class">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10DropReasonE">
+<span id="_CPPv3N4vnet8blackbox10DropReasonE"></span><span id="_CPPv2N4vnet8blackbox10DropReasonE"></span><span class="target" id="namespacevnet_1_1blackbox_1aed9504b4957acd775f690988bc9b2df4"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DropReason</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10DropReasonE" title="Link to this definition">¶</a><br /></dt>
+<dd><p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10DropReason4NONEE">
+<span id="_CPPv3N4vnet8blackbox10DropReason4NONEE"></span><span id="_CPPv2N4vnet8blackbox10DropReason4NONEE"></span><span class="target" id="namespacevnet_1_1blackbox_1aed9504b4957acd775f690988bc9b2df4ab50339a10e1de285ac99d4c3990b8693"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NONE</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10DropReason4NONEE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10DropReason16MALFORMED_PACKETE">
+<span id="_CPPv3N4vnet8blackbox10DropReason16MALFORMED_PACKETE"></span><span id="_CPPv2N4vnet8blackbox10DropReason16MALFORMED_PACKETE"></span><span class="target" id="namespacevnet_1_1blackbox_1aed9504b4957acd775f690988bc9b2df4abb343fcb656e8d2a41247a9817031581"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MALFORMED_PACKET</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10DropReason16MALFORMED_PACKETE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10DropReason12SOURCE_SPOOFE">
+<span id="_CPPv3N4vnet8blackbox10DropReason12SOURCE_SPOOFE"></span><span id="_CPPv2N4vnet8blackbox10DropReason12SOURCE_SPOOFE"></span><span class="target" id="namespacevnet_1_1blackbox_1aed9504b4957acd775f690988bc9b2df4aae3060d1ae2b44a64fab432488df0052"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SOURCE_SPOOF</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10DropReason12SOURCE_SPOOFE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10DropReason14SOURCE_UNKNOWNE">
+<span id="_CPPv3N4vnet8blackbox10DropReason14SOURCE_UNKNOWNE"></span><span id="_CPPv2N4vnet8blackbox10DropReason14SOURCE_UNKNOWNE"></span><span class="target" id="namespacevnet_1_1blackbox_1aed9504b4957acd775f690988bc9b2df4a25758caea1169e082e4ff4f045650c26"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SOURCE_UNKNOWN</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10DropReason14SOURCE_UNKNOWNE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10DropReason16DEST_UNREACHABLEE">
+<span id="_CPPv3N4vnet8blackbox10DropReason16DEST_UNREACHABLEE"></span><span id="_CPPv2N4vnet8blackbox10DropReason16DEST_UNREACHABLEE"></span><span class="target" id="namespacevnet_1_1blackbox_1aed9504b4957acd775f690988bc9b2df4ae5db1666b51134d0e6431e6b18f59276"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DEST_UNREACHABLE</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10DropReason16DEST_UNREACHABLEE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10DropReason10ACL_DENIEDE">
+<span id="_CPPv3N4vnet8blackbox10DropReason10ACL_DENIEDE"></span><span id="_CPPv2N4vnet8blackbox10DropReason10ACL_DENIEDE"></span><span class="target" id="namespacevnet_1_1blackbox_1aed9504b4957acd775f690988bc9b2df4aec7b595adc84d639beec3516710039fd"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ACL_DENIED</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10DropReason10ACL_DENIEDE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10DropReason12RATE_LIMITEDE">
+<span id="_CPPv3N4vnet8blackbox10DropReason12RATE_LIMITEDE"></span><span id="_CPPv2N4vnet8blackbox10DropReason12RATE_LIMITEDE"></span><span class="target" id="namespacevnet_1_1blackbox_1aed9504b4957acd775f690988bc9b2df4a0b481e215c9fdd207e9d14f6a0cc228f"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RATE_LIMITED</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10DropReason12RATE_LIMITEDE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10DropReason5COUNTE">
+<span id="_CPPv3N4vnet8blackbox10DropReason5COUNTE"></span><span id="_CPPv2N4vnet8blackbox10DropReason5COUNTE"></span><span class="target" id="namespacevnet_1_1blackbox_1aed9504b4957acd775f690988bc9b2df4a4905ac9d6a22bdfc1ae096094ce6248d"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">COUNT</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10DropReason5COUNTE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox16drop_reason_nameE10DropReason">
+<span id="_CPPv3N4vnet8blackbox16drop_reason_nameE10DropReason"></span><span id="_CPPv2N4vnet8blackbox16drop_reason_nameE10DropReason"></span><span id="vnet::blackbox::drop_reason_name__DropReason"></span><span class="target" id="namespacevnet_1_1blackbox_1a11cd4d8020d0d5b741ead5377b3ebbd9"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">drop_reason_name</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReasonE" title="vnet::blackbox::DropReason"><span class="n"><span class="pre">DropReason</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">reason</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox16drop_reason_nameE10DropReason" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10ipv4_parseEPK7uint8_t6size_tR10IPv4Header">
+<span id="_CPPv3N4vnet8blackbox10ipv4_parseEPK7uint8_t6size_tR10IPv4Header"></span><span id="_CPPv2N4vnet8blackbox10ipv4_parseEPK7uint8_t6size_tR10IPv4Header"></span><span id="vnet::blackbox::ipv4_parse__uint8_tCP.s.IPv4HeaderR"></span><span class="target" id="namespacevnet_1_1blackbox_1a54aa9a7c45b2c3feae7ba26f691b0ca8"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ipv4_parse</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">len</span></span>, <a class="reference internal" href="#_CPPv4N4vnet8blackbox10IPv4HeaderE" title="vnet::blackbox::IPv4Header"><span class="n"><span class="pre">IPv4Header</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10ipv4_parseEPK7uint8_t6size_tR10IPv4Header" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Parse a raw IPv4 packet and populate <code class="docutils literal notranslate"><span class="pre">out</span></code>. </p>
+<p>Validates:<ul class="simple">
+<li><p>Minimum buffer size (20 bytes)</p></li>
+<li><p>IP version == 4</p></li>
+<li><p>IHL &gt;= 5</p></li>
+<li><p>Total length consistent with buffer size</p></li>
+<li><p>Enough bytes for transport header ports (if TCP/UDP)</p></li>
+</ul>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – Pointer to the raw IPv4 packet. </p></li>
+<li><p><strong>len</strong> – Number of bytes available in <code class="docutils literal notranslate"><span class="pre">data</span></code>. </p></li>
+<li><p><strong>out</strong> – Receives the parsed header fields. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true if the packet is well-formed, false otherwise. </p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-variables">Variables</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10PROTO_ICMPE">
+<span id="_CPPv3N4vnet8blackbox10PROTO_ICMPE"></span><span id="_CPPv2N4vnet8blackbox10PROTO_ICMPE"></span><span id="vnet::blackbox::PROTO_ICMP__uint8_t"></span><span class="target" id="namespacevnet_1_1blackbox_1a781537e9a08548e59d2284f24cd3eb40"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PROTO_ICMP</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10PROTO_ICMPE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox9PROTO_TCPE">
+<span id="_CPPv3N4vnet8blackbox9PROTO_TCPE"></span><span id="_CPPv2N4vnet8blackbox9PROTO_TCPE"></span><span id="vnet::blackbox::PROTO_TCP__uint8_t"></span><span class="target" id="namespacevnet_1_1blackbox_1a24ba7ecd09f1bb989ad63fdb8351d3c4"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PROTO_TCP</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">6</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox9PROTO_TCPE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox9PROTO_UDPE">
+<span id="_CPPv3N4vnet8blackbox9PROTO_UDPE"></span><span id="_CPPv2N4vnet8blackbox9PROTO_UDPE"></span><span id="vnet::blackbox::PROTO_UDP__uint8_t"></span><span class="target" id="namespacevnet_1_1blackbox_1a4ad1c0fe09df08c65e9a52eed1f577f8"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PROTO_UDP</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">17</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox9PROTO_UDPE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntryE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntryE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntryE"></span><span id="vnet::blackbox::AgentEntry"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AgentEntry</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntryE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;agent_registry.hpp&gt;</em></div>
+<p>Represents a single agent connected to this switch. </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry4nameE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry4nameE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry4nameE"></span><span id="vnet::blackbox::AgentEntry::name__ss"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1a11b58f88038177bf1b5cbed8f5dc8c1d"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">name</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry4nameE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry12virtual_ipv4E">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry12virtual_ipv4E"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry12virtual_ipv4E"></span><span id="vnet::blackbox::AgentEntry::virtual_ipv4__uint32_t"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1a5ec80c0fd1a05c3ba26cda3a40b910c3"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">virtual_ipv4</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry12virtual_ipv4E" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry2fdE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry2fdE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry2fdE"></span><span id="vnet::blackbox::AgentEntry::fd__i"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1a3663f0597fe250079efc658dac6c44c8"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">fd</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry2fdE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry3ppsE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry3ppsE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry3ppsE"></span><span id="vnet::blackbox::AgentEntry::pps__TokenBucket"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1ad2fb052ddf556e2f0587f358395e407c"></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox11TokenBucketE" title="vnet::blackbox::TokenBucket"><span class="n"><span class="pre">TokenBucket</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">pps</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry3ppsE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry3bpsE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry3bpsE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry3bpsE"></span><span id="vnet::blackbox::AgentEntry::bps__TokenBucket"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1a0d16f53430542455b567e93f2f12a778"></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox11TokenBucketE" title="vnet::blackbox::TokenBucket"><span class="n"><span class="pre">TokenBucket</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">bps</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry3bpsE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry7pkts_inE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry7pkts_inE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry7pkts_inE"></span><span id="vnet::blackbox::AgentEntry::pkts_in__uint64_t"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1a24b6353540648303a59feeb9956b6122"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">pkts_in</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry7pkts_inE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry8bytes_inE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry8bytes_inE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry8bytes_inE"></span><span id="vnet::blackbox::AgentEntry::bytes_in__uint64_t"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1ab6dac66dab1f530ea2d0125e81ccda55"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">bytes_in</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry8bytes_inE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry8pkts_outE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry8pkts_outE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry8pkts_outE"></span><span id="vnet::blackbox::AgentEntry::pkts_out__uint64_t"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1a302f2df559d98d1d32b8775432ab4888"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">pkts_out</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry8pkts_outE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry9bytes_outE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry9bytes_outE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry9bytes_outE"></span><span id="vnet::blackbox::AgentEntry::bytes_out__uint64_t"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1aac34884d89198bd45d88be529ea87d96"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">bytes_out</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry9bytes_outE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10AgentEntry7droppedE">
+<span id="_CPPv3N4vnet8blackbox10AgentEntry7droppedE"></span><span id="_CPPv2N4vnet8blackbox10AgentEntry7droppedE"></span><span id="vnet::blackbox::AgentEntry::dropped__uint64_t"></span><span class="target" id="structvnet_1_1blackbox_1_1AgentEntry_1a9ce7c550ca9d7f93fa83425cee88b4c9"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dropped</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10AgentEntry7droppedE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox13AgentRegistryE">
+<span id="_CPPv3N4vnet8blackbox13AgentRegistryE"></span><span id="_CPPv2N4vnet8blackbox13AgentRegistryE"></span><span id="vnet::blackbox::AgentRegistry"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AgentRegistry</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox13AgentRegistryE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;agent_registry.hpp&gt;</em></div>
+<p>Maintains the set of agents currently connected to this switch, indexed three ways for O(1) lookup in the packet processing path. </p>
+<p>Thread safety: NOT thread-safe. Intended to be used from a single-threaded event loop (epoll).</p>
+<p>Ownership: the registry owns the <a class="reference internal" href="#structvnet_1_1blackbox_1_1AgentEntry"><span class="std std-ref">AgentEntry</span></a> objects. They are freed when unregistered or when the registry is destroyed. </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox13AgentRegistry14register_agentERKNSt6stringE8uint32_ti">
+<span id="_CPPv3N4vnet8blackbox13AgentRegistry14register_agentERKNSt6stringE8uint32_ti"></span><span id="_CPPv2N4vnet8blackbox13AgentRegistry14register_agentERKNSt6stringE8uint32_ti"></span><span id="vnet::blackbox::AgentRegistry::register_agent__ssCR.uint32_t.i"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry_1a695cb837f013a51ecb563166defc4179"></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntryE" title="vnet::blackbox::AgentEntry"><span class="n"><span class="pre">AgentEntry</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">register_agent</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span>, <span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">virtual_ipv4</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox13AgentRegistry14register_agentERKNSt6stringE8uint32_ti" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Register a new agent. </p>
+<p>If an agent with the same name was already registered, the old entry is removed first.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> – The agent name (from MIP). </p></li>
+<li><p><strong>virtual_ipv4</strong> – The agent’s virtual IP (network order, from config). </p></li>
+<li><p><strong>fd</strong> – The TCP fd for communicating with the agent. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>pointer to the created entry, or nullptr on failure. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox13AgentRegistry16unregister_by_fdEi">
+<span id="_CPPv3N4vnet8blackbox13AgentRegistry16unregister_by_fdEi"></span><span id="_CPPv2N4vnet8blackbox13AgentRegistry16unregister_by_fdEi"></span><span id="vnet::blackbox::AgentRegistry::unregister_by_fd__i"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry_1a4f5f82f91ce05609221d414c6e24fd88"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">unregister_by_fd</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox13AgentRegistry16unregister_by_fdEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Remove an agent by fd. </p>
+<p>Called when the agent disconnects. Frees the <a class="reference internal" href="#structvnet_1_1blackbox_1_1AgentEntry"><span class="std std-ref">AgentEntry</span></a>. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox13AgentRegistry18unregister_by_nameERKNSt6stringE">
+<span id="_CPPv3N4vnet8blackbox13AgentRegistry18unregister_by_nameERKNSt6stringE"></span><span id="_CPPv2N4vnet8blackbox13AgentRegistry18unregister_by_nameERKNSt6stringE"></span><span id="vnet::blackbox::AgentRegistry::unregister_by_name__ssCR"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry_1a9c0b0f2908c3ad779f9d21a26d3a3340"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">unregister_by_name</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox13AgentRegistry18unregister_by_nameERKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Remove an agent by name. </p>
+<p>Frees the <a class="reference internal" href="#structvnet_1_1blackbox_1_1AgentEntry"><span class="std std-ref">AgentEntry</span></a>. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox13AgentRegistry12find_by_ipv4E8uint32_t">
+<span id="_CPPv3NK4vnet8blackbox13AgentRegistry12find_by_ipv4E8uint32_t"></span><span id="_CPPv2NK4vnet8blackbox13AgentRegistry12find_by_ipv4E8uint32_t"></span><span id="vnet::blackbox::AgentRegistry::find_by_ipv4__uint32_tC"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry_1a9413050ae0eb6af7e8995c97fffc02c7"></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntryE" title="vnet::blackbox::AgentEntry"><span class="n"><span class="pre">AgentEntry</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">find_by_ipv4</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ipv4</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox13AgentRegistry12find_by_ipv4E8uint32_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Look up an agent by its virtual IPv4. </p>
+<p>O(1). </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox13AgentRegistry10find_by_fdEi">
+<span id="_CPPv3NK4vnet8blackbox13AgentRegistry10find_by_fdEi"></span><span id="_CPPv2NK4vnet8blackbox13AgentRegistry10find_by_fdEi"></span><span id="vnet::blackbox::AgentRegistry::find_by_fd__iC"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry_1a5eacd4c236cfd5e3d854f6a03f887d58"></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntryE" title="vnet::blackbox::AgentEntry"><span class="n"><span class="pre">AgentEntry</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">find_by_fd</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox13AgentRegistry10find_by_fdEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Look up an agent by its TCP fd. </p>
+<p>O(1). </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox13AgentRegistry12find_by_nameERKNSt6stringE">
+<span id="_CPPv3NK4vnet8blackbox13AgentRegistry12find_by_nameERKNSt6stringE"></span><span id="_CPPv2NK4vnet8blackbox13AgentRegistry12find_by_nameERKNSt6stringE"></span><span id="vnet::blackbox::AgentRegistry::find_by_name__ssCRC"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry_1a69b4e327455c84ce8788df8517749120"></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntryE" title="vnet::blackbox::AgentEntry"><span class="n"><span class="pre">AgentEntry</span></span></a><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">find_by_name</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox13AgentRegistry12find_by_nameERKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Look up an agent by name. </p>
+<p>O(1). </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox13AgentRegistry4sizeEv">
+<span id="_CPPv3NK4vnet8blackbox13AgentRegistry4sizeEv"></span><span id="_CPPv2NK4vnet8blackbox13AgentRegistry4sizeEv"></span><span id="vnet::blackbox::AgentRegistry::sizeC"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry_1ae90c0807237c4013d922eaccef86c25d"></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">size</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox13AgentRegistry4sizeEv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Number of registered agents. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox13AgentRegistry7entriesEv">
+<span id="_CPPv3NK4vnet8blackbox13AgentRegistry7entriesEv"></span><span id="_CPPv2NK4vnet8blackbox13AgentRegistry7entriesEv"></span><span id="vnet::blackbox::AgentRegistry::entriesC"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry_1aeb8a1d6e3865399fa6bc4c47da71762d"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10AgentEntryE" title="vnet::blackbox::AgentEntry"><span class="n"><span class="pre">AgentEntry</span></span></a><span class="p"><span class="pre">*</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">entries</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox13AgentRegistry7entriesEv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Every registered agent, in no particular order. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox13AgentRegistryD0Ev">
+<span id="_CPPv3N4vnet8blackbox13AgentRegistryD0Ev"></span><span id="_CPPv2N4vnet8blackbox13AgentRegistryD0Ev"></span><span id="vnet::blackbox::AgentRegistry::~AgentRegistry"></span><span class="target" id="classvnet_1_1blackbox_1_1AgentRegistry_1a59b57889799291f043757e5ae40323c2"></span><span class="sig-name descname"><span class="n"><span class="pre">~AgentRegistry</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox13AgentRegistryD0Ev" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8CountersE">
+<span id="_CPPv3N4vnet8blackbox8CountersE"></span><span id="_CPPv2N4vnet8blackbox8CountersE"></span><span id="vnet::blackbox::Counters"></span><span class="target" id="structvnet_1_1blackbox_1_1Counters"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Counters</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8CountersE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;blackbox.hpp&gt;</em></div>
+<p>What the black box decided since it was made. </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox8Counters13dropped_totalEv">
+<span id="_CPPv3NK4vnet8blackbox8Counters13dropped_totalEv"></span><span id="_CPPv2NK4vnet8blackbox8Counters13dropped_totalEv"></span><span id="vnet::blackbox::Counters::dropped_totalC"></span><span class="target" id="structvnet_1_1blackbox_1_1Counters_1aa183074b6896f7bea66285181da83d89"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dropped_total</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox8Counters13dropped_totalEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8Counters15delivered_localE">
+<span id="_CPPv3N4vnet8blackbox8Counters15delivered_localE"></span><span id="_CPPv2N4vnet8blackbox8Counters15delivered_localE"></span><span id="vnet::blackbox::Counters::delivered_local__uint64_t"></span><span class="target" id="structvnet_1_1blackbox_1_1Counters_1a554433a8be61fab0e54105797f4c4e52"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">delivered_local</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8Counters15delivered_localE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8Counters16forwarded_switchE">
+<span id="_CPPv3N4vnet8blackbox8Counters16forwarded_switchE"></span><span id="_CPPv2N4vnet8blackbox8Counters16forwarded_switchE"></span><span id="vnet::blackbox::Counters::forwarded_switch__uint64_t"></span><span class="target" id="structvnet_1_1blackbox_1_1Counters_1a18369281d0b6453e604532a427eb86f7"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">forwarded_switch</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8Counters16forwarded_switchE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8Counters18forwarded_internetE">
+<span id="_CPPv3N4vnet8blackbox8Counters18forwarded_internetE"></span><span id="_CPPv2N4vnet8blackbox8Counters18forwarded_internetE"></span><span id="vnet::blackbox::Counters::forwarded_internet__uint64_t"></span><span class="target" id="structvnet_1_1blackbox_1_1Counters_1aa1e0356c8adea9e403103a5ed490359f"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">forwarded_internet</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8Counters18forwarded_internetE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8Counters15route_requestedE">
+<span id="_CPPv3N4vnet8blackbox8Counters15route_requestedE"></span><span id="_CPPv2N4vnet8blackbox8Counters15route_requestedE"></span><span id="vnet::blackbox::Counters::route_requested__uint64_t"></span><span class="target" id="structvnet_1_1blackbox_1_1Counters_1a4618740edf2f4c79f4baf99caccb419e"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">route_requested</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8Counters15route_requestedE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8Counters7droppedE">
+<span id="_CPPv3N4vnet8blackbox8Counters7droppedE"></span><span id="_CPPv2N4vnet8blackbox8Counters7droppedE"></span><span id="vnet::blackbox::Counters::dropped__uint64_tA"></span><span class="target" id="structvnet_1_1blackbox_1_1Counters_1aa7ae3188cc408ce96eb29947292216e5"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dropped</span></span></span><span class="p"><span class="pre">[</span></span><span class="k"><span class="pre">static_cast</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">size_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">(</span></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReasonE" title="vnet::blackbox::DropReason"><span class="n"><span class="pre">DropReason</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason5COUNTE" title="vnet::blackbox::DropReason::COUNT"><span class="n"><span class="pre">COUNT</span></span></a><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">}</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8Counters7droppedE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox14PacketDecisionE">
+<span id="_CPPv3N4vnet8blackbox14PacketDecisionE"></span><span id="_CPPv2N4vnet8blackbox14PacketDecisionE"></span><span id="vnet::blackbox::PacketDecision"></span><span class="target" id="structvnet_1_1blackbox_1_1PacketDecision"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PacketDecision</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox14PacketDecisionE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;blackbox.hpp&gt;</em></div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox14PacketDecision6actionE">
+<span id="_CPPv3N4vnet8blackbox14PacketDecision6actionE"></span><span id="_CPPv2N4vnet8blackbox14PacketDecision6actionE"></span><span id="vnet::blackbox::PacketDecision::action__PacketAction"></span><span class="target" id="structvnet_1_1blackbox_1_1PacketDecision_1a9727617012959570e2b7b2134f554a68"></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox12PacketActionE" title="vnet::blackbox::PacketAction"><span class="n"><span class="pre">PacketAction</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">action</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8blackbox12PacketActionE" title="vnet::blackbox::PacketAction"><span class="n"><span class="pre">PacketAction</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox12PacketAction4DROPE" title="vnet::blackbox::PacketAction::DROP"><span class="n"><span class="pre">DROP</span></span></a><a class="headerlink" href="#_CPPv4N4vnet8blackbox14PacketDecision6actionE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox14PacketDecision9target_fdE">
+<span id="_CPPv3N4vnet8blackbox14PacketDecision9target_fdE"></span><span id="_CPPv2N4vnet8blackbox14PacketDecision9target_fdE"></span><span id="vnet::blackbox::PacketDecision::target_fd__i"></span><span class="target" id="structvnet_1_1blackbox_1_1PacketDecision_1aa9de41fb3cd21e02c17c9cfe0e5116ff"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">target_fd</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="o"><span class="pre">-</span></span><span class="m"><span class="pre">1</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox14PacketDecision9target_fdE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox14PacketDecision9dest_ipv4E">
+<span id="_CPPv3N4vnet8blackbox14PacketDecision9dest_ipv4E"></span><span id="_CPPv2N4vnet8blackbox14PacketDecision9dest_ipv4E"></span><span id="vnet::blackbox::PacketDecision::dest_ipv4__uint32_t"></span><span class="target" id="structvnet_1_1blackbox_1_1PacketDecision_1a1e27ff50b2c8e50600f2e60ab1d96b41"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dest_ipv4</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox14PacketDecision9dest_ipv4E" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox14PacketDecision11drop_reasonE">
+<span id="_CPPv3N4vnet8blackbox14PacketDecision11drop_reasonE"></span><span id="_CPPv2N4vnet8blackbox14PacketDecision11drop_reasonE"></span><span id="vnet::blackbox::PacketDecision::drop_reason__DropReason"></span><span class="target" id="structvnet_1_1blackbox_1_1PacketDecision_1aeee94075f110983d6a54d8d35eacf66a"></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReasonE" title="vnet::blackbox::DropReason"><span class="n"><span class="pre">DropReason</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">drop_reason</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReasonE" title="vnet::blackbox::DropReason"><span class="n"><span class="pre">DropReason</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10DropReason4NONEE" title="vnet::blackbox::DropReason::NONE"><span class="n"><span class="pre">NONE</span></span></a><a class="headerlink" href="#_CPPv4N4vnet8blackbox14PacketDecision11drop_reasonE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBoxE">
+<span id="_CPPv3N4vnet8blackbox8BlackBoxE"></span><span id="_CPPv2N4vnet8blackbox8BlackBoxE"></span><span id="vnet::blackbox::BlackBox"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">BlackBox</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBoxE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;blackbox.hpp&gt;</em></div>
+<p>The switch’s packet processing engine. </p>
+<p>Responsibilities:<ul class="simple">
+<li><p>Source validation (anti-spoofing for agent-sourced packets)</p></li>
+<li><p>Destination lookup (local agent, remote agent via routing, or internet)</p></li>
+<li><p>Packet decision (deliver, forward, request route, or drop)</p></li>
+</ul>
+</p>
+<p>Does NOT perform I/O. The switch event loop calls <a class="reference internal" href="#classvnet_1_1blackbox_1_1BlackBox_1a9a9a1435893cf64705754092ac94ab9a"><span class="std std-ref">process()</span></a> and acts on the returned <a class="reference internal" href="#structvnet_1_1blackbox_1_1PacketDecision"><span class="std std-ref">PacketDecision</span></a>.</p>
+<p>Thread safety: NOT thread-safe. Intended for single-threaded event loop usage.</p>
+<p>Lifecycle hooks:<ul class="simple">
+<li><p><a class="reference internal" href="#classvnet_1_1blackbox_1_1BlackBox_1a5051fcdd52be601d94d3e28522a60d1c"><span class="std std-ref">on_agent_authenticated()</span></a> : called after MIP, populates agent registry</p></li>
+<li><p><a class="reference internal" href="#classvnet_1_1blackbox_1_1BlackBox_1a241dc1e3815551a74abed2b521d40fe5"><span class="std std-ref">on_agent_disconnected()</span></a> : called on fd close, cleans up</p></li>
+<li><p><a class="reference internal" href="#classvnet_1_1blackbox_1_1BlackBox_1a5ab3d54a2dacdcaa7ffd2d4e5965ecb4"><span class="std std-ref">on_route_update()</span></a> : called on SWITCH_ROUTE_UPDATE and AGENT_UNREGISTERED from the conductor</p></li>
+<li><p><a class="reference internal" href="#classvnet_1_1blackbox_1_1BlackBox_1ac6286c8c60de166a335537f16f0925e0"><span class="std std-ref">on_switch_disconnected()</span></a> : called when a peer switch drops </p></li>
+</ul>
+</p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBox8BlackBoxERK6Configi">
+<span id="_CPPv3N4vnet8blackbox8BlackBox8BlackBoxERK6Configi"></span><span id="_CPPv2N4vnet8blackbox8BlackBox8BlackBoxERK6Configi"></span><span id="vnet::blackbox::BlackBox::BlackBox__ConfigCR.i"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a0f4f2d8d24bf95775e0be55737d8e26c"></span><span class="sig-name descname"><span class="n"><span class="pre">BlackBox</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8blackbox6ConfigE" title="vnet::blackbox::Config"><span class="n"><span class="pre">Config</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">config</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">tun_fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBox8BlackBoxERK6Configi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Construct a black box with the given config. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>config</strong> – Parsed config (agent→IP mappings, internet permissions). The <a class="reference internal" href="#classvnet_1_1blackbox_1_1BlackBox"><span class="std std-ref">BlackBox</span></a> takes a copy. </p></li>
+<li><p><strong>tun_fd</strong> – File descriptor of the internet TUN device, or -1 if internet is not available. </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBox16set_agent_limitsE8uint64_t8uint64_t">
+<span id="_CPPv3N4vnet8blackbox8BlackBox16set_agent_limitsE8uint64_t8uint64_t"></span><span id="_CPPv2N4vnet8blackbox8BlackBox16set_agent_limitsE8uint64_t8uint64_t"></span><span id="vnet::blackbox::BlackBox::set_agent_limits__uint64_t.uint64_t"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1adf9a8c9b6d895ff5da920d40ea175c30"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">set_agent_limits</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">pps</span></span>, <span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">bytes_per_sec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBox16set_agent_limitsE8uint64_t8uint64_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Limit what each agent may send: packets per second and bytes per second, each with a burst of one second’s worth. </p>
+<p>0 means no limit. Applies to agents registered after the call. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBox14replace_configERK6Config">
+<span id="_CPPv3N4vnet8blackbox8BlackBox14replace_configERK6Config"></span><span id="_CPPv2N4vnet8blackbox8BlackBox14replace_configERK6Config"></span><span id="vnet::blackbox::BlackBox::replace_config__ConfigCR"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a9210d50fbef70327ed7bb16f8171e2fa"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">replace_config</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8blackbox6ConfigE" title="vnet::blackbox::Config"><span class="n"><span class="pre">Config</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">config</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBox14replace_configERK6Config" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Put a newly loaded config in force. </p>
+<p>Rules apply to the next packet. Agents already registered keep the virtual IP they were given; a changed or removed assignment takes effect when that agent next connects. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBox7processE10SourceTypeiPK7uint8_t6size_t">
+<span id="_CPPv3N4vnet8blackbox8BlackBox7processE10SourceTypeiPK7uint8_t6size_t"></span><span id="_CPPv2N4vnet8blackbox8BlackBox7processE10SourceTypeiPK7uint8_t6size_t"></span><span id="vnet::blackbox::BlackBox::process__SourceType.i.uint8_tCP.s"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a9a9a1435893cf64705754092ac94ab9a"></span><a class="reference internal" href="#_CPPv4N4vnet8blackbox14PacketDecisionE" title="vnet::blackbox::PacketDecision"><span class="n"><span class="pre">PacketDecision</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">process</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4vnet8blackbox10SourceTypeE" title="vnet::blackbox::SourceType"><span class="n"><span class="pre">SourceType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">source_type</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">source_fd</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">raw_ipv4</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">len</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBox7processE10SourceTypeiPK7uint8_t6size_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Process a raw IPv4 packet and decide what to do with it. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_type</strong> – What kind of fd delivered the packet. </p></li>
+<li><p><strong>source_fd</strong> – The fd that delivered the packet. </p></li>
+<li><p><strong>raw_ipv4</strong> – Pointer to the raw IPv4 packet bytes. </p></li>
+<li><p><strong>len</strong> – Number of bytes in raw_ipv4. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A <a class="reference internal" href="#structvnet_1_1blackbox_1_1PacketDecision"><span class="std std-ref">PacketDecision</span></a> telling the caller what to do. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBox22on_agent_authenticatedERKNSt6stringEi">
+<span id="_CPPv3N4vnet8blackbox8BlackBox22on_agent_authenticatedERKNSt6stringEi"></span><span id="_CPPv2N4vnet8blackbox8BlackBox22on_agent_authenticatedERKNSt6stringEi"></span><span id="vnet::blackbox::BlackBox::on_agent_authenticated__ssCR.i"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a5051fcdd52be601d94d3e28522a60d1c"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">on_agent_authenticated</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBox22on_agent_authenticatedERKNSt6stringEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>An agent has completed MIP and been authenticated. </p>
+<p>Looks up the config for the agent’s virtual IP and registers it in the agent registry.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> – Agent name (from MIP). </p></li>
+<li><p><strong>fd</strong> – The agent’s TCP fd. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true if the agent was found in the config and registered. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBox21on_agent_disconnectedEi">
+<span id="_CPPv3N4vnet8blackbox8BlackBox21on_agent_disconnectedEi"></span><span id="_CPPv2N4vnet8blackbox8BlackBox21on_agent_disconnectedEi"></span><span id="vnet::blackbox::BlackBox::on_agent_disconnected__i"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a241dc1e3815551a74abed2b521d40fe5"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">on_agent_disconnected</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBox21on_agent_disconnectedEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>An agent’s fd was closed (disconnect, error, etc.). </p>
+<p>Removes the agent from the registry. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBox15on_route_updateE8uint32_ti">
+<span id="_CPPv3N4vnet8blackbox8BlackBox15on_route_updateE8uint32_ti"></span><span id="_CPPv2N4vnet8blackbox8BlackBox15on_route_updateE8uint32_ti"></span><span id="vnet::blackbox::BlackBox::on_route_update__uint32_t.i"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a5ab3d54a2dacdcaa7ffd2d4e5965ecb4"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">on_route_update</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dest_ipv4</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">next_switch_fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBox15on_route_updateE8uint32_ti" title="Link to this definition">¶</a><br /></dt>
+<dd><p>The conductor published or withdrew the route to an agent on another switch. </p>
+<p>Updates the routing table.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dest_ipv4</strong> – Target IP (network order). </p></li>
+<li><p><strong>next_switch_fd</strong> – The peer switch fd to forward to, or -1 to remove the route (target disconnected). </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBox22on_switch_disconnectedEi">
+<span id="_CPPv3N4vnet8blackbox8BlackBox22on_switch_disconnectedEi"></span><span id="_CPPv2N4vnet8blackbox8BlackBox22on_switch_disconnectedEi"></span><span id="vnet::blackbox::BlackBox::on_switch_disconnected__i"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1ac6286c8c60de166a335537f16f0925e0"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">on_switch_disconnected</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">switch_fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBox22on_switch_disconnectedEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>A peer switch fd was closed. </p>
+<p>Removes all routes pointing to that switch. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox8BlackBox15retarget_switchEii">
+<span id="_CPPv3N4vnet8blackbox8BlackBox15retarget_switchEii"></span><span id="_CPPv2N4vnet8blackbox8BlackBox15retarget_switchEii"></span><span id="vnet::blackbox::BlackBox::retarget_switch__i.i"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a5caf63ea7caad21e29f2e6ee642fc9b6"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">retarget_switch</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">old_fd</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">new_fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox8BlackBox15retarget_switchEii" title="Link to this definition">¶</a><br /></dt>
+<dd><p>A peer session moved from old_fd to new_fd. </p>
+<p>Routes stay; only the socket changes. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox8BlackBox6agentsEv">
+<span id="_CPPv3NK4vnet8blackbox8BlackBox6agentsEv"></span><span id="_CPPv2NK4vnet8blackbox8BlackBox6agentsEv"></span><span id="vnet::blackbox::BlackBox::agentsC"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a2f046a3110a11db5556b5e4f16056ab1"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8blackbox13AgentRegistryE" title="vnet::blackbox::AgentRegistry"><span class="n"><span class="pre">AgentRegistry</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">agents</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox8BlackBox6agentsEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox8BlackBox6routesEv">
+<span id="_CPPv3NK4vnet8blackbox8BlackBox6routesEv"></span><span id="_CPPv2NK4vnet8blackbox8BlackBox6routesEv"></span><span id="vnet::blackbox::BlackBox::routesC"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1afa2b7081d5f3dce66f8c437e50db4932"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8blackbox12RoutingTableE" title="vnet::blackbox::RoutingTable"><span class="n"><span class="pre">RoutingTable</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">routes</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox8BlackBox6routesEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox8BlackBox6configEv">
+<span id="_CPPv3NK4vnet8blackbox8BlackBox6configEv"></span><span id="_CPPv2NK4vnet8blackbox8BlackBox6configEv"></span><span id="vnet::blackbox::BlackBox::configC"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1ad3d8eeaccf681eeb2c6e41b58d911052"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8blackbox6ConfigE" title="vnet::blackbox::Config"><span class="n"><span class="pre">Config</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">config</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox8BlackBox6configEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox8BlackBox8countersEv">
+<span id="_CPPv3NK4vnet8blackbox8BlackBox8countersEv"></span><span id="_CPPv2NK4vnet8blackbox8BlackBox8countersEv"></span><span id="vnet::blackbox::BlackBox::countersC"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a648e0b7c8bca8e2d7b0c12f95cc55118"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4vnet8blackbox8CountersE" title="vnet::blackbox::Counters"><span class="n"><span class="pre">Counters</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">counters</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox8BlackBox8countersEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox8BlackBox7summaryEv">
+<span id="_CPPv3NK4vnet8blackbox8BlackBox7summaryEv"></span><span id="_CPPv2NK4vnet8blackbox8BlackBox7summaryEv"></span><span id="vnet::blackbox::BlackBox::summaryC"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1ac619b3c3e083fd9db93bc454fb7fe0d9"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">summary</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox8BlackBox7summaryEv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>The counters as one line, and one line per agent. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox8BlackBox11agent_linesEv">
+<span id="_CPPv3NK4vnet8blackbox8BlackBox11agent_linesEv"></span><span id="_CPPv2NK4vnet8blackbox8BlackBox11agent_linesEv"></span><span id="vnet::blackbox::BlackBox::agent_linesC"></span><span class="target" id="classvnet_1_1blackbox_1_1BlackBox_1a6fff31d747e067099ce3976ee81d9f51"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">agent_lines</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox8BlackBox11agent_linesEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox6ConfigE">
+<span id="_CPPv3N4vnet8blackbox6ConfigE"></span><span id="_CPPv2N4vnet8blackbox6ConfigE"></span><span id="vnet::blackbox::Config"></span><span class="target" id="classvnet_1_1blackbox_1_1Config"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Config</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox6ConfigE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;config.hpp&gt;</em></div>
+<p>Parsed configuration for the black box. </p>
+<p>The config file has one entry per line. Blank lines and lines starting with ‘#’ are ignored.</p>
+<p>Two kinds of entries:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>*   IP ASSIGNMENT:
+*     agent_name  ip_address
+*
+*     Maps a virtual IPv4 address to an agent name.
+*     Distinguished from ACL rules because the second
+*     token is a valid IPv4 address.
+*
+*   ACL RULE:
+*     agent_name  agent_name
+*       Allows bidirectional communication between two agents.
+*
+*     agent_name  ::internet:ip_address
+*     agent_name  ::internet:a.b.c.d/n
+*       Allows this agent to reach a specific internet IP, or every
+*       address in a prefix. Return traffic from there is also allowed.
+*
+* Example:
+*   # IP assignments
+*   contestant1  10.0.1.1
+*   contestant2  10.0.1.2
+*   gameserver   10.0.0.1
+*
+*   # Contestants can talk to game server only
+*   contestant1  gameserver
+*   contestant2  gameserver
+*
+*   # Game server can reach specific internet hosts
+*   gameserver   ::internet:8.8.8.8
+*   gameserver   ::internet:1.1.1.1
+*
+</pre></div>
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox6Config4loadERKNSt6stringE">
+<span id="_CPPv3N4vnet8blackbox6Config4loadERKNSt6stringE"></span><span id="_CPPv2N4vnet8blackbox6Config4loadERKNSt6stringE"></span><span id="vnet::blackbox::Config::load__ssCR"></span><span class="target" id="classvnet_1_1blackbox_1_1Config_1ac68c791e33695e74ef3bccb1fd235993"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">load</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">path</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox6Config4loadERKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Load and parse a config file. </p>
+<p>Assignments and rules may come in any order. Agent names must be 1 to 10 characters from [A-Za-z0-9_-].</p>
+<p>On failure this object is left as it was, so a reload that fails keeps the previous config in force.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> – Path to the config file. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true on success, false on parse error or I/O failure. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox6Config9load_textERKNSt6stringE">
+<span id="_CPPv3N4vnet8blackbox6Config9load_textERKNSt6stringE"></span><span id="_CPPv2N4vnet8blackbox6Config9load_textERKNSt6stringE"></span><span id="vnet::blackbox::Config::load_text__ssCR"></span><span class="target" id="classvnet_1_1blackbox_1_1Config_1a3826c4a6447fac2b546f859ec064ec47"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">load_text</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">text</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox6Config9load_textERKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Parse a config held in memory, in the file format: what a switch received from the conductor. </p>
+<p>Same guarantees as <a class="reference internal" href="#classvnet_1_1blackbox_1_1Config_1ac68c791e33695e74ef3bccb1fd235993"><span class="std std-ref">load()</span></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>text</strong> – The whole config file. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true on success, false on parse error. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox6Config11fingerprintEv">
+<span id="_CPPv3NK4vnet8blackbox6Config11fingerprintEv"></span><span id="_CPPv2NK4vnet8blackbox6Config11fingerprintEv"></span><span id="vnet::blackbox::Config::fingerprintC"></span><span class="target" id="classvnet_1_1blackbox_1_1Config_1a87c0a082f2e771f2631fd5fd78a5d845"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">fingerprint</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox6Config11fingerprintEv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>SHA-256, as hex, of the parsed content in a canonical order: two files that mean the same have the same fingerprint however they are written. </p>
+<p>The conductor compares the fingerprints the switches report with each other, or with its own config when it is the one handing the config out. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox6Config17find_agent_for_ipE8uint32_t">
+<span id="_CPPv3NK4vnet8blackbox6Config17find_agent_for_ipE8uint32_t"></span><span id="_CPPv2NK4vnet8blackbox6Config17find_agent_for_ipE8uint32_t"></span><span id="vnet::blackbox::Config::find_agent_for_ip__uint32_tC"></span><span class="target" id="classvnet_1_1blackbox_1_1Config_1a6fad535e6c67376d0602dfb09fce78e5"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">find_agent_for_ip</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ipv4</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox6Config17find_agent_for_ipE8uint32_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Find the agent name that owns a given IPv4. </p>
+<p>Empty if not found. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox6Config17find_ip_for_agentERKNSt6stringE">
+<span id="_CPPv3NK4vnet8blackbox6Config17find_ip_for_agentERKNSt6stringE"></span><span id="_CPPv2NK4vnet8blackbox6Config17find_ip_for_agentERKNSt6stringE"></span><span id="vnet::blackbox::Config::find_ip_for_agent__ssCRC"></span><span class="target" id="classvnet_1_1blackbox_1_1Config_1a3edf23ae960ce4e2efaaad4aaac0803a"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">find_ip_for_agent</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox6Config17find_ip_for_agentERKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Find the virtual IPv4 assigned to an agent. </p>
+<p>0 if not found. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox6Config6agentsEv">
+<span id="_CPPv3NK4vnet8blackbox6Config6agentsEv"></span><span id="_CPPv2NK4vnet8blackbox6Config6agentsEv"></span><span id="vnet::blackbox::Config::agentsC"></span><span class="target" id="classvnet_1_1blackbox_1_1Config_1a8aed800fcc9ee0c0cb9ea9c254d258ba"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">unordered_map</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">uint32_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">agents</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox6Config6agentsEv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>All configured agent names and their IPs. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox6Config22can_agents_communicateE8uint32_t8uint32_t">
+<span id="_CPPv3NK4vnet8blackbox6Config22can_agents_communicateE8uint32_t8uint32_t"></span><span id="_CPPv2NK4vnet8blackbox6Config22can_agents_communicateE8uint32_t8uint32_t"></span><span id="vnet::blackbox::Config::can_agents_communicate__uint32_t.uint32_tC"></span><span class="target" id="classvnet_1_1blackbox_1_1Config_1a9ee9ec8c52c3a235eb1e86ce36a5f6e9"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">can_agents_communicate</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">src_ipv4</span></span>, <span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dst_ipv4</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox6Config22can_agents_communicateE8uint32_t8uint32_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Can the agent at src_ipv4 communicate with the agent at dst_ipv4? </p>
+<p>Bidirectional: if A→B is allowed, B→A is also allowed. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox6Config21can_reach_internet_ipE8uint32_t8uint32_t">
+<span id="_CPPv3NK4vnet8blackbox6Config21can_reach_internet_ipE8uint32_t8uint32_t"></span><span id="_CPPv2NK4vnet8blackbox6Config21can_reach_internet_ipE8uint32_t8uint32_t"></span><span id="vnet::blackbox::Config::can_reach_internet_ip__uint32_t.uint32_tC"></span><span class="target" id="classvnet_1_1blackbox_1_1Config_1ad85b123c63a0f112e5de38e7213a5f94"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">can_reach_internet_ip</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">agent_ipv4</span></span>, <span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">internet_ipv4</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox6Config21can_reach_internet_ipE8uint32_t8uint32_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Can the agent at agent_ipv4 reach the given internet IP? </p>
+<p>Also used for return traffic: if agent can reach internet_ipv4, then return traffic from internet_ipv4 to agent is allowed. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox6Config23has_any_internet_accessE8uint32_t">
+<span id="_CPPv3NK4vnet8blackbox6Config23has_any_internet_accessE8uint32_t"></span><span id="_CPPv2NK4vnet8blackbox6Config23has_any_internet_accessE8uint32_t"></span><span id="vnet::blackbox::Config::has_any_internet_access__uint32_tC"></span><span class="target" id="classvnet_1_1blackbox_1_1Config_1a188ad912173cbacac3bb7c2257586ea8"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">has_any_internet_access</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">agent_ipv4</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox6Config23has_any_internet_accessE8uint32_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Does this agent have any internet rules at all? </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10IPv4HeaderE">
+<span id="_CPPv3N4vnet8blackbox10IPv4HeaderE"></span><span id="_CPPv2N4vnet8blackbox10IPv4HeaderE"></span><span id="vnet::blackbox::IPv4Header"></span><span class="target" id="structvnet_1_1blackbox_1_1IPv4Header"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IPv4Header</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10IPv4HeaderE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;ipv4.hpp&gt;</em></div>
+<p>Parsed fields from an IPv4 packet header. </p>
+<p>All multi-byte fields are stored in network byte order (big endian) so they can be compared directly against addresses stored elsewhere in the system without conversion.</p>
+<p>Ports are only meaningful for TCP (protocol 6) and UDP (protocol 17). For other protocols (e.g. ICMP) they are set to 0. </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10IPv4Header7versionE">
+<span id="_CPPv3N4vnet8blackbox10IPv4Header7versionE"></span><span id="_CPPv2N4vnet8blackbox10IPv4Header7versionE"></span><span id="vnet::blackbox::IPv4Header::version__uint8_t"></span><span class="target" id="structvnet_1_1blackbox_1_1IPv4Header_1aa29d9cefb9eb891edf080ac579fa5cc9"></span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">version</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10IPv4Header7versionE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10IPv4Header3ihlE">
+<span id="_CPPv3N4vnet8blackbox10IPv4Header3ihlE"></span><span id="_CPPv2N4vnet8blackbox10IPv4Header3ihlE"></span><span id="vnet::blackbox::IPv4Header::ihl__uint8_t"></span><span class="target" id="structvnet_1_1blackbox_1_1IPv4Header_1ac95d4572633dff5684edfd30c77921bb"></span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ihl</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10IPv4Header3ihlE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10IPv4Header12total_lengthE">
+<span id="_CPPv3N4vnet8blackbox10IPv4Header12total_lengthE"></span><span id="_CPPv2N4vnet8blackbox10IPv4Header12total_lengthE"></span><span id="vnet::blackbox::IPv4Header::total_length__uint16_t"></span><span class="target" id="structvnet_1_1blackbox_1_1IPv4Header_1a276a80be2eb1a0022015cd348393af62"></span><span class="n"><span class="pre">uint16_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">total_length</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10IPv4Header12total_lengthE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10IPv4Header8protocolE">
+<span id="_CPPv3N4vnet8blackbox10IPv4Header8protocolE"></span><span id="_CPPv2N4vnet8blackbox10IPv4Header8protocolE"></span><span id="vnet::blackbox::IPv4Header::protocol__uint8_t"></span><span class="target" id="structvnet_1_1blackbox_1_1IPv4Header_1ae3981af5dc3804719d05579707e50f68"></span><span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">protocol</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10IPv4Header8protocolE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10IPv4Header6src_ipE">
+<span id="_CPPv3N4vnet8blackbox10IPv4Header6src_ipE"></span><span id="_CPPv2N4vnet8blackbox10IPv4Header6src_ipE"></span><span id="vnet::blackbox::IPv4Header::src_ip__uint32_t"></span><span class="target" id="structvnet_1_1blackbox_1_1IPv4Header_1abfb665225fa439d375f868cba2e44d81"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">src_ip</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10IPv4Header6src_ipE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10IPv4Header6dst_ipE">
+<span id="_CPPv3N4vnet8blackbox10IPv4Header6dst_ipE"></span><span id="_CPPv2N4vnet8blackbox10IPv4Header6dst_ipE"></span><span id="vnet::blackbox::IPv4Header::dst_ip__uint32_t"></span><span class="target" id="structvnet_1_1blackbox_1_1IPv4Header_1af94665be219c3ae05c516ab1e9865d5f"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dst_ip</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10IPv4Header6dst_ipE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10IPv4Header8src_portE">
+<span id="_CPPv3N4vnet8blackbox10IPv4Header8src_portE"></span><span id="_CPPv2N4vnet8blackbox10IPv4Header8src_portE"></span><span id="vnet::blackbox::IPv4Header::src_port__uint16_t"></span><span class="target" id="structvnet_1_1blackbox_1_1IPv4Header_1a12837251570111ad638fea20ee0297c7"></span><span class="n"><span class="pre">uint16_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">src_port</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10IPv4Header8src_portE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox10IPv4Header8dst_portE">
+<span id="_CPPv3N4vnet8blackbox10IPv4Header8dst_portE"></span><span id="_CPPv2N4vnet8blackbox10IPv4Header8dst_portE"></span><span id="vnet::blackbox::IPv4Header::dst_port__uint16_t"></span><span class="target" id="structvnet_1_1blackbox_1_1IPv4Header_1ac63d98e05efe9edce0aa8ad381e07a1d"></span><span class="n"><span class="pre">uint16_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dst_port</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox10IPv4Header8dst_portE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox11TokenBucketE">
+<span id="_CPPv3N4vnet8blackbox11TokenBucketE"></span><span id="_CPPv2N4vnet8blackbox11TokenBucketE"></span><span id="vnet::blackbox::TokenBucket"></span><span class="target" id="classvnet_1_1blackbox_1_1TokenBucket"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TokenBucket</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox11TokenBucketE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;ratelimit.hpp&gt;</em></div>
+<p>A token bucket: rate tokens arrive per second, at most burst are held. </p>
+<p><a class="reference internal" href="#classvnet_1_1blackbox_1_1TokenBucket_1a0d73fb7fa9fd3df19a147a268fce057a"><span class="std std-ref">take()</span></a> succeeds when enough tokens are present. A rate of 0 means no limit. Time is passed in by the caller in nanoseconds, so the bucket itself has no clock. </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox11TokenBucket11TokenBucketEv">
+<span id="_CPPv3N4vnet8blackbox11TokenBucket11TokenBucketEv"></span><span id="_CPPv2N4vnet8blackbox11TokenBucket11TokenBucketEv"></span><span id="vnet::blackbox::TokenBucket::TokenBucket"></span><span class="target" id="classvnet_1_1blackbox_1_1TokenBucket_1ab3204a5f4ee0e96f7d123fdb64f7afcf"></span><span class="sig-name descname"><span class="n"><span class="pre">TokenBucket</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox11TokenBucket11TokenBucketEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox11TokenBucket11TokenBucketE8uint64_t8uint64_t">
+<span id="_CPPv3N4vnet8blackbox11TokenBucket11TokenBucketE8uint64_t8uint64_t"></span><span id="_CPPv2N4vnet8blackbox11TokenBucket11TokenBucketE8uint64_t8uint64_t"></span><span id="vnet::blackbox::TokenBucket::TokenBucket__uint64_t.uint64_t"></span><span class="target" id="classvnet_1_1blackbox_1_1TokenBucket_1a9e85b80c86d826bfe0f1a4c15e3efb98"></span><span class="sig-name descname"><span class="n"><span class="pre">TokenBucket</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">rate_per_sec</span></span>, <span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">burst</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox11TokenBucket11TokenBucketE8uint64_t8uint64_t" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox11TokenBucket4takeE8uint64_t8uint64_t">
+<span id="_CPPv3N4vnet8blackbox11TokenBucket4takeE8uint64_t8uint64_t"></span><span id="_CPPv2N4vnet8blackbox11TokenBucket4takeE8uint64_t8uint64_t"></span><span id="vnet::blackbox::TokenBucket::take__uint64_t.uint64_t"></span><span class="target" id="classvnet_1_1blackbox_1_1TokenBucket_1a0d73fb7fa9fd3df19a147a268fce057a"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">take</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">n</span></span>, <span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">now_ns</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox11TokenBucket4takeE8uint64_t8uint64_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Take n tokens at time now_ns. </p>
+<p>False when they are not there. rate times 10 s and burst must stay below 1.8e10 (2^64 / 1e9). </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox11TokenBucket9unlimitedEv">
+<span id="_CPPv3NK4vnet8blackbox11TokenBucket9unlimitedEv"></span><span id="_CPPv2NK4vnet8blackbox11TokenBucket9unlimitedEv"></span><span id="vnet::blackbox::TokenBucket::unlimitedC"></span><span class="target" id="classvnet_1_1blackbox_1_1TokenBucket_1a8577e16b9ec7751a755048b916ed67cb"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">unlimited</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox11TokenBucket9unlimitedEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox11TokenBucket4rateEv">
+<span id="_CPPv3NK4vnet8blackbox11TokenBucket4rateEv"></span><span id="_CPPv2NK4vnet8blackbox11TokenBucket4rateEv"></span><span id="vnet::blackbox::TokenBucket::rateC"></span><span class="target" id="classvnet_1_1blackbox_1_1TokenBucket_1a2cfe4bac4ec210c098b83fa0cba40e3d"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rate</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox11TokenBucket4rateEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12RoutingTableE">
+<span id="_CPPv3N4vnet8blackbox12RoutingTableE"></span><span id="_CPPv2N4vnet8blackbox12RoutingTableE"></span><span id="vnet::blackbox::RoutingTable"></span><span class="target" id="classvnet_1_1blackbox_1_1RoutingTable"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RoutingTable</span></span></span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12RoutingTableE" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;routing_table.hpp&gt;</em></div>
+<p>Maintains the next-hop switch for each destination IPv4 address that is not owned by a local agent. </p>
+<p>Populated from the SWITCH_ROUTE_UPDATE messages the conductor broadcasts when an agent registers, and emptied by AGENT_UNREGISTERED and SWITCH_DISCONNECTED.</p>
+<p>Thread safety: NOT thread-safe. Single-threaded event loop. </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12RoutingTable9set_routeE8uint32_ti">
+<span id="_CPPv3N4vnet8blackbox12RoutingTable9set_routeE8uint32_ti"></span><span id="_CPPv2N4vnet8blackbox12RoutingTable9set_routeE8uint32_ti"></span><span id="vnet::blackbox::RoutingTable::set_route__uint32_t.i"></span><span class="target" id="classvnet_1_1blackbox_1_1RoutingTable_1ad5fcfd39dcf7cf79d22b73a083c34c9c"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">set_route</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dest_ipv4</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">next_switch_fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12RoutingTable9set_routeE8uint32_ti" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Set or update the next-hop for a destination IPv4. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dest_ipv4</strong> – Target IP in network order. </p></li>
+<li><p><strong>next_switch_fd</strong> – The fd of the TCP connection to the next switch to forward packets to. </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12RoutingTable12remove_routeE8uint32_t">
+<span id="_CPPv3N4vnet8blackbox12RoutingTable12remove_routeE8uint32_t"></span><span id="_CPPv2N4vnet8blackbox12RoutingTable12remove_routeE8uint32_t"></span><span id="vnet::blackbox::RoutingTable::remove_route__uint32_t"></span><span class="target" id="classvnet_1_1blackbox_1_1RoutingTable_1a6f14d15470f066c3a9ce0d0512f7a428"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">remove_route</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dest_ipv4</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12RoutingTable12remove_routeE8uint32_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Remove a route. </p>
+<p>Called when the conductor withdraws an agent (AGENT_UNREGISTERED) or when a switch-to-switch connection drops. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12RoutingTable24remove_routes_for_switchEi">
+<span id="_CPPv3N4vnet8blackbox12RoutingTable24remove_routes_for_switchEi"></span><span id="_CPPv2N4vnet8blackbox12RoutingTable24remove_routes_for_switchEi"></span><span id="vnet::blackbox::RoutingTable::remove_routes_for_switch__i"></span><span class="target" id="classvnet_1_1blackbox_1_1RoutingTable_1a57955de780a80cecece795832357062d"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">remove_routes_for_switch</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">switch_fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12RoutingTable24remove_routes_for_switchEi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Remove all routes that point to a specific switch fd. </p>
+<p>Called when a switch-to-switch connection drops. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12RoutingTable8retargetEii">
+<span id="_CPPv3N4vnet8blackbox12RoutingTable8retargetEii"></span><span id="_CPPv2N4vnet8blackbox12RoutingTable8retargetEii"></span><span id="vnet::blackbox::RoutingTable::retarget__i.i"></span><span class="target" id="classvnet_1_1blackbox_1_1RoutingTable_1af72f668ae86e55b554e8fe1e49f55c55"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">retarget</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">old_fd</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">new_fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12RoutingTable8retargetEii" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Point every route that used old_fd at new_fd. </p>
+<p>Used when two peer dials collapse onto one socket. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox12RoutingTable6lookupE8uint32_t">
+<span id="_CPPv3NK4vnet8blackbox12RoutingTable6lookupE8uint32_t"></span><span id="_CPPv2NK4vnet8blackbox12RoutingTable6lookupE8uint32_t"></span><span id="vnet::blackbox::RoutingTable::lookup__uint32_tC"></span><span class="target" id="classvnet_1_1blackbox_1_1RoutingTable_1a769b9ff14055b0994860bc659b315f91"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">lookup</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dest_ipv4</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox12RoutingTable6lookupE8uint32_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Look up the next-hop fd for a destination IPv4. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The switch fd, or -1 if no route exists. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK4vnet8blackbox12RoutingTable4sizeEv">
+<span id="_CPPv3NK4vnet8blackbox12RoutingTable4sizeEv"></span><span id="_CPPv2NK4vnet8blackbox12RoutingTable4sizeEv"></span><span id="vnet::blackbox::RoutingTable::sizeC"></span><span class="target" id="classvnet_1_1blackbox_1_1RoutingTable_1affacc5541bb2663baf4dde9303553a21"></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">size</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4vnet8blackbox12RoutingTable4sizeEv" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Number of entries in the table. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4vnet8blackbox12RoutingTable5clearEv">
+<span id="_CPPv3N4vnet8blackbox12RoutingTable5clearEv"></span><span id="_CPPv2N4vnet8blackbox12RoutingTable5clearEv"></span><span id="vnet::blackbox::RoutingTable::clear"></span><span class="target" id="classvnet_1_1blackbox_1_1RoutingTable_1afd81b43031947e705d5e3e190deef7e1"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">clear</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4vnet8blackbox12RoutingTable5clearEv" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/api/blackbox.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

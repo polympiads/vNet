@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Common functions &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="vnet::tls" href="tls.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">C++ API reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="blackbox.html">vnet::blackbox</a></li>
+<li class="toctree-l2"><a class="reference internal" href="netqueue.html">vnet::netqueue</a></li>
+<li class="toctree-l2"><a class="reference internal" href="protocol.html">vnet::protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tls.html">vnet::tls</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Common functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#bypass-h">bypass.h</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv412parse_bypassRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc"><code class="docutils literal notranslate"><span class="pre">parse_bypass()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv416load_bypass_fileRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc"><code class="docutils literal notranslate"><span class="pre">load_bypass_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv410BypassRule"><code class="docutils literal notranslate"><span class="pre">BypassRule</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N10BypassRule4KindE"><code class="docutils literal notranslate"><span class="pre">Kind</span></code></a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#_CPPv4N10BypassRule4Kind5ROUTEE"><code class="docutils literal notranslate"><span class="pre">ROUTE</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#_CPPv4N10BypassRule4Kind2INE"><code class="docutils literal notranslate"><span class="pre">IN</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#_CPPv4N10BypassRule4Kind3OUTE"><code class="docutils literal notranslate"><span class="pre">OUT</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#_CPPv4N10BypassRule4Kind3IN6E"><code class="docutils literal notranslate"><span class="pre">IN6</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#_CPPv4N10BypassRule4Kind4OUT6E"><code class="docutils literal notranslate"><span class="pre">OUT6</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N10BypassRule4kindE"><code class="docutils literal notranslate"><span class="pre">kind</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N10BypassRule4cidrE"><code class="docutils literal notranslate"><span class="pre">cidr</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N10BypassRule4addrE"><code class="docutils literal notranslate"><span class="pre">addr</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N10BypassRule6prefixE"><code class="docutils literal notranslate"><span class="pre">prefix</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N10BypassRule4argsE"><code class="docutils literal notranslate"><span class="pre">args</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#config-h">config.h</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv413MachineConfig"><code class="docutils literal notranslate"><span class="pre">MachineConfig</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N13MachineConfig2ipE"><code class="docutils literal notranslate"><span class="pre">ip</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#_CPPv4N13MachineConfig4portE"><code class="docutils literal notranslate"><span class="pre">port</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#socket-utils-h">socket_utils.h</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv410connect_toRK13MachineConfig"><code class="docutils literal notranslate"><span class="pre">connect_to()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv413connect_startRKNSt6stringE8uint16_t"><code class="docutils literal notranslate"><span class="pre">connect_start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv412resolve_ipv4RKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">resolve_ipv4()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv415set_nonblockingi"><code class="docutils literal notranslate"><span class="pre">set_nonblocking()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv412set_blockingi"><code class="docutils literal notranslate"><span class="pre">set_blocking()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv418set_socket_timeoutii"><code class="docutils literal notranslate"><span class="pre">set_socket_timeout()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv412read_n_bytesiPv6size_tP6ssl_st"><code class="docutils literal notranslate"><span class="pre">read_n_bytes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv413write_n_bytesiPKv6size_tP6ssl_st"><code class="docutils literal notranslate"><span class="pre">write_n_bytes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv420send_protobuf_packetiN4vnet8protocol10PacketTypeERKN6google8protobuf7MessageEP6ssl_st"><code class="docutils literal notranslate"><span class="pre">send_protobuf_packet()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv420read_protobuf_packetiN4vnet8protocol10PacketTypeERN6google8protobuf7MessageEP6ssl_st"><code class="docutils literal notranslate"><span class="pre">read_protobuf_packet()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv415read_raw_packetiRN4vnet8protocol10PacketTypeERNSt6vectorIcEE"><code class="docutils literal notranslate"><span class="pre">read_raw_packet()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv414send_heartbeati"><code class="docutils literal notranslate"><span class="pre">send_heartbeat()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv414ipv4_to_string8uint32_t"><code class="docutils literal notranslate"><span class="pre">ipv4_to_string()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv414string_to_ipv4RKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">string_to_ipv4()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv418read_default_routeRNSt6stringER8uint32_t"><code class="docutils literal notranslate"><span class="pre">read_default_route()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#sysutil-h">sysutil.h</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv411run_programRKNSt6vectorINSt6stringEEEPKcb"><code class="docutils literal notranslate"><span class="pre">run_program()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv47env_intPKcllRl"><code class="docutils literal notranslate"><span class="pre">env_int()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv46env_orPKcRKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">env_or()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv410valid_nameRKNSt6stringE6size_t"><code class="docutils literal notranslate"><span class="pre">valid_name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv410parse_cidrRKNSt6stringER8uint32_tRi"><code class="docutils literal notranslate"><span class="pre">parse_cidr()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv413load_auth_keyPKcPKc"><code class="docutils literal notranslate"><span class="pre">load_auth_key()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv414AGENT_NAME_MAX"><code class="docutils literal notranslate"><span class="pre">AGENT_NAME_MAX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv415SWITCH_NAME_MAX"><code class="docutils literal notranslate"><span class="pre">SWITCH_NAME_MAX</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#tun-h">tun.h</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv48tun_openRKNSt6stringE8uint32_t7uint8_t"><code class="docutils literal notranslate"><span class="pre">tun_open()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv49tun_closeiRKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">tun_close()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="common-functions">
+<h1>Common functions<a class="headerlink" href="#common-functions" title="Link to this heading">¶</a></h1>
+<p>Headers in <code class="docutils literal notranslate"><span class="pre">include/common</span></code>, in the global namespace.</p>
+<section id="bypass-h">
+<h2>bypass.h<a class="headerlink" href="#bypass-h" title="Link to this heading">¶</a></h2>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv412parse_bypassRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc">
+<span id="_CPPv312parse_bypassRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc"></span><span id="_CPPv212parse_bypassRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc"></span><span id="parse_bypass__ssCR.ssCR.std::vector:BypassRule:R.cCP"></span><span class="target" id="bypass_8h_1a379a7a3ea9a5cc53c66a21ef6375ffba"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">parse_bypass</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">text</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">overlay_cidr</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv410BypassRule" title="BypassRule"><span class="n"><span class="pre">BypassRule</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">rules</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">tag</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv412parse_bypassRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Parse the text of a bypass file. </p>
+<p>Every line must parse for the call to succeed; the first bad line is reported on stderr with its number. A route prefix must not be 0.0.0.0/0 (that would undo the default route through the TUN) and must not overlap the overlay prefix (that would take the overlay off the TUN).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>text</strong> – The whole file. </p></li>
+<li><p><strong>overlay_cidr</strong> – The overlay prefix, a.b.c.d/n. </p></li>
+<li><p><strong>rules</strong> – Receives the rules, in file order, on success. </p></li>
+<li><p><strong>tag</strong> – Log prefix such as “[Agent]”. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true when every line parsed. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv416load_bypass_fileRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc">
+<span id="_CPPv316load_bypass_fileRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc"></span><span id="_CPPv216load_bypass_fileRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc"></span><span id="load_bypass_file__ssCR.ssCR.std::vector:BypassRule:R.cCP"></span><span class="target" id="bypass_8h_1a92002985d315083291fe72fa1c07fc76"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">load_bypass_file</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">path</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">overlay_cidr</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv410BypassRule" title="BypassRule"><span class="n"><span class="pre">BypassRule</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">rules</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">tag</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv416load_bypass_fileRKNSt6stringERKNSt6stringERNSt6vectorI10BypassRuleEEPKc" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Read and parse a bypass file. </p>
+<p>A file that cannot be opened is an error, so a wrong path cannot silently leave a machine without its exceptions. </p>
+</dd></dl>
+
+</div>
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv410BypassRule">
+<span id="_CPPv310BypassRule"></span><span id="_CPPv210BypassRule"></span><span id="BypassRule"></span><span class="target" id="structBypassRule"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">BypassRule</span></span></span><a class="headerlink" href="#_CPPv410BypassRule" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;bypass.h&gt;</em></div>
+<p>The bypass file of an agent (VNET_BYPASS_FILE): what stays on the physical network while the agent is joined. </p>
+<p>Blank lines and lines starting with ‘#’ are ignored. Three kinds of lines:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>*   route a.b.c.d/n
+*     The prefix keeps going through the physical gateway instead of the
+*     TUN, and under lockdown it is allowed in both directions on every
+*     port. A bare address is a /32.
+*
+*   out &lt;iptables arguments&gt;
+*   in  &lt;iptables arguments&gt;
+*     A rule appended to the lockdown chain VNET_OUT or VNET_IN, before
+*     the final DROP, exactly as written: &quot;in -p tcp -s 10.20.0.0/16
+*     --dport 22443 -j ACCEPT&quot;. The arguments are split on whitespace and
+*     handed to iptables without a shell. Without lockdown they do
+*     nothing.
+*
+*   out6 &lt;ip6tables arguments&gt;
+*   in6  &lt;ip6tables arguments&gt;
+*     The same for IPv6, which lockdown otherwise blocks entirely.
+*
+</pre></div>
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
+<dl class="cpp enum">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4KindE">
+<span id="_CPPv3N10BypassRule4KindE"></span><span id="_CPPv2N10BypassRule4KindE"></span><span class="target" id="structBypassRule_1a2386aeeffec36616661c13b9b9a8c6a8"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Kind</span></span></span><a class="headerlink" href="#_CPPv4N10BypassRule4KindE" title="Link to this definition">¶</a><br /></dt>
+<dd><p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4Kind5ROUTEE">
+<span id="_CPPv3N10BypassRule4Kind5ROUTEE"></span><span id="_CPPv2N10BypassRule4Kind5ROUTEE"></span><span class="target" id="structBypassRule_1a2386aeeffec36616661c13b9b9a8c6a8a9691d0a3e60076237366558bd007bb6c"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ROUTE</span></span></span><a class="headerlink" href="#_CPPv4N10BypassRule4Kind5ROUTEE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4Kind2INE">
+<span id="_CPPv3N10BypassRule4Kind2INE"></span><span id="_CPPv2N10BypassRule4Kind2INE"></span><span class="target" id="structBypassRule_1a2386aeeffec36616661c13b9b9a8c6a8ae7e58308e44fe8e27cb90ce68347339e"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IN</span></span></span><a class="headerlink" href="#_CPPv4N10BypassRule4Kind2INE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4Kind3OUTE">
+<span id="_CPPv3N10BypassRule4Kind3OUTE"></span><span id="_CPPv2N10BypassRule4Kind3OUTE"></span><span class="target" id="structBypassRule_1a2386aeeffec36616661c13b9b9a8c6a8a3e2cca40c22ec211d97afe0bb4256827"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OUT</span></span></span><a class="headerlink" href="#_CPPv4N10BypassRule4Kind3OUTE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4Kind3IN6E">
+<span id="_CPPv3N10BypassRule4Kind3IN6E"></span><span id="_CPPv2N10BypassRule4Kind3IN6E"></span><span class="target" id="structBypassRule_1a2386aeeffec36616661c13b9b9a8c6a8a4c9e34e90f0cbcf7a33760ba5948b56a"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IN6</span></span></span><a class="headerlink" href="#_CPPv4N10BypassRule4Kind3IN6E" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4Kind4OUT6E">
+<span id="_CPPv3N10BypassRule4Kind4OUT6E"></span><span id="_CPPv2N10BypassRule4Kind4OUT6E"></span><span class="target" id="structBypassRule_1a2386aeeffec36616661c13b9b9a8c6a8a67921b8fdbb2df7e9afe568226cb1e0b"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OUT6</span></span></span><a class="headerlink" href="#_CPPv4N10BypassRule4Kind4OUT6E" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4kindE">
+<span id="_CPPv3N10BypassRule4kindE"></span><span id="_CPPv2N10BypassRule4kindE"></span><span id="BypassRule::kind__Kind"></span><span class="target" id="structBypassRule_1a007c6e8aaae03764f25ff7cce33facc4"></span><a class="reference internal" href="#_CPPv4N10BypassRule4KindE" title="BypassRule::Kind"><span class="n"><span class="pre">Kind</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kind</span></span></span><a class="headerlink" href="#_CPPv4N10BypassRule4kindE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4cidrE">
+<span id="_CPPv3N10BypassRule4cidrE"></span><span id="_CPPv2N10BypassRule4cidrE"></span><span id="BypassRule::cidr__ss"></span><span class="target" id="structBypassRule_1a012c46c760d5994eb84966bae6d0f578"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">cidr</span></span></span><a class="headerlink" href="#_CPPv4N10BypassRule4cidrE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>ROUTE: the prefix as written, normalized to a.b.c.d/n. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4addrE">
+<span id="_CPPv3N10BypassRule4addrE"></span><span id="_CPPv2N10BypassRule4addrE"></span><span id="BypassRule::addr__uint32_t"></span><span class="target" id="structBypassRule_1aead7e0febb0d92e7b21a98845d126d83"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">addr</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N10BypassRule4addrE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>ROUTE: the prefix in network order and its length. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule6prefixE">
+<span id="_CPPv3N10BypassRule6prefixE"></span><span id="_CPPv2N10BypassRule6prefixE"></span><span id="BypassRule::prefix__i"></span><span class="target" id="structBypassRule_1a786af0bff6b947488a41e4afb60b43f0"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">prefix</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N10BypassRule6prefixE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10BypassRule4argsE">
+<span id="_CPPv3N10BypassRule4argsE"></span><span id="_CPPv2N10BypassRule4argsE"></span><span id="BypassRule::args__std::vector:ss:"></span><span class="target" id="structBypassRule_1a5339b8255e032741acc8c6b4f5f47336"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">args</span></span></span><a class="headerlink" href="#_CPPv4N10BypassRule4argsE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>IN, OUT, IN6, OUT6: the iptables arguments. </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+</section>
+<section id="config-h">
+<h2>config.h<a class="headerlink" href="#config-h" title="Link to this heading">¶</a></h2>
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv413MachineConfig">
+<span id="_CPPv313MachineConfig"></span><span id="_CPPv213MachineConfig"></span><span id="MachineConfig"></span><span class="target" id="structMachineConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MachineConfig</span></span></span><a class="headerlink" href="#_CPPv413MachineConfig" title="Link to this definition">¶</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;config.h&gt;</em></div>
+<p>Generic machine configuration (IP + port). </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N13MachineConfig2ipE">
+<span id="_CPPv3N13MachineConfig2ipE"></span><span id="_CPPv2N13MachineConfig2ipE"></span><span id="MachineConfig::ip__ss"></span><span class="target" id="structMachineConfig_1aac75b4d7eef95e719f231e19b3d6fc82"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ip</span></span></span><a class="headerlink" href="#_CPPv4N13MachineConfig2ipE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>The IP address of the conductor. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N13MachineConfig4portE">
+<span id="_CPPv3N13MachineConfig4portE"></span><span id="_CPPv2N13MachineConfig4portE"></span><span id="MachineConfig::port__uint16_t"></span><span class="target" id="structMachineConfig_1ad2f27abe82340cdd0385ff3e34ce36aa"></span><span class="n"><span class="pre">uint16_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">port</span></span></span><a class="headerlink" href="#_CPPv4N13MachineConfig4portE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>The port number of the conductor. </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+</section>
+<section id="socket-utils-h">
+<h2>socket_utils.h<a class="headerlink" href="#socket-utils-h" title="Link to this heading">¶</a></h2>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv410connect_toRK13MachineConfig">
+<span id="_CPPv310connect_toRK13MachineConfig"></span><span id="_CPPv210connect_toRK13MachineConfig"></span><span id="connect_to__MachineConfigCR"></span><span class="target" id="socket__utils_8h_1a725fec36c6b1c922d977f37d76942c28"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">connect_to</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv413MachineConfig" title="MachineConfig"><span class="n"><span class="pre">MachineConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">mc</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv410connect_toRK13MachineConfig" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Connect to another machine using <a class="reference internal" href="#structMachineConfig"><span class="std std-ref">MachineConfig</span></a> (blocking). </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>socket fd on success, -1 on failure. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv413connect_startRKNSt6stringE8uint16_t">
+<span id="_CPPv313connect_startRKNSt6stringE8uint16_t"></span><span id="_CPPv213connect_startRKNSt6stringE8uint16_t"></span><span id="connect_start__ssCR.uint16_t"></span><span class="target" id="socket__utils_8h_1a663dda12623a514231159afb88f1b9a3"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">connect_start</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">host</span></span>, <span class="n"><span class="pre">uint16_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">port</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv413connect_startRKNSt6stringE8uint16_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Start a non-blocking connect to host:port (IPv4; host may be a name). </p>
+<p>The connect may still be in progress when this returns; NetQueue::put_sck_connecting finishes it. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the socket fd, or -1 when the name does not resolve or the connect fails at once. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv412resolve_ipv4RKNSt6stringE">
+<span id="_CPPv312resolve_ipv4RKNSt6stringE"></span><span id="_CPPv212resolve_ipv4RKNSt6stringE"></span><span id="resolve_ipv4__ssCR"></span><span class="target" id="socket__utils_8h_1a1370d9ec2d2b7300314d7cf9a73285ad"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">resolve_ipv4</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">host</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv412resolve_ipv4RKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Resolve an IPv4 address or host name to an address in network order; 0 when it does not resolve. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv415set_nonblockingi">
+<span id="_CPPv315set_nonblockingi"></span><span id="_CPPv215set_nonblockingi"></span><span id="set_nonblocking__i"></span><span class="target" id="socket__utils_8h_1a7b49eacb9a0fc550f4b38302b3957e21"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">set_nonblocking</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv415set_nonblockingi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Set a file descriptor to non-blocking mode. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>true on success. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv412set_blockingi">
+<span id="_CPPv312set_blockingi"></span><span id="_CPPv212set_blockingi"></span><span id="set_blocking__i"></span><span class="target" id="socket__utils_8h_1a10f56c1e8b2fb4546ac26863b0cde0c4"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">set_blocking</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv412set_blockingi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Clear O_NONBLOCK so a TLS handshake can run to completion. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv418set_socket_timeoutii">
+<span id="_CPPv318set_socket_timeoutii"></span><span id="_CPPv218set_socket_timeoutii"></span><span id="set_socket_timeout__i.i"></span><span class="target" id="socket__utils_8h_1a8a09b5e9c04da64f1fe11c86b9532087"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">set_socket_timeout</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ms</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv418set_socket_timeoutii" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Bound each blocking read and write on fd to ms milliseconds; 0 removes the bound. </p>
+<p>Used around blocking TLS handshakes so a silent peer cannot hold an event loop. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>true on success. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv412read_n_bytesiPv6size_tP6ssl_st">
+<span id="_CPPv312read_n_bytesiPv6size_tP6ssl_st"></span><span id="_CPPv212read_n_bytesiPv6size_tP6ssl_st"></span><span id="read_n_bytes__i.voidP.s.ssl_stP"></span><span class="target" id="socket__utils_8h_1af8f447c94daa77596a2b15a78648690f"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read_n_bytes</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">sock</span></span>, <span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">buffer</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">n</span></span>, <span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">nullptr</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv412read_n_bytesiPv6size_tP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Read exactly n bytes from a socket (blocking). </p>
+<p>ssl, when set, reads through that finished TLS session. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv413write_n_bytesiPKv6size_tP6ssl_st">
+<span id="_CPPv313write_n_bytesiPKv6size_tP6ssl_st"></span><span id="_CPPv213write_n_bytesiPKv6size_tP6ssl_st"></span><span id="write_n_bytes__i.voidCP.s.ssl_stP"></span><span class="target" id="socket__utils_8h_1a0d6d8ee03426e190864bb110ce6234a0"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write_n_bytes</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">sock</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">buffer</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">n</span></span>, <span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">nullptr</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv413write_n_bytesiPKv6size_tP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Write exactly n bytes to a socket. </p>
+<p>Handles EAGAIN for non-blocking fds via retry. ssl, when set, writes through that finished TLS session. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv420send_protobuf_packetiN4vnet8protocol10PacketTypeERKN6google8protobuf7MessageEP6ssl_st">
+<span id="_CPPv320send_protobuf_packetiN4vnet8protocol10PacketTypeERKN6google8protobuf7MessageEP6ssl_st"></span><span id="_CPPv220send_protobuf_packetiN4vnet8protocol10PacketTypeERKN6google8protobuf7MessageEP6ssl_st"></span><span id="send_protobuf_packet__i.vnet::protocol::PacketType.google::protobuf::MessageCR.ssl_stP"></span><span class="target" id="socket__utils_8h_1aeba58ba1d4a22c991c2c9dae551e4cfc"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">send_protobuf_packet</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">sock</span></span>, <span class="n"><span class="pre">vnet</span></span><span class="p"><span class="pre">::</span></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocolE" title="vnet::protocol"><span class="n"><span class="pre">protocol</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">type</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">google</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">protobuf</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Message</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">msg</span></span>, <span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">nullptr</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv420send_protobuf_packetiN4vnet8protocol10PacketTypeERKN6google8protobuf7MessageEP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Send a protobuf message with the 6-byte packet header. </p>
+<p>Wire format: [4-byte payload_size (network order)] [2-byte packet_type (network order)] [protobuf payload bytes]</p>
+<p>payload_size = sizeof(packet_type) + protobuf_size but we store it as just protobuf_size since the header struct stores both fields and NetQueue reads header first.</p>
+<p>IMPORTANT: payload_size in the header is the number of bytes AFTER the 6-byte header, matching NetQueue::process(). </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv420read_protobuf_packetiN4vnet8protocol10PacketTypeERN6google8protobuf7MessageEP6ssl_st">
+<span id="_CPPv320read_protobuf_packetiN4vnet8protocol10PacketTypeERN6google8protobuf7MessageEP6ssl_st"></span><span id="_CPPv220read_protobuf_packetiN4vnet8protocol10PacketTypeERN6google8protobuf7MessageEP6ssl_st"></span><span id="read_protobuf_packet__i.vnet::protocol::PacketType.google::protobuf::MessageR.ssl_stP"></span><span class="target" id="socket__utils_8h_1af6efc5feedae347cb0929afbe2c1f231"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read_protobuf_packet</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">sock</span></span>, <span class="n"><span class="pre">vnet</span></span><span class="p"><span class="pre">::</span></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocolE" title="vnet::protocol"><span class="n"><span class="pre">protocol</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">expected_type</span></span>, <span class="n"><span class="pre">google</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">protobuf</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Message</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">msg</span></span>, <span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="n"><span class="pre">ssl_st</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">ssl</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">nullptr</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv420read_protobuf_packetiN4vnet8protocol10PacketTypeERN6google8protobuf7MessageEP6ssl_st" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Read a protobuf message with the 6-byte packet header (blocking). </p>
+<p>Reads the full header, skips heartbeats, verifies the packet type, then reads and parses the protobuf payload.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sock</strong> – The connected socket. </p></li>
+<li><p><strong>expected_type</strong> – The type the packet must have; any other type makes the call fail. </p></li>
+<li><p><strong>msg</strong> – Receives the parsed payload. </p></li>
+<li><p><strong>ssl</strong> – The TLS session of the socket, or nullptr. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true when a packet of expected_type was read and parsed. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv415read_raw_packetiRN4vnet8protocol10PacketTypeERNSt6vectorIcEE">
+<span id="_CPPv315read_raw_packetiRN4vnet8protocol10PacketTypeERNSt6vectorIcEE"></span><span id="_CPPv215read_raw_packetiRN4vnet8protocol10PacketTypeERNSt6vectorIcEE"></span><span id="read_raw_packet__i.vnet::protocol::PacketTypeR.std::vector:c:R"></span><span class="target" id="socket__utils_8h_1aa1a40ab73b10c6b68657b4f799f2b8d2"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read_raw_packet</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">sock</span></span>, <span class="n"><span class="pre">vnet</span></span><span class="p"><span class="pre">::</span></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocolE" title="vnet::protocol"><span class="n"><span class="pre">protocol</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="protocol.html#_CPPv4N4vnet8protocol10PacketTypeE" title="vnet::protocol::PacketType"><span class="n"><span class="pre">PacketType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">type</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">char</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">buffer</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv415read_raw_packetiRN4vnet8protocol10PacketTypeERNSt6vectorIcEE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Read a packet header and payload, returning the type. </p>
+<p>Useful when you don’t know the packet type in advance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sock</strong> – The connected socket. </p></li>
+<li><p><strong>type</strong> – Receives the packet type. </p></li>
+<li><p><strong>buffer</strong> – Receives the payload bytes; its size is the payload size. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true on success. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv414send_heartbeati">
+<span id="_CPPv314send_heartbeati"></span><span id="_CPPv214send_heartbeati"></span><span id="send_heartbeat__i"></span><span class="target" id="socket__utils_8h_1a55cb52d71b12cdaa59726fe9f5b64e3a"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">send_heartbeat</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">sock</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv414send_heartbeati" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Send a heartbeat (header-only, zero-length payload). </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv414ipv4_to_string8uint32_t">
+<span id="_CPPv314ipv4_to_string8uint32_t"></span><span id="_CPPv214ipv4_to_string8uint32_t"></span><span id="ipv4_to_string__uint32_t"></span><span class="target" id="socket__utils_8h_1aa203ad9d9f669d3847c9f4ee8ff97bae"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ipv4_to_string</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ipv4</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv414ipv4_to_string8uint32_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Convert a network-order uint32_t IPv4 to string. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv414string_to_ipv4RKNSt6stringE">
+<span id="_CPPv314string_to_ipv4RKNSt6stringE"></span><span id="_CPPv214string_to_ipv4RKNSt6stringE"></span><span id="string_to_ipv4__ssCR"></span><span class="target" id="socket__utils_8h_1a6bea0f4ea7e8825503457a9ef06ccae2"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">string_to_ipv4</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ip</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv414string_to_ipv4RKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Convert an IPv4 string to network-order uint32_t. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv418read_default_routeRNSt6stringER8uint32_t">
+<span id="_CPPv318read_default_routeRNSt6stringER8uint32_t"></span><span id="_CPPv218read_default_routeRNSt6stringER8uint32_t"></span><span id="read_default_route__ssR.uint32_tR"></span><span class="target" id="socket__utils_8h_1a817c58dbaeaeb4f83b0d95deebf3604f"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read_default_route</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">iface</span></span>, <span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">gateway_nbo</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv418read_default_routeRNSt6stringER8uint32_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Read the IPv4 default route from /proc/net/route. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>iface</strong> – Receives the outbound interface name. </p></li>
+<li><p><strong>gateway_nbo</strong> – Receives the gateway address in network order. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true when a default route exists. </p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</section>
+<section id="sysutil-h">
+<h2>sysutil.h<a class="headerlink" href="#sysutil-h" title="Link to this heading">¶</a></h2>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv411run_programRKNSt6vectorINSt6stringEEEPKcb">
+<span id="_CPPv311run_programRKNSt6vectorINSt6stringEEEPKcb"></span><span id="_CPPv211run_programRKNSt6vectorINSt6stringEEEPKcb"></span><span id="run_program__std::vector:ss:CR.cCP.b"></span><span class="target" id="sysutil_8h_1a5b67d4541f53938d6a7c7da3dab42b91"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">run_program</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">argv</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">tag</span></span>, <span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">quiet</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv411run_programRKNSt6vectorINSt6stringEEEPKcb" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Run a program with the given argument vector and wait for it. </p>
+<p>The program is found through PATH; no shell is involved, so the arguments are never interpreted.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>argv</strong> – Program name followed by its arguments. </p></li>
+<li><p><strong>tag</strong> – Log prefix such as “[Agent]” for the failure message. </p></li>
+<li><p><strong>quiet</strong> – Discard the program’s output and log nothing on failure; for probes whose failure is an expected answer. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true when the program exited with status 0. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv47env_intPKcllRl">
+<span id="_CPPv37env_intPKcllRl"></span><span id="_CPPv27env_intPKcllRl"></span><span id="env_int__cCP.l.l.lR"></span><span class="target" id="sysutil_8h_1a65517bd1e55c02640513445f01033c91"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">env_int</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">name</span></span>, <span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">min</span></span>, <span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max</span></span>, <span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv47env_intPKcllRl" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Read an integer setting from the environment. </p>
+<p>Unset: value is left unchanged and true is returned. Set and within [min, max]: value is updated and true is returned. Otherwise an error naming the variable is printed and false is returned. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv46env_orPKcRKNSt6stringE">
+<span id="_CPPv36env_orPKcRKNSt6stringE"></span><span id="_CPPv26env_orPKcRKNSt6stringE"></span><span id="env_or__cCP.ssCR"></span><span class="target" id="sysutil_8h_1a80abb92e38ca487f5b7ab177dde1819e"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">env_or</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">name</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">def</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv46env_orPKcRKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Read a string setting from the environment, or def when unset. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv410valid_nameRKNSt6stringE6size_t">
+<span id="_CPPv310valid_nameRKNSt6stringE6size_t"></span><span id="_CPPv210valid_nameRKNSt6stringE6size_t"></span><span id="valid_name__ssCR.s"></span><span class="target" id="sysutil_8h_1a9afaed58f19cca3e811962144e15a758"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">valid_name</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_len</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv410valid_nameRKNSt6stringE6size_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>A machine name: 1 to max_len characters from [A-Za-z0-9_-]. </p>
+<p>Agent names are limited to 10 characters, since “vnet-” plus the name must fit the 15-character interface name limit. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv410parse_cidrRKNSt6stringER8uint32_tRi">
+<span id="_CPPv310parse_cidrRKNSt6stringER8uint32_tRi"></span><span id="_CPPv210parse_cidrRKNSt6stringER8uint32_tRi"></span><span id="parse_cidr__ssCR.uint32_tR.iR"></span><span class="target" id="sysutil_8h_1a5205a92eb8e967b754e2b68255e76ace"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">parse_cidr</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">text</span></span>, <span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">addr</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">prefix</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv410parse_cidrRKNSt6stringER8uint32_tRi" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Parse “a.b.c.d/n”. </p>
+<p>addr is returned in network order, prefix in [0, 32]. A bare address is accepted as /32. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv413load_auth_keyPKcPKc">
+<span id="_CPPv313load_auth_keyPKcPKc"></span><span id="_CPPv213load_auth_keyPKcPKc"></span><span id="load_auth_key__cCP.cCP"></span><span class="target" id="sysutil_8h_1ad479f3c34eebbc41722cbb7d8723c4cf"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">load_auth_key</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">argv_key</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">tag</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv413load_auth_keyPKcPKc" title="Link to this definition">¶</a><br /></dt>
+<dd><p>The shared secret of this machine: VNET_AUTH_KEY, or the first line of the file named by VNET_AUTH_KEY_FILE, or the command-line fallback. </p>
+<p>Empty when none is available. </p>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-variables">Variables</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv414AGENT_NAME_MAX">
+<span id="_CPPv314AGENT_NAME_MAX"></span><span id="_CPPv214AGENT_NAME_MAX"></span><span id="AGENT_NAME_MAX__sC"></span><span class="target" id="sysutil_8h_1a20e7bb409343d690444c6452f663e0c7"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AGENT_NAME_MAX</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">10</span></span><a class="headerlink" href="#_CPPv414AGENT_NAME_MAX" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv415SWITCH_NAME_MAX">
+<span id="_CPPv315SWITCH_NAME_MAX"></span><span id="_CPPv215SWITCH_NAME_MAX"></span><span id="SWITCH_NAME_MAX__sC"></span><span class="target" id="sysutil_8h_1afa247e0c5ba846fe855fd90d4e49e631"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SWITCH_NAME_MAX</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">32</span></span><a class="headerlink" href="#_CPPv415SWITCH_NAME_MAX" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</section>
+<section id="tun-h">
+<h2>tun.h<a class="headerlink" href="#tun-h" title="Link to this heading">¶</a></h2>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv48tun_openRKNSt6stringE8uint32_t7uint8_t">
+<span id="_CPPv38tun_openRKNSt6stringE8uint32_t7uint8_t"></span><span id="_CPPv28tun_openRKNSt6stringE8uint32_t7uint8_t"></span><span id="tun_open__ssCR.uint32_t.uint8_t"></span><span class="target" id="tun_8h_1ab2b0b824b55907577de8f0d5906dda9d"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">tun_open</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span>, <span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ipv4</span></span>, <span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">prefix_len</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">24</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv48tun_openRKNSt6stringE8uint32_t7uint8_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Open a TUN device and configure it. </p>
+<p>Creates a TUN interface with the given name, assigns the given IPv4 address with a /24 prefix, and brings the interface up.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> – Interface name (e.g. “vnet0”). Max 15 chars. </p></li>
+<li><p><strong>ipv4</strong> – Virtual IPv4 address in network order. </p></li>
+<li><p><strong>prefix_len</strong> – Subnet prefix length (default 24 = /24). </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>File descriptor for the TUN device, or -1 on failure. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv49tun_closeiRKNSt6stringE">
+<span id="_CPPv39tun_closeiRKNSt6stringE"></span><span id="_CPPv29tun_closeiRKNSt6stringE"></span><span id="tun_close__i.ssCR"></span><span class="target" id="tun_8h_1a2fdaf72da9060fbf7c3ef7dd00459e10"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">tun_close</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fd</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv49tun_closeiRKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Bring the interface down and close the TUN device. </p>
+<p>Pass fd &lt; 0 when something else owns and closes the descriptor. </p>
+</dd></dl>
+
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/api/common.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

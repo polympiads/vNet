@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Your first event &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Prepare an event" href="../guides/prepare-event.html" />
+    <link rel="prev" title="Try vNet with Docker" href="docker.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Your first event</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#the-plan">The plan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#install-vnet">1. Install vNet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#write-the-roster">2. Write the roster</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#generate-the-files">3. Generate the files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#put-the-files-on-the-machines">4. Put the files on the machines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#start-the-services">5. Start the services</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#check">6. Check</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next steps</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">C++ API reference</a></li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="your-first-event">
+<h1>Your first event<a class="headerlink" href="#your-first-event" title="Link to this heading">¶</a></h1>
+<p>This tutorial takes a small event from nothing to running: one conductor,
+two switches, one judge machine and two contestant machines. A larger
+event is the same with more lines in the roster. Allow an hour the first
+time.</p>
+<section id="the-plan">
+<h2>The plan<a class="headerlink" href="#the-plan" title="Link to this heading">¶</a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 25.0%" />
+<col style="width: 55.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Machine</p></th>
+<th class="head"><p>Address</p></th>
+<th class="head"><p>Role</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">conductor</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">192.0.2.5</span></code></p></td>
+<td><p>Admits machines and holds the rules. Organizer machine.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">switch1</span></code>, <code class="docutils literal notranslate"><span class="pre">switch2</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">192.0.2.11</span></code>, <code class="docutils literal notranslate"><span class="pre">192.0.2.12</span></code></p></td>
+<td><p>Check and forward packets. Organizer machines.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">judge</span></code></p></td>
+<td><p>virtual <code class="docutils literal notranslate"><span class="pre">10.0.0.1</span></code></p></td>
+<td><p>Runs the contest server. Reaches the internet.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">c001</span></code>, <code class="docutils literal notranslate"><span class="pre">c002</span></code></p></td>
+<td><p>virtual <code class="docutils literal notranslate"><span class="pre">10.0.1.1</span></code>, <code class="docutils literal notranslate"><span class="pre">10.0.1.2</span></code></p></td>
+<td><p>Contestant machines. Reach the judge and nothing else.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Network requirements, on the physical network:</p>
+<ul class="simple">
+<li><p>every switch and every agent reaches the conductor on TCP port 5000;</p></li>
+<li><p>every agent reaches every switch on its port (6000, 6001, …);</p></li>
+<li><p>switches reach each other on those ports;</p></li>
+<li><p>switches reach the internet, if any machine is allowed to.</p></li>
+</ul>
+<p>Organizer machines must not have an address inside the overlay prefix,
+<code class="docutils literal notranslate"><span class="pre">10.0.0.0/8</span></code> by default.</p>
+</section>
+<section id="install-vnet">
+<h2>1. Install vNet<a class="headerlink" href="#install-vnet" title="Link to this heading">¶</a></h2>
+<p>On each organizer machine and in the image of the contestant machines,
+build and install. The dependencies are those of a C++17 project with
+protobuf and OpenSSL; on Ubuntu:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>g++<span class="w"> </span>cmake<span class="w"> </span>libprotobuf-dev<span class="w"> </span>protobuf-compiler<span class="w"> </span>libssl-dev<span class="w"> </span>iproute2<span class="w"> </span>iptables
+<span class="gp">$ </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/polympiads/vNet.git<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>vNet
+<span class="gp">$ </span>cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release
+<span class="gp">$ </span>cmake<span class="w"> </span>--build<span class="w"> </span>build<span class="w"> </span>-j
+<span class="gp">$ </span>sudo<span class="w"> </span>cmake<span class="w"> </span>--install<span class="w"> </span>build
+</pre></div>
+</div>
+<p>This puts <code class="docutils literal notranslate"><span class="pre">conductor</span></code>, <code class="docutils literal notranslate"><span class="pre">switch</span></code>, <code class="docutils literal notranslate"><span class="pre">agent</span></code>, <code class="docutils literal notranslate"><span class="pre">vnet-state</span></code>,
+<code class="docutils literal notranslate"><span class="pre">vnet-certs</span></code> and <code class="docutils literal notranslate"><span class="pre">vnet-roster</span></code> in <code class="docutils literal notranslate"><span class="pre">/usr/local/bin</span></code> and the three
+systemd units in <code class="docutils literal notranslate"><span class="pre">/usr/local/lib/systemd/system</span></code>.</p>
+</section>
+<section id="write-the-roster">
+<h2>2. Write the roster<a class="headerlink" href="#write-the-roster" title="Link to this heading">¶</a></h2>
+<p>On your own machine (not on the event’s machines), write <code class="docutils literal notranslate"><span class="pre">roster.txt</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>switch switch1
+switch switch2
+agent  judge 10.0.0.1 judges internet=0.0.0.0/0
+agent  c001  10.0.1.1 contestants lockdown
+agent  c002  10.0.1.2 contestants lockdown
+allow  contestants judges
+</pre></div>
+</div>
+<p>Each <code class="docutils literal notranslate"><span class="pre">agent</span></code> line gives a machine its virtual address and its groups;
+<code class="docutils literal notranslate"><span class="pre">allow</span></code> lets two groups talk; <code class="docutils literal notranslate"><span class="pre">internet=</span></code> lists the internet addresses a
+machine may reach; <code class="docutils literal notranslate"><span class="pre">lockdown</span></code> closes the physical network around the
+overlay on that machine. <a class="reference internal" href="../reference/roster.html"><span class="doc">Roster and vnet-roster</span></a> describes every
+option.</p>
+</section>
+<section id="generate-the-files">
+<h2>3. Generate the files<a class="headerlink" href="#generate-the-files" title="Link to this heading">¶</a></h2>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vnet-roster<span class="w"> </span>roster.txt<span class="w"> </span>out<span class="w"> </span>--conductor<span class="w"> </span><span class="m">192</span>.0.2.5<span class="w"> </span>--tls
+<span class="go">wrote out/certs/ca.pem and out/certs/ca.key</span>
+<span class="go">wrote out/certs/conductor.pem and out/certs/conductor.key (OU=conductor)</span>
+<span class="go">...</span>
+<span class="go">wrote out: 2 switch(es), 3 agent(s), 2 allowed pair(s), 0 bypass file(s), certificates</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">out/</span></code> now holds everything:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>out/auth.txt               the machines and their keys, for the conductor
+out/switch.txt             the access list, for the conductor
+out/machines/&lt;name&gt;.env    the environment of each machine&#39;s service
+out/certs/                 the CA and one certificate per machine
+</pre></div>
+</div>
+<p>Keep <code class="docutils literal notranslate"><span class="pre">out/</span></code> private: it holds every key. <code class="docutils literal notranslate"><span class="pre">out/certs/ca.key</span></code> stays on
+your machine and goes nowhere else.</p>
+</section>
+<section id="put-the-files-on-the-machines">
+<h2>4. Put the files on the machines<a class="headerlink" href="#put-the-files-on-the-machines" title="Link to this heading">¶</a></h2>
+<p>Every machine reads its settings from <code class="docutils literal notranslate"><span class="pre">/etc/vnet</span></code>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Machine</p></th>
+<th class="head"><p>Files</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>conductor</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">out/auth.txt</span></code> as <code class="docutils literal notranslate"><span class="pre">/etc/vnet/auth.txt</span></code>; <code class="docutils literal notranslate"><span class="pre">out/switch.txt</span></code> as
+<code class="docutils literal notranslate"><span class="pre">/etc/vnet/switch.txt</span></code>; <code class="docutils literal notranslate"><span class="pre">out/machines/conductor.env</span></code> as
+<code class="docutils literal notranslate"><span class="pre">/etc/vnet/conductor.env</span></code>; <code class="docutils literal notranslate"><span class="pre">ca.pem</span></code>, <code class="docutils literal notranslate"><span class="pre">conductor.pem</span></code> and
+<code class="docutils literal notranslate"><span class="pre">conductor.key</span></code> into <code class="docutils literal notranslate"><span class="pre">/etc/vnet/certs/</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>each switch</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">out/machines/&lt;name&gt;.env</span></code> as <code class="docutils literal notranslate"><span class="pre">/etc/vnet/switch.env</span></code>; <code class="docutils literal notranslate"><span class="pre">ca.pem</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&lt;name&gt;.pem</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;.key</span></code> into <code class="docutils literal notranslate"><span class="pre">/etc/vnet/certs/</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>each agent</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">out/machines/&lt;name&gt;.env</span></code> as <code class="docutils literal notranslate"><span class="pre">/etc/vnet/agent.env</span></code>; its bypass
+file, if it has one, as <code class="docutils literal notranslate"><span class="pre">/etc/vnet/bypass.conf</span></code>; <code class="docutils literal notranslate"><span class="pre">ca.pem</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&lt;name&gt;.pem</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;.key</span></code> into <code class="docutils literal notranslate"><span class="pre">/etc/vnet/certs/</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Make the key files readable by root only (<code class="docutils literal notranslate"><span class="pre">chmod</span> <span class="pre">600</span></code>).</p>
+<p>A switch turns on IPv4 forwarding and loose reverse-path filtering itself
+when it starts (<code class="docutils literal notranslate"><span class="pre">net.ipv4.ip_forward=1</span></code>, <code class="docutils literal notranslate"><span class="pre">rp_filter=0</span></code>) and adds its
+NAT rule; there is nothing to do unless something on the machine resets
+them.</p>
+</section>
+<section id="start-the-services">
+<h2>5. Start the services<a class="headerlink" href="#start-the-services" title="Link to this heading">¶</a></h2>
+<p>Start the conductor first; the order does not matter otherwise, since
+switches and agents retry every two seconds.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">conductor$ sudo systemctl enable --now vnet-conductor</span>
+<span class="go">switch1$   sudo systemctl enable --now vnet-switch</span>
+<span class="go">c001$      sudo systemctl enable --now vnet-agent</span>
+</pre></div>
+</div>
+</section>
+<section id="check">
+<h2>6. Check<a class="headerlink" href="#check" title="Link to this heading">¶</a></h2>
+<p>On the conductor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">kill</span><span class="w"> </span>-s<span class="w"> </span>USR1<span class="w"> </span>vnet-conductor
+<span class="gp">$ </span>sudo<span class="w"> </span>vnet-state<span class="w"> </span>/var/vnet-dump.bin<span class="w"> </span>/etc/vnet/auth.txt
+</pre></div>
+</div>
+<p>Wait until the list <em>expected but not connected</em> is empty. Then, from a
+contestant machine:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ping</span> <span class="pre">10.0.0.1</span></code> answers: contestants may reach the judge;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ping</span> <span class="pre">10.0.1.2</span></code> from <code class="docutils literal notranslate"><span class="pre">c001</span></code> does not: contestants may not reach each
+other;</p></li>
+<li><p>the LAN gateway does not answer: lockdown closed the physical network.</p></li>
+</ul>
+<p>Repeat the first ping from contestants on each switch, so that a path
+across two switches is tested.</p>
+</section>
+<section id="next-steps">
+<h2>Next steps<a class="headerlink" href="#next-steps" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../guides/prepare-event.html"><span class="doc">Prepare an event</span></a> is the checklist for a real event.</p></li>
+<li><p><a class="reference internal" href="../guides/vdi-lockdown.html"><span class="doc">Lock down contestant machines</span></a> if the contestant machines are VDI
+desktops.</p></li>
+<li><p><a class="reference internal" href="../guides/during-event.html"><span class="doc">During an event</span></a> for changes once the contest has started.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/tutorials/first-event.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

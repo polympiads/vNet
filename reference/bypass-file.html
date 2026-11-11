@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Bypass file &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Roster and vnet-roster" href="roster.html" />
+    <link rel="prev" title="Auth file" href="auth-file.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auth-file.html">Auth file</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Bypass file</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#format">Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example">Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-a-route-line-is-applied">How a route line is applied</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#errors">Errors</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">C++ API reference</a></li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="bypass-file">
+<h1>Bypass file<a class="headerlink" href="#bypass-file" title="Link to this heading">¶</a></h1>
+<p>The bypass file of an agent lists what stays on the machine’s physical
+network while it is joined: addresses that keep their route through the
+physical gateway, and, with lockdown, firewall exceptions. The agent reads
+it from <code class="docutils literal notranslate"><span class="pre">VNET_BYPASS_FILE</span></code> at start and again on <code class="docutils literal notranslate"><span class="pre">SIGHUP</span></code>
+(<code class="docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">reload</span> <span class="pre">vnet-agent</span></code>). <code class="docutils literal notranslate"><span class="pre">vnet-roster</span></code> writes one per machine
+that has <code class="docutils literal notranslate"><span class="pre">bypass</span></code> lines, as <code class="docutils literal notranslate"><span class="pre">machines/&lt;name&gt;.bypass</span></code>, to install as
+<code class="docutils literal notranslate"><span class="pre">/etc/vnet/bypass.conf</span></code>.</p>
+<section id="format">
+<h2>Format<a class="headerlink" href="#format" title="Link to this heading">¶</a></h2>
+<p>Blank lines and lines whose first non-blank character is <code class="docutils literal notranslate"><span class="pre">#</span></code> are
+ignored. Five kinds of lines:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">route</span> <span class="pre">&lt;a.b.c.d/n&gt;</span></code></dt><dd><p>The prefix keeps going through the physical gateway instead of the TUN.
+With lockdown it is also allowed in both directions, any protocol and
+port. A bare address is a <code class="docutils literal notranslate"><span class="pre">/32</span></code>. The prefix must not be <code class="docutils literal notranslate"><span class="pre">0.0.0.0/0</span></code>
+and must not overlap the overlay prefix.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">out</span> <span class="pre">&lt;iptables</span> <span class="pre">arguments&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">in</span> <span class="pre">&lt;iptables</span> <span class="pre">arguments&gt;</span></code></dt><dd><p>A rule appended to the lockdown chain <code class="docutils literal notranslate"><span class="pre">VNET_OUT</span></code> or <code class="docutils literal notranslate"><span class="pre">VNET_IN</span></code>, before
+the final drop, exactly as written. The words are passed to
+<code class="docutils literal notranslate"><span class="pre">iptables</span></code> without a shell, so quotes and variables are not
+interpreted. Without lockdown these lines do nothing, and the agent says
+so at start.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">out6</span> <span class="pre">&lt;ip6tables</span> <span class="pre">arguments&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">in6</span> <span class="pre">&lt;ip6tables</span> <span class="pre">arguments&gt;</span></code></dt><dd><p>The same for IPv6, which lockdown otherwise blocks entirely.</p>
+</dd>
+</dl>
+</section>
+<section id="example">
+<h2>Example<a class="headerlink" href="#example" title="Link to this heading">¶</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span># VDI broker and the organizers&#39; DNS stay on the LAN
+route 192.0.2.10
+route 192.0.2.53/32
+# the VDI gateway connects in
+in  -p tcp -s 198.51.100.0/24 --dport 3389 -j ACCEPT
+# organizers&#39; SSH, over IPv6 too
+in  -p tcp -s 198.51.100.0/24 --dport 22 -j ACCEPT
+in6 -p tcp -s 2001:db8:100::/48 --dport 22 -j ACCEPT
+</pre></div>
+</div>
+</section>
+<section id="how-a-route-line-is-applied">
+<h2>How a route line is applied<a class="headerlink" href="#how-a-route-line-is-applied" title="Link to this heading">¶</a></h2>
+<p>Once the default route points into the TUN, the agent pins each route
+prefix:</p>
+<ul class="simple">
+<li><p>a prefix inside a subnet the machine is directly on needs nothing, since
+the subnet route already wins;</p></li>
+<li><p>a prefix the machine already routes through another gateway is left to
+that route;</p></li>
+<li><p>anything else gets a route through the physical gateway that was the
+default before the agent joined.</p></li>
+</ul>
+<p>The agent logs one of <code class="docutils literal notranslate"><span class="pre">&lt;prefix&gt;</span> <span class="pre">stays</span> <span class="pre">on</span> <span class="pre">the</span> <span class="pre">physical</span> <span class="pre">network</span> <span class="pre">via</span> <span class="pre">&lt;gw&gt;</span>
+<span class="pre">dev</span> <span class="pre">&lt;if&gt;</span></code> or <code class="docutils literal notranslate"><span class="pre">&lt;prefix&gt;</span> <span class="pre">already</span> <span class="pre">has</span> <span class="pre">a</span> <span class="pre">route</span> <span class="pre">via</span> <span class="pre">...</span></code> for each. When a
+reload removes a line, its route is removed (<code class="docutils literal notranslate"><span class="pre">Route</span> <span class="pre">&lt;prefix&gt;</span> <span class="pre">no</span> <span class="pre">longer</span>
+<span class="pre">bypasses</span> <span class="pre">the</span> <span class="pre">TUN</span></code>).</p>
+</section>
+<section id="errors">
+<h2>Errors<a class="headerlink" href="#errors" title="Link to this heading">¶</a></h2>
+<p>A file with an error is refused as a whole: at start the agent stops, on a
+reload the previous rules stay in force (<code class="docutils literal notranslate"><span class="pre">Bypass</span> <span class="pre">file</span> <span class="pre">reload</span> <span class="pre">failed</span></code>).</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 55.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Message</p></th>
+<th class="head"><p>Cause</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Bypass</span> <span class="pre">file</span> <span class="pre">line</span> <span class="pre">N:</span> <span class="pre">expected</span> <span class="pre">'route</span> <span class="pre">a.b.c.d/n'</span></code></p></td>
+<td><p>a route line without a prefix, with more than one, or malformed</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Bypass</span> <span class="pre">file</span> <span class="pre">line</span> <span class="pre">N:</span> <span class="pre">a</span> <span class="pre">route</span> <span class="pre">for</span> <span class="pre">0.0.0.0/0</span> <span class="pre">would</span> <span class="pre">undo</span> <span class="pre">the</span> <span class="pre">default</span> <span class="pre">route</span> <span class="pre">through</span> <span class="pre">the</span> <span class="pre">TUN</span></code></p></td>
+<td><p>a <code class="docutils literal notranslate"><span class="pre">/0</span></code> route</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Bypass</span> <span class="pre">file</span> <span class="pre">line</span> <span class="pre">N:</span> <span class="pre">&lt;prefix&gt;</span> <span class="pre">overlaps</span> <span class="pre">the</span> <span class="pre">overlay</span> <span class="pre">&lt;overlay&gt;</span></code></p></td>
+<td><p>a route inside, or containing, the overlay prefix</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Bypass</span> <span class="pre">file</span> <span class="pre">line</span> <span class="pre">N:</span> <span class="pre">'&lt;kind&gt;'</span> <span class="pre">needs</span> <span class="pre">iptables</span> <span class="pre">arguments</span></code></p></td>
+<td><p>an <code class="docutils literal notranslate"><span class="pre">in</span></code>/<code class="docutils literal notranslate"><span class="pre">out</span></code> line with nothing after it</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Bypass</span> <span class="pre">file</span> <span class="pre">line</span> <span class="pre">N:</span> <span class="pre">unknown</span> <span class="pre">line</span> <span class="pre">kind</span> <span class="pre">'...'</span></code></p></td>
+<td><p>a first word other than the five above</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Cannot</span> <span class="pre">open</span> <span class="pre">bypass</span> <span class="pre">file</span> <span class="pre">&lt;path&gt;</span></code></p></td>
+<td><p>wrong path or permissions</p></td>
+</tr>
+</tbody>
+</table>
+<p>An <code class="docutils literal notranslate"><span class="pre">in</span></code>/<code class="docutils literal notranslate"><span class="pre">out</span></code> line that parses but that iptables rejects is reported
+when the chains are built: the iptables error, then <code class="docutils literal notranslate"><span class="pre">Bypass</span> <span class="pre">rule</span> <span class="pre">not</span>
+<span class="pre">installed:</span> <span class="pre">in</span> <span class="pre">...</span></code>. The other rules are installed.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/reference/bypass-file.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The data plane &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Security model" href="security.html" />
+    <link rel="prev" title="How a machine joins" href="joining.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="joining.html">How a machine joins</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The data plane</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#leaving-the-machine">Leaving the machine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-switch-decides">The switch decides</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#where-the-packet-goes">Where the packet goes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rules-are-symmetric">Rules are symmetric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#backpressure">Backpressure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">C++ API reference</a></li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="the-data-plane">
+<h1>The data plane<a class="headerlink" href="#the-data-plane" title="Link to this heading">¶</a></h1>
+<p>This page follows one IPv4 packet from the machine that sends it to the
+machine that receives it, and lists every place where it can be dropped.</p>
+<section id="leaving-the-machine">
+<h2>Leaving the machine<a class="headerlink" href="#leaving-the-machine" title="Link to this heading">¶</a></h2>
+<p>An application on the machine sends a packet. The kernel routes it into
+<code class="docutils literal notranslate"><span class="pre">vnet-&lt;name&gt;</span></code>: the overlay prefix always goes there, and with
+<code class="docutils literal notranslate"><span class="pre">VNET_DEFAULT_VIA_TUN=1</span></code> (the default) so does everything that has no
+more specific route. The agent reads the packet from the TUN and sends it,
+unchanged, to its switch as one <code class="docutils literal notranslate"><span class="pre">IPV4_RAW</span></code> message.</p>
+<p>The agent carries IPv4 only. With lockdown on, IPv6 is blocked on the host
+(<a class="reference internal" href="../guides/vdi-lockdown.html"><span class="doc">Lock down contestant machines</span></a>).</p>
+</section>
+<section id="the-switch-decides">
+<h2>The switch decides<a class="headerlink" href="#the-switch-decides" title="Link to this heading">¶</a></h2>
+<p>The switch checks a packet from one of its agents in this order. The first
+check that fails drops the packet and counts it under the reason shown,
+which appears in the switch’s statistics line
+(<a class="reference internal" href="../guides/monitoring.html"><span class="doc">Monitor the network</span></a>).</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 10.0%" />
+<col style="width: 65.0%" />
+<col style="width: 25.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Step</p></th>
+<th class="head"><p>Check</p></th>
+<th class="head"><p>Drop reason</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>The bytes are an IPv4 packet with a valid header.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">malformed</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>The connection belongs to an agent that completed its join.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">unknown-source</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>The source address is the agent’s own virtual address.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spoof</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>The agent is within its packet and byte rate
+(<code class="docutils literal notranslate"><span class="pre">VNET_AGENT_PPS</span></code>, <code class="docutils literal notranslate"><span class="pre">VNET_AGENT_MBPS</span></code>).</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">rate-limited</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>If the destination is a virtual address in the access list: a rule
+connects the two machines. Otherwise the destination is on the
+internet: a <code class="docutils literal notranslate"><span class="pre">::internet:</span></code> rule of the sender covers it.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">acl</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>6</p></td>
+<td><p>The switch can reach the destination: it has the agent, a route to
+its switch, or an uplink for the internet.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">unreachable</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>A destination that is in the access list but whose machine has not joined
+yet, or whose route has not reached this switch yet, is not dropped at
+once: the switch keeps up to 16 packets per destination for up to 5
+seconds, and sends them when the route arrives. They are counted as
+<code class="docutils literal notranslate"><span class="pre">waited-for-route</span></code>.</p>
+<p>Any address that is not a virtual address in the access list counts as an
+internet address, including an unassigned address inside the overlay
+prefix. Such a packet is dropped as <code class="docutils literal notranslate"><span class="pre">acl</span></code> unless a <code class="docutils literal notranslate"><span class="pre">::internet:</span></code> rule
+covers it.</p>
+</section>
+<section id="where-the-packet-goes">
+<h2>Where the packet goes<a class="headerlink" href="#where-the-packet-goes" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>Local</dt><dd><p>The destination is attached to the same switch. The switch writes the
+packet to that agent’s connection, and the agent writes it into its TUN.</p>
+</dd>
+<dt>Another switch</dt><dd><p>The destination is attached to another switch. The switch sends the
+packet over its direct link to that switch. The receiving switch checks
+again that the destination is one of its own agents, that the source is
+a configured machine reached through the switch that sent it, and that
+the access list allows the pair; then it delivers. A switch never
+forwards a packet it received from another switch, so a packet crosses
+at most one switch-to-switch link.</p>
+</dd>
+<dt>Internet</dt><dd><p>The switch writes the packet into its <code class="docutils literal notranslate"><span class="pre">vnet-out</span></code> TUN. The kernel
+routes it out through the switch’s own default route with address
+translation (an iptables <code class="docutils literal notranslate"><span class="pre">MASQUERADE</span></code> rule on the uplink interface,
+which the switch adds at start), so the internet sees the switch’s
+address. A reply comes back through <code class="docutils literal notranslate"><span class="pre">vnet-out</span></code>, and the
+switch delivers it only if the receiving machine has a <code class="docutils literal notranslate"><span class="pre">::internet:</span></code>
+rule for the address it came from.</p>
+</dd>
+</dl>
+</section>
+<section id="rules-are-symmetric">
+<h2>Rules are symmetric<a class="headerlink" href="#rules-are-symmetric" title="Link to this heading">¶</a></h2>
+<p>A rule between two machines allows both directions: <code class="docutils literal notranslate"><span class="pre">c001</span> <span class="pre">judge</span></code> lets
+<code class="docutils literal notranslate"><span class="pre">c001</span></code> reach <code class="docutils literal notranslate"><span class="pre">judge</span></code> and <code class="docutils literal notranslate"><span class="pre">judge</span></code> reach <code class="docutils literal notranslate"><span class="pre">c001</span></code>. A <code class="docutils literal notranslate"><span class="pre">::internet:</span></code>
+rule allows the machine to reach that address, and the replies to come
+back; it does not let the internet open connections to the machine, since
+the internet only sees the switch’s translated address.</p>
+<p>There is no port filtering in the switch. If a machine may talk to
+another, it may use any protocol and port. Narrow this on the machines
+themselves if you need to.</p>
+</section>
+<section id="backpressure">
+<h2>Backpressure<a class="headerlink" href="#backpressure" title="Link to this heading">¶</a></h2>
+<p>Every link has a write buffer of 2 MiB. When the link to a destination is
+full, the switch drops the packet rather than wait, and counts it in
+<code class="docutils literal notranslate"><span class="pre">link-full-drops</span></code>. A switch handles at most 64 packets from one
+connection before it serves the next, so one busy machine cannot hold the
+loop.</p>
+<p>The per-agent limit (20000 packets per second and 200 Mbit/s by default,
+each with a burst of one second) keeps one machine from taking a switch’s
+capacity from the others. Set either to 0 to remove it.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/concepts/data-plane.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

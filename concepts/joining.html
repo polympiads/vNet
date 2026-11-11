@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>How a machine joins &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=e2803d01" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="The data plane" href="data-plane.html" />
+    <link rel="prev" title="Architecture" href="architecture.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">How a machine joins</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#why-it-works-this-way">Why it works this way</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-the-agent-does-after-joining">What the agent does after joining</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#failed-joins">Failed joins</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">C++ API reference</a></li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="how-a-machine-joins">
+<h1>How a machine joins<a class="headerlink" href="#how-a-machine-joins" title="Link to this heading">¶</a></h1>
+<p>A machine joins in seven messages. The order is chosen so that a switch
+never learns a machine’s identity from the machine itself.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="../_images/join-sequence.svg"><img alt="Seven messages between an agent, a switch, the conductor and the other switches." src="../_images/join-sequence.svg" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">The switch learns a machine name from the conductor, never from the
+machine.</span><a class="headerlink" href="#id1" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>The agent connects to the conductor and sends its name and key
+(<code class="docutils literal notranslate"><span class="pre">AGENT_MIP</span></code>).</p></li>
+<li><p>The conductor checks them against the auth file, picks a switch, and
+sends the agent the switch’s address and a random 64-bit token
+(<code class="docutils literal notranslate"><span class="pre">CONNECT_TO_SWITCH</span></code>).</p></li>
+<li><p>The conductor sends the same token to the switch, with the agent’s name
+(<code class="docutils literal notranslate"><span class="pre">AGENT_CONNECTION_TOKEN</span></code>). The token is valid once, for 60 seconds.</p></li>
+<li><p>The agent connects to the switch and presents the token, and nothing
+else (<code class="docutils literal notranslate"><span class="pre">AUTH_CONNECT_TO_SWITCH</span></code>).</p></li>
+<li><p>The switch finds the name that goes with the token, looks up that name’s
+virtual address in the access list, and answers with the address
+(<code class="docutils literal notranslate"><span class="pre">CONNECTION_ACCEPTED</span></code>). The agent opens its TUN with it.</p></li>
+<li><p>The switch tells the conductor the machine is attached
+(<code class="docutils literal notranslate"><span class="pre">AGENT_REGISTERED</span></code>).</p></li>
+<li><p>The conductor tells every other switch where that address now lives
+(<code class="docutils literal notranslate"><span class="pre">SWITCH_ROUTE_UPDATE</span></code>).</p></li>
+</ol>
+<section id="why-it-works-this-way">
+<h2>Why it works this way<a class="headerlink" href="#why-it-works-this-way" title="Link to this heading">¶</a></h2>
+<p>A contestant machine is not trusted. If an agent told its switch who it
+is, a machine with a stolen or modified agent could claim another
+machine’s name, and with it another machine’s rules. Here the machine
+proves its identity once, to the conductor, with its key and its TLS
+certificate; the switch only matches a token the conductor gave it. The
+switch then binds the connection to that name’s address, and drops every
+packet whose source address is not that one.</p>
+<p>Both links of the agent stay open. The switch link carries packets; the
+conductor link carries heartbeats and lets the agent rejoin quickly.</p>
+</section>
+<section id="what-the-agent-does-after-joining">
+<h2>What the agent does after joining<a class="headerlink" href="#what-the-agent-does-after-joining" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>It brings up <code class="docutils literal notranslate"><span class="pre">vnet-&lt;name&gt;</span></code> with its virtual address and a route to the
+overlay prefix.</p></li>
+<li><p>It pins <code class="docutils literal notranslate"><span class="pre">/32</span></code> routes to the conductor and to its switch through the
+previous gateway, and the <code class="docutils literal notranslate"><span class="pre">route</span></code> prefixes of its bypass file, so these
+stay on the physical network.</p></li>
+<li><p>Unless <code class="docutils literal notranslate"><span class="pre">VNET_DEFAULT_VIA_TUN=0</span></code>, it replaces the default route with the
+TUN. The previous route is saved in <code class="docutils literal notranslate"><span class="pre">/run/vnet/agent-&lt;name&gt;.route</span></code> so
+that it can be put back even after a crash.</p></li>
+<li><p>With <code class="docutils literal notranslate"><span class="pre">VNET_LOCKDOWN=1</span></code>, it installs its firewall chains.</p></li>
+</ul>
+<p>When it stops, the agent puts the default route back, removes its pins and
+its firewall chains.</p>
+</section>
+<section id="failed-joins">
+<h2>Failed joins<a class="headerlink" href="#failed-joins" title="Link to this heading">¶</a></h2>
+<p>The agent learns little when a join fails: the conductor does not explain
+a refusal to a machine it does not trust. The agent prints
+<code class="docutils literal notranslate"><span class="pre">No</span> <span class="pre">switch</span> <span class="pre">assignment</span> <span class="pre">from</span> <span class="pre">the</span> <span class="pre">conductor</span> <span class="pre">(rejected,</span> <span class="pre">no</span> <span class="pre">switch</span> <span class="pre">available,</span>
+<span class="pre">or</span> <span class="pre">no</span> <span class="pre">answer)</span></code> and tries again two seconds later; the reason is in the
+conductor’s log. <a class="reference internal" href="../troubleshooting.html"><span class="doc">Troubleshooting</span></a> lists the cases.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/concepts/joining.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

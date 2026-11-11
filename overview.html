@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Overview &#8212; vNet documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=9005d67d" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=e2803d01" />
+    <script src="_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Try vNet with Docker" href="tutorials/docker.html" />
+    <link rel="prev" title="vNet : Virtual Network" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">vNet</a></h1>
+
+
+
+
+
+
+
+
+
+
+
+<div id="searchbox" role="search">
+  <form class="search" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search" aria-label="Search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+  </form>
+</div><p class="caption" role="heading"><span class="caption-text">Start here</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-vnet-gives-an-event">What vNet gives an event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#where-to-start">Where to start</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/docker.html">Try vNet with Docker</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/first-event.html">Your first event</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="guides/prepare-event.html">Prepare an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guides/during-event.html">During an event</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guides/vdi-lockdown.html">Lock down contestant machines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guides/monitoring.html">Monitor the network</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guides/certificates.html">Manage certificates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="concepts/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts/joining.html">How a machine joins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts/data-plane.html">The data plane</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts/security.html">Security model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts/recovery.html">Failures and recovery</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="reference/environment.html">Environment variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/switch-config.html">Switch config</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/auth-file.html">Auth file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/bypass-file.html">Bypass file</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/roster.html">Roster and vnet-roster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/commands.html">Programs, signals and services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/logs.html">Log messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/limits.html">Limits and timings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/protocol.html">Wire protocol</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">For developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">C++ API reference</a></li>
+</ul>
+<h3>Versions</h3>
+<ul>
+    
+    <li><p style="margin: 0;"><a href="https://polympiads.github.io/vNet/">release</a> (Current)</p></li>
+</ul>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="overview">
+<h1>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h1>
+<p>vNet gives every machine of an on-site programming contest exactly the
+network access the rules allow, and nothing else, on infrastructure the
+organizers do not control: university rooms, a VDI pool, a shared LAN.</p>
+<p>Each machine runs a small program, the <strong>agent</strong>, which opens a virtual
+interface and sends all of the machine’s IPv4 traffic through the overlay.
+<strong>Switches</strong> run by the organizers check every packet against one access
+list before forwarding it. A <strong>conductor</strong> admits machines, places them on
+switches and distributes the routes and the access list. Decisions are
+taken on organizer machines only; a contestant machine only carries
+packets.</p>
+<section id="what-vnet-gives-an-event">
+<h2>What vNet gives an event<a class="headerlink" href="#what-vnet-gives-an-event" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>One access list for the whole event.</strong> Which machine may talk to
+which, and which internet addresses each may reach, is one text file on
+the conductor. Changing it is one edit and one reload; nothing restarts.</p></li>
+<li><p><strong>Enforcement off the contestant machine.</strong> Every packet is checked on a
+switch for its source address, its destination and its rate. Root on a
+contestant machine does not open the network.</p></li>
+<li><p><strong>Mutual TLS on every link</strong>, with the role of each machine (conductor,
+switch or agent) in its certificate.</p></li>
+<li><p><strong>A host firewall</strong> on contestant machines (<em>lockdown</em>) that closes the
+physical network around the overlay, with a bypass file for what must
+stay reachable, such as a VDI broker.</p></li>
+<li><p><strong>Recovery without intervention.</strong> A switch that dies hands its machines
+to the others; a conductor that restarts learns the state back from the
+switches; the data plane keeps running while the conductor is down.</p></li>
+<li><p><strong>One roster for everything.</strong> <code class="docutils literal notranslate"><span class="pre">vnet-roster</span></code> turns one file listing the
+machines and the rules into every key, certificate, config and
+environment file the event needs.</p></li>
+</ul>
+</section>
+<section id="where-to-start">
+<h2>Where to start<a class="headerlink" href="#where-to-start" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>To see vNet run in five minutes on one machine:
+<a class="reference internal" href="tutorials/docker.html"><span class="doc">Try vNet with Docker</span></a>.</p></li>
+<li><p>To prepare a real event: <a class="reference internal" href="tutorials/first-event.html"><span class="doc">Your first event</span></a>, then
+<a class="reference internal" href="guides/prepare-event.html"><span class="doc">Prepare an event</span></a>.</p></li>
+<li><p>During an event, when something is wrong: <a class="reference internal" href="troubleshooting.html"><span class="doc">Troubleshooting</span></a>.</p></li>
+<li><p>To understand how it works: <a class="reference internal" href="concepts/architecture.html"><span class="doc">Architecture</span></a>.</p></li>
+<li><p>Every variable, file format, command and log line:
+the reference pages, starting with <a class="reference internal" href="reference/environment.html"><span class="doc">Environment variables</span></a>.</p></li>
+</ul>
+<p>The source code is at <a class="reference external" href="https://github.com/polympiads/vNet">https://github.com/polympiads/vNet</a>, under the MIT
+license. Measurements are at
+<a class="reference external" href="https://github.com/polympiads/vNet-benchmarks">https://github.com/polympiads/vNet-benchmarks</a>.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;2025, polympiads.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/overview.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
