@@ -79,12 +79,15 @@ bool send_protobuf_packet(int sock, vnet::protocol::PacketType type,
 /**
  * @brief Read a protobuf message with the 6-byte packet header (blocking).
  *
- * Reads the full header, verifies the packet type, then reads
- * and parses the protobuf payload.
+ * Reads the full header, skips heartbeats, verifies the packet type,
+ * then reads and parses the protobuf payload.
  *
- * @param expected_type  If set to a valid type, the function will
- *                       fail if the received type doesn't match.
- * @param received_type  If non-null, receives the actual packet type.
+ * @param sock           The connected socket.
+ * @param expected_type  The type the packet must have; any other type
+ *                       makes the call fail.
+ * @param msg            Receives the parsed payload.
+ * @param ssl            The TLS session of the socket, or nullptr.
+ * @return true when a packet of expected_type was read and parsed.
  */
 bool read_protobuf_packet(int sock, vnet::protocol::PacketType expected_type,
                           google::protobuf::Message& msg,
@@ -94,9 +97,9 @@ bool read_protobuf_packet(int sock, vnet::protocol::PacketType expected_type,
  * @brief Read a packet header and payload, returning the type.
  *        Useful when you don't know the packet type in advance.
  *
+ * @param sock     The connected socket.
  * @param type     Receives the packet type.
- * @param buffer   Receives the payload bytes.
- * @param buf_size Receives the payload size.
+ * @param buffer   Receives the payload bytes; its size is the payload size.
  * @return true on success.
  */
 bool read_raw_packet(int sock, vnet::protocol::PacketType& type,
