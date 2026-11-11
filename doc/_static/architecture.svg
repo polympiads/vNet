@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" role="img" aria-labelledby="fig1-title fig1-desc" font-size="13">
+<style>
+text { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+.f-ink { fill: #111; } .f-quiet { fill: #555; } .f-band { fill: #f2f2f2; }
+.f-box { fill: #fff; stroke: #111; stroke-width: 1.25; } .f-main { fill: #eef3f8; stroke-width: 2.25; }
+.f-ctl { fill: none; stroke: #111; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.f-data { fill: none; stroke: #111; stroke-width: 1.75; } .f-life { stroke: #ccc; stroke-width: 1.25; }
+.f-msg { fill: none; stroke: #111; stroke-width: 1.25; } .f-msg-main { stroke-width: 2.25; }
+.f-tip, .f-tip-main { fill: #111; }
+.f-lbl { paint-order: stroke; stroke: #fff; stroke-width: 4; stroke-linejoin: round; }
+</style>
+  <title id="fig1-title">Organizer machines decide and check; agents only carry packets</title>
+  <desc id="fig1-desc">A conductor above two switches, and four machines below them. Dashed control links join the conductor to each switch and to all agents. Solid data links join each machine to a switch and the two switches to each other.</desc>
+  <text class="f-ink" x="24" y="34" font-size="15" font-weight="700">Organizer machines decide and check; agents only carry packets</text>
+  <text class="f-quiet" x="24" y="54" font-size="11.5">Solid lines carry packets, dashed lines carry control messages. Every link is mutually authenticated TLS.</text>
+  <rect class="f-band" x="48" y="66" width="700" height="238"/>
+  <text class="f-quiet" x="60" y="84" font-size="11.5">Organizer machines</text>
+  <rect class="f-band" x="48" y="336" width="700" height="100"/>
+  <text class="f-quiet" x="60" y="426" font-size="11.5">Machines in the overlay: contestants, servers, hosts</text>
+  <g class="f-ctl">
+    <path d="M294 164V220"/>
+    <path d="M502 164V220"/>
+    <path d="M60 376H36V120H228"/>
+  </g>
+  <g class="f-data">
+    <path d="M360 256H436"/>
+    <path d="M138.5 348V292"/>
+    <path d="M311.5 348V292"/>
+    <path d="M484.5 348V292"/>
+    <path d="M657.5 348V292"/>
+  </g>
+  <rect class="f-box" x="228" y="76" width="340" height="88"/>
+  <text class="f-ink" x="398" y="100" text-anchor="middle" font-weight="700">Conductor</text>
+  <text class="f-quiet" x="398" y="116" text-anchor="middle" font-size="11.5">admits machines and places them on a switch</text>
+  <text class="f-quiet" x="398" y="132" text-anchor="middle" font-size="11.5">issues join tokens and switch-pair tokens</text>
+  <text class="f-quiet" x="398" y="148" text-anchor="middle" font-size="11.5">publishes routes and sends the config</text>
+  <rect class="f-box f-main" x="60" y="220" width="300" height="72"/>
+  <text class="f-ink" x="210" y="244" text-anchor="middle" font-weight="700">Switch 1</text>
+  <text class="f-ink" x="210" y="260" text-anchor="middle" font-size="11.5">checks source, access list and rate</text>
+  <text class="f-ink" x="210" y="276" text-anchor="middle" font-size="11.5">forwards to machines, peers, internet</text>
+  <rect class="f-box f-main" x="436" y="220" width="300" height="72"/>
+  <text class="f-ink" x="586" y="244" text-anchor="middle" font-weight="700">Switch 2</text>
+  <text class="f-ink" x="586" y="260" text-anchor="middle" font-size="11.5">checks source, access list and rate</text>
+  <text class="f-ink" x="586" y="276" text-anchor="middle" font-size="11.5">forwards to machines, peers, internet</text>
+  <rect class="f-box" x="60" y="348" width="157" height="56"/>
+  <text class="f-ink" x="138.5" y="372" text-anchor="middle" font-weight="700">Contestant c001</text>
+  <text class="f-quiet" x="138.5" y="388" text-anchor="middle" font-size="11.5">agent, TUN 10.0.1.1</text>
+  <rect class="f-box" x="233" y="348" width="157" height="56"/>
+  <text class="f-ink" x="311.5" y="372" text-anchor="middle" font-weight="700">Contestant c002</text>
+  <text class="f-quiet" x="311.5" y="388" text-anchor="middle" font-size="11.5">agent, TUN 10.0.1.2</text>
+  <rect class="f-box" x="406" y="348" width="157" height="56"/>
+  <text class="f-ink" x="484.5" y="372" text-anchor="middle" font-weight="700">Contestant c003</text>
+  <text class="f-quiet" x="484.5" y="388" text-anchor="middle" font-size="11.5">agent, TUN 10.0.1.3</text>
+  <rect class="f-box" x="579" y="348" width="157" height="56"/>
+  <text class="f-ink" x="657.5" y="372" text-anchor="middle" font-weight="700">Game server</text>
+  <text class="f-quiet" x="657.5" y="388" text-anchor="middle" font-size="11.5">agent, TUN 10.0.0.1</text>
+  <text class="f-quiet" x="302" y="196" font-size="11.5">tokens, routes, config</text>
+  <text class="f-quiet" x="510" y="196" font-size="11.5">tokens, routes, config</text>
+  <text class="f-quiet" x="60" y="112" font-size="11.5">all agents: join, control</text>
+  <text class="f-quiet" x="398" y="246" text-anchor="middle" font-size="11.5">packets</text>
+  <text class="f-quiet" x="147" y="324" font-size="11.5">IPv4 packets in TLS</text>
+</svg>
