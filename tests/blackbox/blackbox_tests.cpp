@@ -2,6 +2,7 @@
 #include "vnet/blackbox/blackbox.hpp"
 
 #include <fstream>
+#include <vector>
 #include <cstring>
 #include <arpa/inet.h>
 
@@ -452,8 +453,20 @@ TEST_F(BlackBoxTest, SwitchDisconnectClearsRoutes) {
     box.on_route_update(ip("10.0.1.2"), 20);
     box.on_route_update(ip("10.0.0.1"), 20);
 
-    box.on_switch_disconnected(20);
+    std::vector<uint32_t> lost = box.on_switch_disconnected(20);
     EXPECT_EQ(box.routes().size(), 0u);
+    EXPECT_EQ(lost.size(), 2u);
+}
+
+TEST_F(BlackBoxTest, RoutesReturnedOnDisconnectCanBeRestored) {
+    BlackBox box(cfg, TUN_FD);
+    box.on_route_update(ip("10.0.1.2"), 20);
+
+    // The link to the peer drops, then comes back on another socket.
+    std::vector<uint32_t> lost = box.on_switch_disconnected(20);
+    for (uint32_t dest : lost) box.on_route_update(dest, 21);
+
+    EXPECT_EQ(box.routes().lookup(ip("10.0.1.2")), 21);
 }
 
 TEST_F(BlackBoxTest, RouteUpdateRemove) {

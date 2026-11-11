@@ -87,8 +87,8 @@ namespace vnet::blackbox {
         }
     }
 
-    void BlackBox::on_switch_disconnected(int switch_fd) {
-        routing_.remove_routes_for_switch(switch_fd);
+    std::vector<uint32_t> BlackBox::on_switch_disconnected(int switch_fd) {
+        return routing_.remove_routes_for_switch(switch_fd);
     }
 
     void BlackBox::retarget_switch(int old_fd, int new_fd) {

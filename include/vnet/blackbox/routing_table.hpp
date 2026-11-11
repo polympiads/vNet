@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 namespace vnet::blackbox {
 
@@ -35,8 +36,11 @@ namespace vnet::blackbox {
         /**
          * Remove all routes that point to a specific switch fd.
          * Called when a switch-to-switch connection drops.
+         *
+         * @return The destinations whose route was removed, so the
+         *         caller can restore them when the link comes back.
          */
-        void remove_routes_for_switch(int switch_fd);
+        std::vector<uint32_t> remove_routes_for_switch(int switch_fd);
 
         /**
          * Point every route that used old_fd at new_fd.
