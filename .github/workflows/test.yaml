@@ -70,3 +70,15 @@ jobs:
           name: integration-logs
           path: build/integration/
           if-no-files-found: ignore
+
+  documentation:
+    name: documentation builds without warnings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-sphinx python3-breathe doxygen
+      - name: build
+        run: sphinx-build -W --keep-going doc build/doc

@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-sphinx
+          sudo apt-get install -y python3-sphinx python3-breathe doxygen
       - name: Sphinx build
         run: |
           branches=`python3 doc/listbranches.py`

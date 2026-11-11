@@ -1,0 +1,89 @@
+/* Plain pages: one text size, small steps for headings, a quiet sidebar. */
+
+div.body { max-width: 900px; }
+div.body p, div.body li, div.body td, div.body th, div.body dd, div.body dt {
+    font-size: 15px; line-height: 1.55;
+    hyphens: manual; -webkit-hyphens: manual; text-align: left;
+}
+div.body h1, div.body h2, div.body h3, div.body h4 {
+    font-weight: 600; margin: 1.6em 0 0.6em; line-height: 1.3;
+}
+div.body h1 { font-size: 24px; margin-top: 0; }
+div.body h2 { font-size: 19px; border-bottom: 1px solid #e5e5e5; padding-bottom: 0.25em; }
+div.body h3 { font-size: 16px; }
+div.body h4 { font-size: 15px; }
+a.reference { border-bottom: none; }
+table.docutils { width: 100%; }
+table.docutils { border: 1px solid #ddd; border-collapse: collapse; }
+table.docutils td, table.docutils th { vertical-align: top; border: 1px solid #ddd; padding: 4px 8px; }
+table.docutils th { background: #f6f6f6; }
+pre { font-size: 13px; line-height: 1.45; }
+code.literal { font-size: 13.5px; }
+.highlight .w { text-decoration: none; }
+
+/* Sidebar: one font size, no big headings, no bullets. */
+div.sphinxsidebar { font-size: 14px; border-right: 1px solid #e5e5e5; }
+div.sphinxsidebarwrapper { padding: 0 16px 0 0; }
+div.sphinxsidebar a { border-bottom: none; color: #333; }
+div.sphinxsidebar h1.logo { font-size: 18px; font-weight: 600; margin: 0 0 12px; }
+div.sphinxsidebar h3 { font-size: 13px; font-weight: 600; color: #666; margin: 18px 0 6px; }
+div.sphinxsidebar p.caption { font-size: 13px; font-weight: 600; color: #666; margin: 16px 0 4px; }
+div.sphinxsidebar ul, div.sphinxsidebar ul ul { list-style: none; margin: 0; padding: 0; }
+div.sphinxsidebar ul ul { margin-left: 12px; }
+div.sphinxsidebar li { margin: 0; padding: 0; }
+div.sphinxsidebar ul li a,
+div.sphinxsidebar ul li.toctree-l1 > a { display: block; padding: 2px 0; font-size: 14px; }
+div.sphinxsidebar ul li.toctree-l2 > a,
+div.sphinxsidebar ul li.toctree-l3 > a { font-size: 13px; color: #666; padding: 1px 0; }
+div.sphinxsidebar li.current > a { font-weight: 600; color: #000; }
+div.sphinxsidebar #searchbox { margin: 0 0 8px; }
+div.sphinxsidebar #searchbox input[type="text"] {
+    width: 100%; box-sizing: border-box; font-size: 13px; padding: 4px 6px;
+    border: 1px solid #ccc; border-radius: 3px; font-family: inherit;
+}
+div.sphinxsidebar hr { display: none; }
+
+/* Links: no underline or border on hover, only a darker color. */
+a:hover, a.reference:hover, div.sphinxsidebar a:hover {
+    text-decoration: none; border-bottom: none;
+}
+a:hover { color: #00334d; }
+div.sphinxsidebar a:hover { color: #000; }
+a:hover code, a:hover tt { background: inherit; }
+
+/* The Menu toggle exists for phones only. */
+.nav-toggle, .nav-toggle-label { display: none; }
+
+/* Phones and narrow windows: the sidebar becomes a white header with
+   the project name, search and a Menu that unfolds the page tree. */
+@media screen and (max-width: 875px) {
+    body { padding: 12px 16px; }
+    div.sphinxsidebar {
+        width: auto; margin: 0 0 16px; padding: 0 0 10px;
+        background: #fff; color: #333; border-right: none;
+        border-bottom: 1px solid #e5e5e5;
+    }
+    div.sphinxsidebarwrapper { padding: 0; }
+    div.sphinxsidebar a { color: #333; }
+    div.sphinxsidebar h3, div.sphinxsidebar p.caption { color: #666; }
+    div.sphinxsidebar h1.logo { margin: 0 0 10px; }
+    div.sphinxsidebar #searchbox { display: block; }
+    .nav-toggle-label {
+        display: block; padding: 6px 0; font-size: 14px; font-weight: 600;
+        cursor: pointer; user-select: none;
+    }
+    .nav-toggle-label::after { content: " +"; color: #666; }
+    .nav-toggle:checked + .nav-toggle-label::after { content: " -"; }
+    .nav-toggle:not(:checked) ~ .nav-tree,
+    .nav-toggle:not(:checked) ~ h3,
+    .nav-toggle:not(:checked) ~ ul { display: none; }
+
+    div.body { min-width: 0; }
+    div.body dd { margin-left: 16px; }
+    div.body h1 { font-size: 22px; }
+    div.body h2 { font-size: 18px; }
+    div.body p, div.body li, div.body td, div.body th { font-size: 15px; }
+    /* Wide tables and code scroll sideways instead of widening the page. */
+    table.docutils { display: block; overflow-x: auto; }
+    div.highlight pre, pre { overflow-x: auto; padding: 8px 12px; margin: 12px 0; }
+}

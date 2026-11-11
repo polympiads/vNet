@@ -1,0 +1,7 @@
+{#- The page tree, without a "Navigation" heading. On a phone it folds
+    behind a Menu toggle (a checkbox, so it works without JavaScript). -#}
+<input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true">
+<label for="nav-toggle" class="nav-toggle-label">Menu</label>
+<div class="nav-tree">
+{{ toctree(includehidden=theme_sidebar_includehidden, collapse=theme_sidebar_collapse) }}
+</div>

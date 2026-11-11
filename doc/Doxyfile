@@ -1,0 +1,20 @@
+# Doxygen settings for the C++ API reference. The Sphinx build (conf.py)
+# runs Doxygen with this file and reads the XML through Breathe; no HTML
+# is produced here.
+PROJECT_NAME           = vNet
+INPUT                  = ../include
+FILE_PATTERNS          = *.h *.hpp
+RECURSIVE              = YES
+OUTPUT_DIRECTORY       = _doxygen
+GENERATE_XML           = YES
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+JAVADOC_AUTOBRIEF      = YES
+QUIET                  = YES
+WARNINGS               = NO
+WARN_IF_UNDOCUMENTED   = NO
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = NO

@@ -17,6 +17,7 @@ namespace vnet::blackbox {
      *
      * Two kinds of entries:
      *
+     * @verbatim
      *   IP ASSIGNMENT:
      *     agent_name  ip_address
      *
@@ -46,6 +47,7 @@ namespace vnet::blackbox {
      *   # Game server can reach specific internet hosts
      *   gameserver   ::internet:8.8.8.8
      *   gameserver   ::internet:1.1.1.1
+     * @endverbatim
      */
     class Config {
     public:

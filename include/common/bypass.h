@@ -9,6 +9,7 @@
  * physical network while the agent is joined. Blank lines and lines
  * starting with '#' are ignored. Three kinds of lines:
  *
+ * @verbatim
  *   route a.b.c.d/n
  *     The prefix keeps going through the physical gateway instead of the
  *     TUN, and under lockdown it is allowed in both directions on every
@@ -25,6 +26,7 @@
  *   out6 <ip6tables arguments>
  *   in6  <ip6tables arguments>
  *     The same for IPv6, which lockdown otherwise blocks entirely.
+ * @endverbatim
  */
 struct BypassRule {
     enum Kind { ROUTE, IN, OUT, IN6, OUT6 };
