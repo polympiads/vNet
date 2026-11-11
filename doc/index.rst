@@ -13,3 +13,6 @@ own IP tunnels.
 .. toctree::
    :maxdepth: 10
    :hidden:
+   :caption: For developers
+
+   api/index

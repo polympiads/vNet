@@ -1,0 +1,13 @@
+/* Plain pages: a wide text column, simple headings, tables that fit. */
+div.body { max-width: 900px; }
+div.body h1, div.body h2, div.body h3 { font-weight: 600; }
+div.body h1 { font-size: 200%; }
+div.body h2 { font-size: 150%; border-bottom: 1px solid #ddd; padding-bottom: 0.2em; }
+div.body h3 { font-size: 120%; }
+a.reference { border-bottom: none; }
+table.docutils { width: 100%; }
+table.docutils td, table.docutils th { vertical-align: top; }
+pre { font-size: 0.85em; }
+div.body p, div.body li, div.body td { hyphens: manual; -webkit-hyphens: manual; text-align: left; }
+div.sphinxsidebar a { border-bottom: none; }
+.highlight .w { text-decoration: none; }
